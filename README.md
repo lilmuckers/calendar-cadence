@@ -1,5 +1,7 @@
 # Cadence
 
+<img src="Support/AppIcon.png" width="128" alt="Cadence icon: a panicking calendar page with googly eyes">
+
 Minimal macOS menu-bar calendar monitor.
 
 - **Menu bar** — next meeting countdown; click for today's agenda with calendar colours, metadata, Join buttons, and expandable map + travel time for in-person meetings.
@@ -17,6 +19,7 @@ Needs only Xcode Command Line Tools (macOS 14+). No SwiftPM, no Xcode project.
 scripts/test.sh            # unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
 CONFIG=debug scripts/build.sh
+scripts/icon.sh            # regenerate Support/AppIcon.icns from scripts/make-icon.swift
 ```
 
 The default ad-hoc signature changes every build, so macOS may ask for calendar access again after rebuilding. To avoid that, sign with a stable identity:
