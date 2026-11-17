@@ -22,11 +22,21 @@ struct Preferences: Codable, Equatable {
     var takeoverAllScreens = true
     var takeoverOnlyWithLink = false
     var takeoverSound = true
+    var whilePresenting: BusyAlertStyle = .banner
+    var whileOnCall: BusyAlertStyle = .banner
     var showPanel = true
     var panelHidesWhenIdle = false
     var showMenuBarTitle = true
     var preferNativeApps = true
     var travelMode: TravelMode = .driving
+    var icsFeeds: [ICSFeed] = []
+    var joinHotKey: HotKeySpec? = .defaultJoin
+    var headsUpEnabled = false
+    var headsUpMinutes = 5
+    var leaveEnabled = true
+    /// Minutes before you need to leave; 0 = "time to leave".
+    var leaveOffsets: [Int] = [10, 0]
+    var clashPromptEnabled = true
 
     private static let key = "Cadence.preferences.v1"
 
@@ -54,10 +64,19 @@ extension Preferences {
         takeoverAllScreens = try c.decodeIfPresent(Bool.self, forKey: .takeoverAllScreens) ?? d.takeoverAllScreens
         takeoverOnlyWithLink = try c.decodeIfPresent(Bool.self, forKey: .takeoverOnlyWithLink) ?? d.takeoverOnlyWithLink
         takeoverSound = try c.decodeIfPresent(Bool.self, forKey: .takeoverSound) ?? d.takeoverSound
+        whilePresenting = try c.decodeIfPresent(BusyAlertStyle.self, forKey: .whilePresenting) ?? d.whilePresenting
+        whileOnCall = try c.decodeIfPresent(BusyAlertStyle.self, forKey: .whileOnCall) ?? d.whileOnCall
         showPanel = try c.decodeIfPresent(Bool.self, forKey: .showPanel) ?? d.showPanel
         panelHidesWhenIdle = try c.decodeIfPresent(Bool.self, forKey: .panelHidesWhenIdle) ?? d.panelHidesWhenIdle
         showMenuBarTitle = try c.decodeIfPresent(Bool.self, forKey: .showMenuBarTitle) ?? d.showMenuBarTitle
         preferNativeApps = try c.decodeIfPresent(Bool.self, forKey: .preferNativeApps) ?? d.preferNativeApps
         travelMode = try c.decodeIfPresent(TravelMode.self, forKey: .travelMode) ?? d.travelMode
+        icsFeeds = try c.decodeIfPresent([ICSFeed].self, forKey: .icsFeeds) ?? d.icsFeeds
+        joinHotKey = c.contains(.joinHotKey) ? try c.decodeIfPresent(HotKeySpec.self, forKey: .joinHotKey) : d.joinHotKey
+        headsUpEnabled = try c.decodeIfPresent(Bool.self, forKey: .headsUpEnabled) ?? d.headsUpEnabled
+        headsUpMinutes = try c.decodeIfPresent(Int.self, forKey: .headsUpMinutes) ?? d.headsUpMinutes
+        leaveEnabled = try c.decodeIfPresent(Bool.self, forKey: .leaveEnabled) ?? d.leaveEnabled
+        leaveOffsets = try c.decodeIfPresent([Int].self, forKey: .leaveOffsets) ?? d.leaveOffsets
+        clashPromptEnabled = try c.decodeIfPresent(Bool.self, forKey: .clashPromptEnabled) ?? d.clashPromptEnabled
     }
 }

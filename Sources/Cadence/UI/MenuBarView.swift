@@ -8,16 +8,20 @@ struct MenuBarLabel: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: symbol)
+            Image(nsImage: MenuBarIcon.image(mood))
             if state.prefs.showMenuBarTitle, let text {
                 Text(text).monospacedDigit()
             }
         }
     }
 
-    private var symbol: String {
-        if let next = state.next, next.start.timeIntervalSince(state.now) <= 300 { return "calendar.badge.clock" }
-        return "calendar"
+    /// Gets more anxious as the next meeting approaches.
+    private var mood: MenuBarIcon.Mood {
+        guard let next = state.next else { return .calm }
+        let remaining = next.start.timeIntervalSince(state.now)
+        if remaining <= 300 { return .panicking }
+        if remaining <= 900 { return .nervous }
+        return .calm
     }
 
     private var text: String? {
@@ -93,7 +97,7 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch state.access {
+        switch state.canShowAgenda ? .granted : state.access {
         case .denied:
             EmptyState(
                 symbol: "lock.shield",
@@ -109,20 +113,29 @@ struct MenuBarView: View {
             if state.todayMeetings.isEmpty {
                 EmptyState(symbol: "sun.max", title: "Nothing today", message: tomorrowHint, actionTitle: nil, action: {})
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 4) {
-                        ForEach(state.todayMeetings) { meeting in
-                            EventRow(meeting: meeting, expanded: expanded == meeting.id) {
-                                withAnimation(Theme.spring) { expanded = expanded == meeting.id ? nil : meeting.id }
-                            }
-                        }
-                    }
-                    .padding(10)
+                if Self.screenshotMode {
+                    // ImageRenderer can't draw ScrollView contents.
+                    agenda
+                } else {
+                    ScrollView { agenda }
+                        .frame(maxHeight: 520)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxHeight: 520)
-                .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    static var screenshotMode = false
+
+    private var agenda: some View {
+        LazyVStack(spacing: 4) {
+            ForEach(state.todayMeetings) { meeting in
+                EventRow(meeting: meeting, expanded: expanded == meeting.id) {
+                    withAnimation(Theme.spring) { expanded = expanded == meeting.id ? nil : meeting.id }
+                }
+            }
+        }
+        .padding(10)
     }
 
     private var tomorrowHint: String {
@@ -134,13 +147,22 @@ struct MenuBarView: View {
 
     private var footer: some View {
         HStack(spacing: 2) {
-            Toggle(isOn: Binding(get: { state.prefs.showPanel }, set: { state.prefs.showPanel = $0 })) {
-                Text("Countdown panel").font(.system(size: 12))
+            if Self.screenshotMode {
+                // ImageRenderer can't draw AppKit-backed switches; fake one for README images.
+                HStack(spacing: 8) {
+                    Text("Countdown panel").font(.system(size: 12))
+                    Capsule().fill(Color.accentColor).frame(width: 26, height: 15)
+                        .overlay(alignment: .trailing) { Circle().fill(.white).padding(2) }
+                }
+            } else {
+                Toggle(isOn: Binding(get: { state.prefs.showPanel }, set: { state.prefs.showPanel = $0 })) {
+                    Text("Countdown panel").font(.system(size: 12))
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
             }
-            .toggleStyle(.switch)
-            .controlSize(.mini)
             Spacer()
-            IconButton(symbol: "arrow.clockwise", help: "Refresh") { state.refresh() }
+            IconButton(symbol: "arrow.clockwise", help: "Refresh") { Task { await state.refreshRemote() } }
             IconButton(symbol: "gearshape", help: "Settings") {
                 NSApp.activate(ignoringOtherApps: true)
                 openSettings()

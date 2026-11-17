@@ -46,7 +46,7 @@ final class CountdownPanelController: NSObject, NSWindowDelegate {
 
     /// Show or hide based on preferences and whether anything is coming up.
     func update() {
-        let hasContent = state.access == .granted && (state.isNextToday || !state.current.isEmpty)
+        let hasContent = state.canShowAgenda && (state.isNextToday || !state.current.isEmpty)
         let visible = state.prefs.showPanel && (hasContent || !state.prefs.panelHidesWhenIdle)
         if visible && !panel.isVisible {
             panel.alphaValue = 0
@@ -195,7 +195,8 @@ struct CountdownPanelView: View {
             JoinButton(meeting: m, size: .small)
         }
         .padding(.horizontal, 16)
-        .background(alignment: .leading) {
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
             LinearGradient(colors: [m.tint.opacity(urgent ? 0.28 : 0.14), .clear], startPoint: .leading, endPoint: .trailing)
         }
     }

@@ -37,6 +37,7 @@ final class TakeoverController {
     private var screenObserver: NSObjectProtocol?
     private var dismissObserver: NSObjectProtocol?
     private var current: Meeting?
+    private var currentDisplays: [UInt32] = []
 
     init(state: AppState) {
         self.state = state
@@ -48,17 +49,20 @@ final class TakeoverController {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, let m = self.current else { return }
-                self.present(m)
+                let remaining = self.currentDisplays.filter { SystemContext.screen(for: $0) != nil }
+                if remaining.isEmpty { self.dismiss() } else { self.present(m, displays: remaining) }
             }
         }
     }
 
     var isPresented: Bool { !windows.isEmpty }
 
-    func present(_ meeting: Meeting) {
+    /// Cover the given displays (by CGDirectDisplayID). The first one gets the keyboard hints.
+    func present(_ meeting: Meeting, displays: [UInt32]) {
         closeWindows()
         current = meeting
-        let screens = state.prefs.takeoverAllScreens ? NSScreen.screens : [NSScreen.main].compactMap { $0 }
+        currentDisplays = displays
+        let screens = displays.compactMap(SystemContext.screen(for:))
         for (index, screen) in screens.enumerated() {
             let window = TakeoverWindow(screen: screen)
             let view = TakeoverView(meeting: meeting, isPrimary: index == 0, actions: .init(

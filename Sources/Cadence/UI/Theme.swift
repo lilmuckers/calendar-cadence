@@ -26,8 +26,26 @@ enum Theme {
     }
 }
 
+/// Glass background. Uses real behind-window blur, or a flat tint when rendering screenshots
+/// (offscreen renders can't capture window-server blur).
+struct VisualEffect: View {
+    var material: NSVisualEffectView.Material = .hudWindow
+    var blending: NSVisualEffectView.BlendingMode = .behindWindow
+
+    /// Set by the screenshot renderer.
+    static var screenshotFill: Color?
+
+    var body: some View {
+        if let fill = Self.screenshotFill {
+            fill
+        } else {
+            VisualEffectView(material: material, blending: blending)
+        }
+    }
+}
+
 /// NSVisualEffectView bridge: real behind-window blur, which SwiftUI materials can't do for a whole window.
-struct VisualEffect: NSViewRepresentable {
+struct VisualEffectView: NSViewRepresentable {
     var material: NSVisualEffectView.Material = .hudWindow
     var blending: NSVisualEffectView.BlendingMode = .behindWindow
 

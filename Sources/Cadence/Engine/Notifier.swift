@@ -1,0 +1,76 @@
+import CadenceCore
+import UserNotifications
+
+/// macOS notification fallback. By default macOS hides notifications while the screen is shared
+/// or mirrored, which is exactly what we want when every display is being presented.
+@MainActor
+final class Notifier: NSObject, UNUserNotificationCenterDelegate {
+    private static let category = "cadence.meeting"
+    private static let joinAction = "cadence.join"
+
+    private let center = UNUserNotificationCenter.current()
+    private let state: AppState
+
+    init(state: AppState) {
+        self.state = state
+        super.init()
+        center.delegate = self
+        let join = UNNotificationAction(identifier: Self.joinAction, title: "Join", options: [.foreground])
+        center.setNotificationCategories([
+            UNNotificationCategory(identifier: Self.category, actions: [join], intentIdentifiers: []),
+        ])
+    }
+
+    func notify(_ meeting: Meeting) {
+        Task {
+            guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return }
+            let content = UNMutableNotificationContent()
+            content.title = meeting.title
+            let secs = max(0, Int(meeting.start.timeIntervalSinceNow.rounded()))
+            content.body = secs > 0
+                ? "Starts in \(CountdownFormatter.short(TimeInterval(secs))) · \(meeting.calendar.title)"
+                : "Starting now · \(meeting.calendar.title)"
+            if state.prefs.takeoverSound { content.sound = .default }
+            content.interruptionLevel = .timeSensitive
+            content.userInfo = ["meetingID": meeting.id]
+            if meeting.joinLink != nil { content.categoryIdentifier = Self.category }
+            try? await center.add(UNNotificationRequest(identifier: meeting.id, content: content, trigger: nil))
+        }
+    }
+
+    func notify(_ reminder: Reminder) {
+        let message = ReminderPlanner.message(for: reminder)
+        Task {
+            guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return }
+            let content = UNMutableNotificationContent()
+            content.title = message.title
+            content.body = message.body
+            content.sound = .default
+            content.interruptionLevel = .timeSensitive
+            content.userInfo = ["meetingID": reminder.meeting.id]
+            if reminder.meeting.joinLink != nil { content.categoryIdentifier = Self.category }
+            try? await center.add(UNNotificationRequest(identifier: reminder.key, content: content, trigger: nil))
+        }
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let id = response.notification.request.content.userInfo["meetingID"] as? String
+        let action = response.actionIdentifier
+        await MainActor.run {
+            guard let id, let meeting = state.allMeetings.first(where: { $0.id == id }) else { return }
+            if action == Self.joinAction || (action == UNNotificationDefaultActionIdentifier && meeting.joinLink != nil) {
+                state.join(meeting)
+            }
+        }
+    }
+}

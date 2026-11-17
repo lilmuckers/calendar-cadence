@@ -45,6 +45,12 @@ struct EventRow: View {
                             .font(.system(size: 13, weight: .semibold))
                             .lineLimit(expanded ? 3 : 1)
                         if isLive { LiveBadge(color: meeting.tint) }
+                        if state.clashes.contains(where: { $0.meetings.contains { $0.id == meeting.id } }) {
+                            Image(systemName: state.suppressedByClash.contains(meeting.id) ? "bell.slash.fill" : "exclamationmark.triangle.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.orange)
+                                .help(state.suppressedByClash.contains(meeting.id) ? "Clash — you chose not to be alerted for this one" : "Overlaps another meeting")
+                        }
                         if meeting.participation == .tentative || meeting.participation == .pending {
                             Image(systemName: "questionmark.circle")
                                 .font(.system(size: 11))
@@ -73,11 +79,14 @@ struct EventRow: View {
             .onTapGesture { if canExpand { toggle() } }
 
             if isLive {
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-                    .tint(meeting.tint)
-                    .controlSize(.mini)
-                    .padding(.horizontal, 10)
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(meeting.tint.opacity(0.18))
+                        Capsule().fill(meeting.tint.gradient).frame(width: max(4, geo.size.width * progress))
+                    }
+                }
+                .frame(height: 3)
+                .padding(.horizontal, 10)
                     .padding(.bottom, 6)
             }
 

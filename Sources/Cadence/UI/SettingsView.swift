@@ -5,12 +5,13 @@ import SwiftUI
 struct SettingsView: View {
     var body: some View {
         TabView {
+            AccountsTab().tabItem { Label("Accounts", systemImage: "person.crop.circle") }
             CalendarsTab().tabItem { Label("Calendars", systemImage: "calendar") }
             FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }
             AlertsTab().tabItem { Label("Alerts", systemImage: "bell.badge") }
             GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
         }
-        .frame(width: 520, height: 460)
+        .frame(width: 580, height: 520)
     }
 }
 
@@ -32,7 +33,7 @@ private struct CalendarsTab: View {
                 }
             }
             Section {
-                Text("Cadence reads every account in macOS Calendar. Add Google, Exchange/Outlook, iCloud or CalDAV accounts in System Settings → Internet Accounts.")
+                Text("Switch individual calendars on or off. Add sources in the Accounts tab.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -134,13 +135,59 @@ private struct AlertsTab: View {
                 Toggle("Play sound", isOn: $state.prefs.takeoverSound)
             }
             Section {
-                Button("Preview Alert") { state.previewAlert() }
+                Picker("While presenting or sharing", selection: $state.prefs.whilePresenting) {
+                    ForEach(BusyAlertStyle.allCases, id: \.self) { Text($0.label).tag($0) }
+                }
+                Picker("While on a call", selection: $state.prefs.whileOnCall) {
+                    ForEach(BusyAlertStyle.allCases, id: \.self) { Text($0.label).tag($0) }
+                }
+                LabeledContent("Right now") {
+                    Text(status).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
+                }
+            } header: {
+                Text("When you're busy")
             } footer: {
-                Text("Esc dismisses · Return joins · Snooze re-alerts after a minute.").foregroundStyle(.secondary)
+                Text("Presenting means a Keynote/PowerPoint slideshow, or the border Zoom and Teams draw around a shared screen. Displays being presented are never covered. On a call means an app is using the microphone.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                Toggle("Heads-up notification", isOn: $state.prefs.headsUpEnabled)
+                Stepper(value: $state.prefs.headsUpMinutes, in: 1...60) {
+                    Text("\(state.prefs.headsUpMinutes) min before")
+                }
+                .disabled(!state.prefs.headsUpEnabled)
+                Toggle("\"Leave now\" for in-person meetings", isOn: $state.prefs.leaveEnabled)
+                OffsetsField(offsets: $state.prefs.leaveOffsets)
+                    .disabled(!state.prefs.leaveEnabled)
+                Toggle("Ask which meeting to alert for when two clash", isOn: $state.prefs.clashPromptEnabled)
+            } header: {
+                Text("Reminders")
+            } footer: {
+                Text("Leave reminders use live travel time (Settings → General → Travel time by) and re-check traffic every 15 minutes. Offsets are minutes before you need to leave; 0 means \"time to leave\".")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                HStack {
+                    Button("Preview Alert") { state.previewAlert() }
+                    Button("Preview Banner") { state.previewAlert(style: .banner) }
+                    Button("Preview Notification") { state.previewAlert(style: .notification) }
+                }
+            } footer: {
+                Text("Preview Alert behaves exactly as a real alert would right now. Esc dismisses · Return joins · Snooze re-alerts after a minute.")
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
+        .task {
+            // Live diagnostic so you can check detection while presenting or on a call.
+            while !Task.isCancelled {
+                status = SystemContext.describe(SystemContext.current())
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
     }
+
+    @State private var status = "Checking…"
 }
 
 private struct GeneralTab: View {
@@ -159,6 +206,9 @@ private struct GeneralTab: View {
                 Toggle("Show next meeting title and countdown", isOn: $state.prefs.showMenuBarTitle)
             }
             Section("Meetings") {
+                LabeledContent("Join next meeting") {
+                    ShortcutRecorder(spec: $state.prefs.joinHotKey)
+                }
                 Toggle("Open Zoom and Teams in their apps when installed", isOn: $state.prefs.preferNativeApps)
                 Picker("Travel time by", selection: $state.prefs.travelMode) {
                     ForEach(TravelMode.allCases) { Label($0.label, systemImage: $0.symbol).tag($0) }
@@ -183,5 +233,21 @@ private struct GeneralTab: View {
             loginError = "Couldn't update login item: \(error.localizedDescription). Move Cadence to /Applications and try again."
             launchAtLogin = SMAppService.mainApp.status == .enabled
         }
+    }
+}
+
+/// Comma-separated minute offsets, e.g. "15, 5, 0".
+private struct OffsetsField: View {
+    @Binding var offsets: [Int]
+    @State private var text = ""
+
+    var body: some View {
+        TextField("Remind me", text: $text, prompt: Text("10, 0"))
+            .onAppear { text = offsets.map(String.init).joined(separator: ", ") }
+            .onChange(of: text) {
+                let parsed = text.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+                    .filter { (0...240).contains($0) }
+                offsets = Array(Set(parsed)).sorted(by: >)
+            }
     }
 }
