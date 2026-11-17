@@ -37,6 +37,17 @@ struct Preferences: Codable, Equatable {
     /// Minutes before you need to leave; 0 = "time to leave".
     var leaveOffsets: [Int] = [10, 0]
     var clashPromptEnabled = true
+    var panelStyle: PanelStyle = .standard
+    /// Use colours set on individual events (Google, ICS) instead of the calendar colour.
+    var useEventColors = true
+    /// Step up to a bigger style 15 and 5 minutes before the meeting.
+    var panelGrow = false
+    /// 0 = always show the next meeting; otherwise only when one starts within this many minutes.
+    var panelWithinMinutes = 0
+    var panelShowDuringMeetings = true
+    /// Single occurrences (Meeting.id) and whole series (Meeting.seriesID) kept off the panel.
+    var panelHiddenMeetings: Set<String> = []
+    var panelHiddenSeries: Set<String> = []
 
     private static let key = "Cadence.preferences.v1"
 
@@ -78,5 +89,12 @@ extension Preferences {
         leaveEnabled = try c.decodeIfPresent(Bool.self, forKey: .leaveEnabled) ?? d.leaveEnabled
         leaveOffsets = try c.decodeIfPresent([Int].self, forKey: .leaveOffsets) ?? d.leaveOffsets
         clashPromptEnabled = try c.decodeIfPresent(Bool.self, forKey: .clashPromptEnabled) ?? d.clashPromptEnabled
+        useEventColors = try c.decodeIfPresent(Bool.self, forKey: .useEventColors) ?? d.useEventColors
+        panelStyle = (try? c.decodeIfPresent(PanelStyle.self, forKey: .panelStyle)) ?? d.panelStyle
+        panelGrow = try c.decodeIfPresent(Bool.self, forKey: .panelGrow) ?? d.panelGrow
+        panelWithinMinutes = try c.decodeIfPresent(Int.self, forKey: .panelWithinMinutes) ?? d.panelWithinMinutes
+        panelShowDuringMeetings = try c.decodeIfPresent(Bool.self, forKey: .panelShowDuringMeetings) ?? d.panelShowDuringMeetings
+        panelHiddenMeetings = try c.decodeIfPresent(Set<String>.self, forKey: .panelHiddenMeetings) ?? d.panelHiddenMeetings
+        panelHiddenSeries = try c.decodeIfPresent(Set<String>.self, forKey: .panelHiddenSeries) ?? d.panelHiddenSeries
     }
 }

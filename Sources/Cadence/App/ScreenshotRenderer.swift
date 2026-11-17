@@ -20,6 +20,11 @@ enum ScreenshotRenderer {
         state.loadDemo(demo.meetings, calendars: demo.calendars, now: at(10, 52, 41))
         render(MenuBarView(), state: state, name: "menu", to: dir, size: CGSize(width: 380, height: 640), wallpaper: true, pad: 28)
         render(CountdownPanelView(), state: state, name: "panel", to: dir, size: CGSize(width: 300, height: 92), wallpaper: true, pad: 28)
+        for style in [PanelStyle.compact, .mini] {
+            state.prefs.panelStyle = style
+            render(CountdownPanelView(), state: state, name: "panel-\(style.rawValue)", to: dir, size: style.size, wallpaper: true, pad: 20)
+        }
+        state.prefs.panelStyle = .standard
         render(FakeMenuBar(state: state), state: state, name: "menubar", to: dir, size: CGSize(width: 560, height: 30), wallpaper: false, pad: 0)
 
         // 23 seconds before Design Review.

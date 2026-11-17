@@ -66,8 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = state.canShowAgenda
             _ = state.prefs.showPanel
             _ = state.prefs.panelHidesWhenIdle
-            _ = state.isNextToday
-            _ = state.current.isEmpty
+            _ = state.prefs.panelWithinMinutes
+            _ = state.panelFocus == nil
+            _ = state.panelStyle
         } onChange: { [weak self] in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {

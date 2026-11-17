@@ -61,6 +61,7 @@ public struct GoogleEvent: Decodable, Sendable {
     public var organizer: Person?
     public var conferenceData: Conference?
     public var eventType: String?
+    public var colorId: String?
 }
 
 public enum GoogleMapper {
@@ -69,6 +70,26 @@ public enum GoogleMapper {
         s.removeFirst()
         guard let v = UInt32(s, radix: 16) else { return .gray }
         return RGBAColor(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
+    }
+
+    /// Google's fixed event palette (colorId 1–11), as Google Calendar's web UI draws it.
+    /// The API's /colors endpoint returns an older, paler set for the same ids.
+    public static let eventColors: [String: String] = [
+        "1": "#7986cb",  // Lavender
+        "2": "#33b679",  // Sage
+        "3": "#8e24aa",  // Grape
+        "4": "#e67c73",  // Flamingo
+        "5": "#f6bf26",  // Banana
+        "6": "#f4511e",  // Tangerine
+        "7": "#039be5",  // Peacock
+        "8": "#616161",  // Graphite
+        "9": "#3f51b5",  // Blueberry
+        "10": "#0b8043", // Basil
+        "11": "#d50000", // Tomato
+    ]
+
+    public static func eventColor(id: String?) -> RGBAColor? {
+        id.flatMap { eventColors[$0] }.map { color(hex: $0) }
     }
 
     static func parse(_ t: GoogleEvent.Time?) -> (date: Date, allDay: Bool)? {
@@ -125,7 +146,8 @@ public enum GoogleMapper {
             attendeeCount: e.attendees?.count ?? 0,
             participation: participation,
             availability: e.transparency == "transparent" ? .free : (participation == .tentative ? .tentative : .busy),
-            joinLink: link
+            joinLink: link,
+            eventColor: eventColor(id: e.colorId)
         )
     }
 }

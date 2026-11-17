@@ -42,6 +42,7 @@ public enum MeetingDeduplicator {
         if m.joinLink == nil { m.joinLink = other.joinLink }
         if m.location == nil { m.location = other.location }
         if m.notes == nil { m.notes = other.notes }
+        if m.eventColor == nil { m.eventColor = other.eventColor }
         if m.participation == .unknown { m.participation = other.participation }
         m.attendeeCount = max(m.attendeeCount, other.attendeeCount)
         return m

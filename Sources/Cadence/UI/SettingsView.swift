@@ -36,6 +36,10 @@ private struct CalendarsTab: View {
                 Text("Switch individual calendars on or off. Add sources in the Accounts tab.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                Toggle(isOn: Binding(get: { state.prefs.useEventColors }, set: { state.prefs.useEventColors = $0 })) {
+                    Text("Use event colours")
+                    Text("Events coloured individually in Google Calendar (or with a colour in an ICS feed) use that colour instead of their calendar's. Google event colours need the direct Google sign-in; macOS Calendar doesn't pass them on.")
+                }
             }
             ForEach(grouped, id: \.0) { source, calendars in
                 Section(source) {
@@ -200,7 +204,36 @@ private struct GeneralTab: View {
         Form {
             Section("Countdown panel") {
                 Toggle("Show floating countdown", isOn: $state.prefs.showPanel)
+                Picker("Style", selection: $state.prefs.panelStyle) {
+                    Text("Standard").tag(PanelStyle.standard)
+                    Text("Compact").tag(PanelStyle.compact)
+                    Text("Mini").tag(PanelStyle.mini)
+                }
+                Toggle(isOn: $state.prefs.panelGrow) {
+                    Text("Grow as meetings approach")
+                    Text("One size up 15 minutes before, full size at 5 minutes.")
+                }
+                .disabled(state.prefs.panelStyle == .standard)
+                Picker("Only show when a meeting starts within", selection: $state.prefs.panelWithinMinutes) {
+                    Text("Always show").tag(0)
+                    ForEach([5, 10, 15, 30, 60], id: \.self) { Text($0 == 60 ? "1 hour" : "\($0) minutes").tag($0) }
+                }
+                Toggle("Also show during meetings", isOn: $state.prefs.panelShowDuringMeetings)
                 Toggle("Hide when nothing else is on today", isOn: $state.prefs.panelHidesWhenIdle)
+                    .disabled(state.prefs.panelWithinMinutes > 0)
+                let hidden = state.prefs.panelHiddenMeetings.count + state.prefs.panelHiddenSeries.count
+                LabeledContent("Hidden events") {
+                    HStack {
+                        Text(hidden == 0 ? "None — right-click an event to hide it" : "\(hidden)")
+                            .foregroundStyle(.secondary)
+                        if hidden > 0 {
+                            Button("Show All") {
+                                state.prefs.panelHiddenMeetings = []
+                                state.prefs.panelHiddenSeries = []
+                            }
+                        }
+                    }
+                }
             }
             Section("Menu bar") {
                 Toggle("Show next meeting title and countdown", isOn: $state.prefs.showMenuBarTitle)

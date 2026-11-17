@@ -14,7 +14,7 @@ finds the join link wherever it's hiding, and — 30 seconds before you're due �
 <img alt="Swift" src="https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white">
 <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-0A84FF?style=flat-square">
 <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-0-34C759?style=flat-square">
-<img alt="Tests" src="https://img.shields.io/badge/tests-54%20passing-34C759?style=flat-square">
+<img alt="Tests" src="https://img.shields.io/badge/tests-63%20passing-34C759?style=flat-square">
 </p>
 
 <img src="docs/screenshots/menubar.png" width="560" alt="Menu bar showing Cadence: 8m · Design Review">
@@ -39,6 +39,10 @@ Expand an in-person meeting for a **map**, **live travel time** and a "leave in 
 <img src="docs/screenshots/panel.jpg" width="100%" alt="Floating countdown panel: Up next, Design Review in 7:19">
 
 A glass pill that sits above everything, on every Space. Drag it anywhere — it snaps to edges.
+
+<p><img src="docs/screenshots/panel-compact.jpg" width="62%" alt="Compact panel: Design Review at 11:00, 7:19, Join"> <img src="docs/screenshots/panel-mini.jpg" width="31%" alt="Mini panel: 7:19 and a Join button"></p>
+
+Pick **Standard**, **Compact** or an ultra-small **Mini**, and let it **grow** as the meeting gets close (one size up at 15 minutes, full size at 5). Show it only when something starts within *N* minutes, and right-click any event to keep it — or every occurrence of it — off the panel.
 
 </td>
 </tr>
@@ -80,6 +84,7 @@ The moment Cadence spots two meetings that overlap — real clashes, not the sam
 - **⌨️ Global join shortcut.** <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>J</kbd> (re-bindable) joins whatever's starting in the next 10 minutes — or the meeting you're already late for.
 - **🚗 "Leave now" reminders.** For in-person meetings, Cadence watches live traffic and pings you at configurable offsets before you need to leave (default: 10 minutes before, and "time to leave").
 - **🔔 Heads-up notifications.** Optional nudge N minutes before each meeting (default 5).
+- **🎨 Event colours.** Colour an event in Google Calendar (or give it a `COLOR` in an ICS feed) and Cadence uses that colour instead of the calendar's. Toggle in *Settings → Calendars*.
 - **🧹 Filters.** Toggle calendars; hide all-day, declined, tentative, free or link-less events; include/exclude by title keyword; minimum duration.
 - **😰 A menu bar icon with feelings.** Calm, nervous at 15 minutes, sweating at 5.
 
@@ -124,7 +129,7 @@ Cadence uses the loopback redirect + PKCE flow and asks only for `calendar.reado
 No Xcode project, no SwiftPM, no dependencies — just the Xcode Command Line Tools on macOS 14+.
 
 ```bash
-scripts/test.sh            # 54 unit tests (Swift Testing)
+scripts/test.sh            # 63 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
 ```
 
@@ -171,7 +176,8 @@ Sources/
 │   ├── FilterSettings        user filters
 │   ├── AlertPlanner          when the takeover fires (snooze, late wake)
 │   ├── AlertPolicy           presenting/call detection → how to alert
-│   └── Reminders             heads-up, leave-now, clash detection
+│   ├── Reminders             heads-up, leave-now, clash detection
+│   └── PanelPlanner          what the countdown panel shows, and how big
 └── Cadence/              The app
     ├── Sources/              EventKit, ICS and Google providers, OAuth, Keychain
     ├── Engine/               system context, alert routing, travel, hotkey, notifications

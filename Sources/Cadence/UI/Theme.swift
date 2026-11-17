@@ -9,7 +9,7 @@ extension Color {
 }
 
 extension Meeting {
-    var tint: Color { Color(calendar.color) }
+    var tint: Color { Color(displayColor) }
 }
 
 enum Theme {

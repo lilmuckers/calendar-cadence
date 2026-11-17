@@ -15,6 +15,28 @@ public struct RGBAColor: Codable, Hashable, Sendable {
     }
 
     public static let gray = RGBAColor(red: 0.55, green: 0.55, blue: 0.58)
+
+    /// "#RGB", "#RRGGBB" (with or without "#"), or a common CSS colour name, as used by the
+    /// iCalendar COLOR property (RFC 7986).
+    public init?(css raw: String) {
+        let s = raw.trimmingCharacters(in: .whitespaces).lowercased()
+        if let named = Self.cssNames[s] { self.init(css: named); return }
+        var hex = s.hasPrefix("#") ? String(s.dropFirst()) : s
+        if hex.count == 3 { hex = hex.map { "\($0)\($0)" }.joined() }
+        guard hex.count == 6, let v = UInt32(hex, radix: 16) else { return nil }
+        self.init(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
+    }
+
+    private static let cssNames: [String: String] = [
+        "red": "ff0000", "crimson": "dc143c", "tomato": "ff6347", "coral": "ff7f50", "orange": "ffa500",
+        "darkorange": "ff8c00", "gold": "ffd700", "yellow": "ffff00", "khaki": "f0e68c", "green": "008000",
+        "lime": "00ff00", "limegreen": "32cd32", "seagreen": "2e8b57", "olive": "808000", "teal": "008080",
+        "turquoise": "40e0d0", "cyan": "00ffff", "aqua": "00ffff", "skyblue": "87ceeb", "lightblue": "add8e6",
+        "dodgerblue": "1e90ff", "royalblue": "4169e1", "blue": "0000ff", "navy": "000080", "indigo": "4b0082",
+        "purple": "800080", "violet": "ee82ee", "orchid": "da70d6", "magenta": "ff00ff", "fuchsia": "ff00ff",
+        "pink": "ffc0cb", "hotpink": "ff69b4", "brown": "a52a2a", "chocolate": "d2691e", "sienna": "a0522d",
+        "gray": "808080", "grey": "808080", "silver": "c0c0c0", "black": "000000", "white": "ffffff",
+    ]
 }
 
 /// The current user's response to an invite.
@@ -60,6 +82,8 @@ public struct Meeting: Identifiable, Hashable, Sendable {
     public var participation: Participation
     public var availability: Availability
     public var joinLink: MeetingLink?
+    /// A colour set on this event itself (Google's per-event colour, ICS COLOR), overriding the calendar's.
+    public var eventColor: RGBAColor?
 
     public init(
         id: String,
@@ -76,7 +100,8 @@ public struct Meeting: Identifiable, Hashable, Sendable {
         attendeeCount: Int = 0,
         participation: Participation = .unknown,
         availability: Availability = .busy,
-        joinLink: MeetingLink? = nil
+        joinLink: MeetingLink? = nil,
+        eventColor: RGBAColor? = nil
     ) {
         self.id = id
         self.title = title
@@ -93,7 +118,11 @@ public struct Meeting: Identifiable, Hashable, Sendable {
         self.participation = participation
         self.availability = availability
         self.joinLink = joinLink
+        self.eventColor = eventColor
     }
+
+    /// The event's own colour if it has one, else its calendar's.
+    public var displayColor: RGBAColor { eventColor ?? calendar.color }
 
     public var duration: TimeInterval { end.timeIntervalSince(start) }
 

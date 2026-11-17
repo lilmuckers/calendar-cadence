@@ -75,6 +75,13 @@ struct ICSParserTests {
         #expect(meetings.first { $0.title.hasPrefix("Long") }?.isCanceled == true)
     }
 
+    @Test func colorProperty() {
+        let ics = "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:c1\nSUMMARY:Gym\nCOLOR:turquoise\nDTSTART:20261117T070000Z\nDTEND:20261117T080000Z\nEND:VEVENT\nEND:VCALENDAR"
+        #expect(ICSParser.parse(ics).first?.color == RGBAColor(css: "#40e0d0"))
+        #expect(RGBAColor(css: "#fc0") == RGBAColor(css: "ffcc00"))
+        #expect(RGBAColor(css: "nonsense") == nil)
+    }
+
     @Test func windowsTimeZoneAndDuration() {
         #expect(ICSParser.timeZone(for: "Pacific Standard Time")?.identifier == "America/Los_Angeles")
         #expect(ICSParser.timeZone(for: "\"Europe/Paris\"")?.identifier == "Europe/Paris")
@@ -172,6 +179,21 @@ struct GoogleMapperTests {
         #expect(m.organizer == "Boss")
         #expect(m.duration == 1800)
         #expect(abs(gcal.color.blue - 252.0 / 255) < 0.001)
+        #expect(m.eventColor == nil)
+        #expect(m.displayColor == gcal.color)
+    }
+
+    @Test func eventColorOverridesCalendar() throws {
+        let json = #"""
+        {"id":"e2","colorId":"5","summary":"Lunch",
+         "start":{"dateTime":"2026-11-17T12:00:00Z"},"end":{"dateTime":"2026-11-17T13:00:00Z"}}
+        """#
+        let event = try JSONDecoder().decode(GoogleEvent.self, from: Data(json.utf8))
+        let gcal = CalendarInfo(id: "c", title: "C", sourceTitle: "Google", color: GoogleMapper.color(hex: "#9fc6e7"))
+        let m = try #require(GoogleMapper.meeting(event, calendar: gcal))
+        #expect(m.eventColor == GoogleMapper.color(hex: "#f6bf26"))
+        #expect(m.displayColor == m.eventColor)
+        #expect(GoogleMapper.eventColor(id: "99") == nil)
     }
 }
 
@@ -187,6 +209,14 @@ struct DedupTests {
         let out = MeetingDeduplicator.dedupe([m("1", "Weekly  Sync"), m("2", "Fwd: weekly sync", link: true, cal: "b"), m("3", "Other")])
         #expect(out.count == 2)
         #expect(out[0].joinLink != nil)
+    }
+
+    @Test func mergeKeepsEventColor() {
+        var colored = m("1", "Sync", cal: "google")
+        colored.eventColor = RGBAColor(red: 1, green: 0.8, blue: 0)
+        let out = MeetingDeduplicator.dedupe([m("2", "Sync", link: true), colored])
+        #expect(out.count == 1)
+        #expect(out[0].eventColor == colored.eventColor)
     }
 
     @Test func differentTitlesSameLinkAreSame() {

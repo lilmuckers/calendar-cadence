@@ -19,6 +19,8 @@ public struct ICSEvent: Equatable, Sendable {
     public var exdates: [Date]
     /// Set on an override of one occurrence of a recurring event.
     public var recurrenceID: Date?
+    /// RFC 7986 COLOR.
+    public var color: RGBAColor? = nil
 }
 
 /// Subset of RFC 5545 RRULE that real-world calendars use.
@@ -211,7 +213,8 @@ public enum ICSParser {
             attendeeCount: e.attendeeCount,
             participation: .unknown,
             availability: e.transparent ? .free : (e.status?.uppercased() == "TENTATIVE" ? .tentative : .busy),
-            joinLink: MeetingLinkDetector.detect(url: e.url, location: e.location, notes: e.description)
+            joinLink: MeetingLinkDetector.detect(url: e.url, location: e.location, notes: e.description),
+            eventColor: e.color
         )
     }
 
@@ -370,7 +373,8 @@ public enum ICSParser {
             attendeeCount: props.filter { $0.name == "ATTENDEE" }.count,
             rrule: prop("RRULE").flatMap { RecurrenceRule($0.value, timeZone: start.tz) },
             exdates: exdates,
-            recurrenceID: date("RECURRENCE-ID")?.date
+            recurrenceID: date("RECURRENCE-ID")?.date,
+            color: text("COLOR").flatMap { RGBAColor(css: $0) }
         )
     }
 

@@ -13,7 +13,7 @@ final class AppState {
             guard prefs != oldValue else { return }
             if persistPrefs { prefs.save() }
             if prefs.icsFeeds != oldValue.icsFeeds { syncFeeds(fetch: true) }
-            if prefs.filters != oldValue.filters { recompute() }
+            if prefs.filters != oldValue.filters || prefs.useEventColors != oldValue.useEventColors { recompute() }
             onPrefsChanged?()
         }
     }
@@ -115,7 +115,7 @@ final class AppState {
     }
 
     private func recompute() {
-        meetings = MeetingDeduplicator.dedupe(allMeetings.filter { prefs.filters.allows($0) })
+        meetings = visibleMeetings()
         clashes = ClashDetector.clashes(in: meetings, after: Date())
         let live = Set(clashes.map(\.key))
         clashChoices = clashChoices.filter { live.contains($0.key) }
@@ -125,6 +125,12 @@ final class AppState {
             promptedClashes.insert(fresh.key)
             onClash?(fresh)
         }
+    }
+
+    private func visibleMeetings() -> [Meeting] {
+        var shown = allMeetings.filter { prefs.filters.allows($0) }
+        if !prefs.useEventColors { shown = shown.map { var m = $0; m.eventColor = nil; return m } }
+        return MeetingDeduplicator.dedupe(shown)
     }
 
     func resolveClash(_ clash: Clash, choice: String?) {
@@ -144,7 +150,7 @@ final class AppState {
         self.calendars = calendars
         access = .granted
         allMeetings = demo.sorted { $0.start < $1.start }
-        meetings = MeetingDeduplicator.dedupe(allMeetings.filter { prefs.filters.allows($0) })
+        meetings = visibleMeetings()
         clashes = ClashDetector.clashes(in: meetings, after: now)
     }
 
@@ -359,6 +365,35 @@ final class AppState {
         } else if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") {
             NSWorkspace.shared.openApplication(at: app, configuration: .init())
         }
+    }
+
+    // MARK: - Countdown panel
+
+    /// What the floating panel shows, after hidden events and the "only within" window.
+    var panelFocus: PanelFocus? {
+        PanelPlanner.focus(meetings: meetings, now: now, isHidden: isHiddenFromPanel,
+                           withinMinutes: prefs.panelWithinMinutes, showDuringMeetings: prefs.panelShowDuringMeetings)
+    }
+
+    /// The style to draw now (grows as the meeting approaches when enabled).
+    var panelStyle: PanelStyle {
+        PanelPlanner.style(base: prefs.panelStyle, grow: prefs.panelGrow, focus: panelFocus, now: now)
+    }
+
+    func isHiddenFromPanel(_ m: Meeting) -> Bool {
+        prefs.panelHiddenMeetings.contains(m.id) || prefs.panelHiddenSeries.contains(m.seriesID)
+    }
+
+    /// Whether `m` repeats (so "all occurrences" makes sense).
+    func isRecurring(_ m: Meeting) -> Bool { m.seriesID != m.id }
+
+    func hideFromPanel(_ m: Meeting, series: Bool) {
+        if series { prefs.panelHiddenSeries.insert(m.seriesID) } else { prefs.panelHiddenMeetings.insert(m.id) }
+    }
+
+    func showInPanel(_ m: Meeting) {
+        prefs.panelHiddenMeetings.remove(m.id)
+        prefs.panelHiddenSeries.remove(m.seriesID)
     }
 
     func isCalendarEnabled(_ id: String) -> Bool { !prefs.filters.disabledCalendarIDs.contains(id) }

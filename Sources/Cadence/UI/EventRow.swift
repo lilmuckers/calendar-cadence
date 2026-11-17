@@ -51,6 +51,12 @@ struct EventRow: View {
                                 .foregroundStyle(.orange)
                                 .help(state.suppressedByClash.contains(meeting.id) ? "Clash — you chose not to be alerted for this one" : "Overlaps another meeting")
                         }
+                        if state.isHiddenFromPanel(meeting) {
+                            Image(systemName: "eye.slash")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                                .help("Hidden from the countdown panel")
+                        }
                         if meeting.participation == .tentative || meeting.participation == .pending {
                             Image(systemName: "questionmark.circle")
                                 .font(.system(size: 11))
@@ -112,6 +118,10 @@ struct EventRow: View {
                 }
             }
             Button("Show in Calendar") { state.openInCalendar(meeting) }
+            if !meeting.isAllDay {
+                Divider()
+                PanelVisibilityMenu(meeting: meeting)
+            }
         }
     }
 
@@ -129,7 +139,7 @@ struct EventRow: View {
     private var metadata: some View {
         HStack(spacing: 6) {
             Text(meeting.calendar.title)
-                .foregroundStyle(meeting.tint)
+                .foregroundStyle(Color(meeting.calendar.color))
             if let service = meeting.joinLink?.service {
                 dot
                 Label(service.displayName, systemImage: service.symbol).labelStyle(.titleOnly)
@@ -199,5 +209,24 @@ private struct EventDetail: View {
             }
         }
         .padding(.leading, 14)
+    }
+}
+
+/// Context-menu items to keep a meeting (or its whole series) off the countdown panel.
+struct PanelVisibilityMenu: View {
+    @Environment(AppState.self) private var state
+    let meeting: Meeting
+
+    var body: some View {
+        if state.isHiddenFromPanel(meeting) {
+            Button("Show in Countdown Panel") { state.showInPanel(meeting) }
+        } else if state.isRecurring(meeting) {
+            Menu("Hide from Countdown Panel") {
+                Button("This Event") { state.hideFromPanel(meeting, series: false) }
+                Button("All Occurrences") { state.hideFromPanel(meeting, series: true) }
+            }
+        } else {
+            Button("Hide from Countdown Panel") { state.hideFromPanel(meeting, series: false) }
+        }
     }
 }
