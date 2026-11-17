@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <header class="site-header">
@@ -39,14 +39,15 @@
     <table>
       <thead><tr><th>What</th><th>Why</th><th>Where it's kept</th></tr></thead>
       <tbody>
-        <tr><td>Calendar events and invites (title, time, location, attendees, notes, join links, your RSVP status, colours and categories)</td><td>Show your agenda, countdowns, join buttons, reminders, clash prompts and invites waiting for a reply</td><td>In memory on your Mac; read from macOS Calendar, your ICS feeds, Google Calendar or Microsoft 365</td></tr>
-        <tr><td>Your approximate location (only if you allow it)</td><td>Estimate travel time to in-person meetings</td><td>In memory on your Mac</td></tr>
-        <tr><td>Settings and preferences, including ICS feed URLs</td><td>Remember how you've configured the app</td><td>macOS user defaults on your Mac</td></tr>
-        <tr><td>For each Google or Microsoft account you connect: its email address and a refresh token</td><td>Fetch that account's calendars, send your invite replies, and label the account in Settings</td><td>Email in macOS user defaults; refresh token in your macOS Keychain</td></tr>
-        <tr><td>Each connected account's profile photo, if it has one</td><td>Show which account is which in Settings and on calendar badges</td><td>Cached in Cadence's Application Support folder on your Mac; refreshed at most once a day and deleted when you disconnect the account</td></tr>
-        <tr><td>Your own Google OAuth client or Microsoft app registration (only if you enter one)</td><td>Sign in with your own client instead of the one built into the app</td><td>Client IDs in macOS user defaults; Google client secret in your macOS Keychain</td></tr>
-        <tr><td>Events you've hidden from the countdown panel</td><td>Keep them off the panel</td><td>macOS user defaults on your Mac</td></tr>
-        <tr><td>Which apps have windows on screen and whether the microphone is in use</td><td>Avoid covering your screen while you present or are on a call</td><td>Checked in the moment; never stored</td></tr>
+        <tr><td data-label="What">Calendar events and invites (title, time, location, attendees, notes, join links, your RSVP status, colours and categories)</td><td data-label="Why">Show your agenda, countdowns, join buttons, reminders, clash prompts and invites waiting for a reply</td><td data-label="Where it's kept">In memory on your Mac; read from macOS Calendar, your ICS feeds, Google Calendar or Microsoft 365</td></tr>
+        <tr><td data-label="What">Your approximate location (only if you allow it)</td><td data-label="Why">Estimate travel time to in-person meetings</td><td data-label="Where it's kept">In memory on your Mac</td></tr>
+        <tr><td data-label="What">Settings and preferences, including ICS feed URLs</td><td data-label="Why">Remember how you've configured the app</td><td data-label="Where it's kept">macOS user defaults on your Mac</td></tr>
+        <tr><td data-label="What">For each Google or Microsoft account you connect: its email address and a refresh token</td><td data-label="Why">Fetch that account's calendars, send your invite replies, and label the account in Settings</td><td data-label="Where it's kept">Email in macOS user defaults; refresh token in your macOS Keychain</td></tr>
+        <tr><td data-label="What">Each connected account's profile photo, if it has one</td><td data-label="Why">Show which account is which in Settings and on calendar badges</td><td data-label="Where it's kept">Cached in Cadence's Application Support folder on your Mac; refreshed at most once a day and deleted when you disconnect the account</td></tr>
+        <tr><td data-label="What">Your own Google OAuth client or Microsoft app registration (only if you enter one)</td><td data-label="Why">Sign in with your own client instead of the one built into the app</td><td data-label="Where it's kept">Client IDs in macOS user defaults; Google client secret in your macOS Keychain</td></tr>
+        <tr><td data-label="What">Events you've hidden from the countdown panel</td><td data-label="Why">Keep them off the panel</td><td data-label="Where it's kept">macOS user defaults on your Mac</td></tr>
+        <tr><td data-label="What">A log of what connected AI assistants asked Cadence for (assistant name, tool, time, outcome and a one-line summary)</td><td data-label="Why">Show you what each assistant did in <em>Settings → Assistants → Activity</em></td><td data-label="Where it's kept">A file only your user can read, in Cadence's Application Support folder; kept for 30 days and clearable any time</td></tr>
+        <tr><td data-label="What">Which apps have windows on screen and whether the microphone is in use</td><td data-label="Why">Avoid covering your screen while you present or are on a call</td><td data-label="Where it's kept">Checked in the moment; never stored</td></tr>
       </tbody>
     </table>
     <p>Presentation and call detection look at window positions and whether the microphone is <em>in use</em>. Cadence never reads your screen contents and never records or listens to audio, and it does not need Screen Recording or Microphone permission.</p>
@@ -56,6 +57,7 @@
     <ul>
       <li><strong>Google</strong>: only if you sign in with Google. Cadence talks to Google's sign-in service and the Google Calendar API directly from your Mac. Google's handling of your data is covered by the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</li>
       <li><strong>Microsoft</strong>: only if you sign in with Microsoft. Cadence talks to Microsoft's sign-in service and Microsoft Graph directly from your Mac. Microsoft's handling of your data is covered by the <a href="https://privacy.microsoft.com/privacystatement">Microsoft Privacy Statement</a>.</li>
+      <li><strong>AI assistants you connect</strong>: only if you set one up in <em>Settings → Assistants</em>. See below.</li>
       <li><strong>ICS / webcal feed hosts</strong> — whatever calendar subscription URLs you add.</li>
       <li><strong>Apple Maps</strong> — when estimating travel time, Cadence sends the meeting location and your approximate position to Apple's MapKit service. See <a href="https://www.apple.com/legal/privacy/">Apple's Privacy Policy</a>.</li>
       <li><strong>Meeting services</strong> — when you click Join, the meeting link opens in your browser or the relevant app (Zoom, Teams, etc.).</li>
@@ -82,6 +84,16 @@
       <li><code>MailboxSettings.Read</code>: read your Outlook category colours so events show in the same colours as in Outlook. Cadence doesn't read your email.</li>
     </ul>
     <p>As with Google, this data goes straight from Microsoft to the app on your Mac, is never sent to us or shared with anyone, and isn't used for advertising or to train AI models. Disconnecting an account in <em>Settings → Accounts</em> deletes its token and cached photo from your Mac.</p>
+
+    <h2>AI assistants</h2>
+    <p>Cadence includes an optional local server that AI assistants on your Mac (such as Claude, Cursor or Windsurf) can use through the Model Context Protocol (MCP). Nothing uses it until you connect an assistant, and you can turn it off completely in <em>Settings → Assistants</em>.</p>
+    <ul>
+      <li><strong>Local only.</strong> Assistants reach Cadence through a Unix socket in your Application Support folder that only your user account can open. There is no network port, so nothing else on your network or the internet can connect.</li>
+      <li><strong>What they can see.</strong> A connected assistant can read the same merged calendar you see in Cadence (events, invites, clashes, free time, your calendar list) and whether you're presenting or on a call.</li>
+      <li><strong>Where it goes next.</strong> What an assistant reads is handled by that assistant and its provider, under their own privacy policy, and may be sent to their servers. Only connect assistants you trust.</li>
+      <li><strong>You approve actions.</strong> Replying to invites, changing colours, joining meetings, hiding events and snoozing alerts each show a card in Cadence first. Requests you don't answer within a minute are denied. You can choose to auto-approve specific actions.</li>
+      <li><strong>Setup changes.</strong> When you click <strong>Install</strong>, Cadence adds a <code>cadence</code> entry to that assistant's MCP configuration file and keeps a backup of the previous version. It doesn't change anything else in the file.</li>
+    </ul>
 
     <h2>What we don't do</h2>
     <ul>

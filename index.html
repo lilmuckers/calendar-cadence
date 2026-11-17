@@ -14,14 +14,14 @@
   <meta property="og:description" content="Your calendar, gently panicking on your behalf.">
   <meta property="og:image" content="https://cadence.patrick-mckinley.com/assets/takeover.jpg">
   <meta property="og:url" content="https://cadence.patrick-mckinley.com/">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <header class="site-header">
     <div class="wrap">
       <a class="brand" href="./"><img src="assets/icon-192.png" alt="">Cadence</a>
       <nav>
-        <a href="#features">Features</a>
+        <a class="nav-features" href="#features">Features</a>
         <a href="privacy.html">Privacy</a>
         <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
       </nav>
@@ -56,7 +56,7 @@
 
     <section>
       <div class="wrap feature flip">
-        <div class="media"><img src="assets/banner.jpg" alt="Compact banner: Design Review, starts in 0:23, Join" style="max-width:420px"></div>
+        <div class="media"><img src="assets/banner.jpg" alt="Compact banner: Design Review, starts in 0:23, Join" class="w-420"></div>
         <div>
           <h2>…but never while you're presenting</h2>
           <p>Sharing your screen in Zoom or Teams, or running a Keynote or PowerPoint slideshow? Displays being shown are never covered — a small banner appears elsewhere instead.</p>
@@ -67,7 +67,7 @@
 
     <section>
       <div class="wrap feature">
-        <div class="media"><img src="assets/menu.jpg" alt="Today's agenda dropdown with colour-coded meetings and Join buttons" style="max-width:440px"></div>
+        <div class="media"><img src="assets/menu.jpg" alt="Today's agenda dropdown with colour-coded meetings and Join buttons" class="w-440"></div>
         <div>
           <h2>Today, at a glance</h2>
           <p>Click the menu bar for a colour-coded agenda with times, attendees, a live <strong>NOW</strong> badge and one-click <strong>Join</strong> on everything joinable.</p>
@@ -95,7 +95,7 @@
 
     <section>
       <div class="wrap feature">
-        <div class="media"><img src="assets/clash.jpg" alt="Double-booked! Which one should I alert you for?" style="max-width:380px"></div>
+        <div class="media"><img src="assets/clash.jpg" alt="Double-booked! Which one should I alert you for?" class="w-380"></div>
         <div>
           <h2>Double-booked? It asks.</h2>
           <p>When two real meetings overlap, Cadence asks which one you want alerts for. Your choice sticks; the other is quietly muted.</p>
@@ -105,11 +105,32 @@
 
     <section>
       <div class="wrap feature flip">
-        <div class="media"><img src="assets/invites.jpg" alt="Good morning! RSVP time: three invites with Accept, Maybe and Decline buttons and a colour picker" style="max-width:400px"></div>
+        <div class="media"><img src="assets/invites.jpg" alt="Good morning! RSVP time: three invites with Accept, Maybe and Decline buttons and a colour picker" class="w-400"></div>
         <div>
           <h2>RSVP without opening your calendar</h2>
           <p>Each morning Cadence gathers every invite still waiting for a reply into one card: <strong>Accept</strong>, <strong>Maybe</strong> or <strong>Decline</strong>, and pick a colour while you're there. New invites get the same card, or a notification with reply buttons, as soon as they arrive.</p>
           <p>Replies go straight to your Google and Microsoft 365 accounts, and the organiser hears back as usual.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="assistants">
+      <div class="wrap feature">
+        <div class="media">
+          <div class="assistant-demo" role="img" aria-label="Illustration: you ask your assistant about your afternoon, it checks Cadence, then asks to accept an invite and Cadence shows an Allow, Deny or Always allow card">
+            <div class="bubble you">What's my afternoon like? Can I fit in a 30-minute call?</div>
+            <div class="tools"><span>get_agenda</span><span>find_free_time</span></div>
+            <div class="bubble ai">Three meetings, done by 16:30. You're free 14:00–14:45 for the call. Want me to accept the Q1 Kick-off invite too?</div>
+            <div class="approval">
+              <div class="approval-title">Claude wants to accept <strong>Q1 Kick-off</strong></div>
+              <div class="approval-buttons"><span class="primary">Allow</span><span>Deny</span><span>Always allow</span></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h2>Ask your assistant about your day</h2>
+          <p>Cadence includes a local <a href="https://modelcontextprotocol.io">MCP</a> server, so Claude, Cursor, Windsurf or any other MCP client on your Mac can read your merged calendar, find free time, reply to invites and hear about meetings as they start and end.</p>
+          <p>Set it up in one click from <em>Settings → Assistants</em>. Every action pops a card in Cadence first (<strong>Allow</strong>, <strong>Deny</strong> or <strong>Always allow</strong>), and an activity view shows exactly what each assistant did.</p>
         </div>
       </div>
     </section>
@@ -124,7 +145,8 @@
           <div class="card"><h3>🗣️ Wrap-up nudge</h3><p>Five minutes before a meeting ends, a reminder to wrap up, and a warning if the next one starts straight after.</p></div>
           <div class="card"><h3>☀️ Morning summary</h3><p>How many meetings you have, when the first starts, when you're done and which invites need a reply. Tomorrow shows up in the evening.</p></div>
           <div class="card"><h3>🎨 Event colours</h3><p>Uses the colours you set in Google Calendar, Outlook categories or ICS feeds, and lets you recolour Google events from the menu.</p></div>
-          <div class="card"><h3>🔔 Heads-up notifications</h3><p>An optional nudge a few minutes before each meeting, on top of the full-screen alert.</p></div>          <div class="card"><h3>🧹 Filters</h3><p>Hide all-day, declined, tentative or link-less events; include or exclude by keyword.</p></div>
+          <div class="card"><h3>🔔 Heads-up notifications</h3><p>An optional nudge a few minutes before each meeting, on top of the full-screen alert.</p></div>
+          <div class="card"><h3>🧹 Filters</h3><p>Hide all-day, declined, tentative or link-less events; include or exclude by keyword.</p></div>
           <div class="card"><h3>😰 An icon with feelings</h3><p>Calm, nervous at 15 minutes, sweating at 5.</p></div>
         </div>
       </div>
@@ -134,7 +156,7 @@
       <div class="wrap">
         <div class="privacy-callout">
           <h2>🔒 Your calendar stays on your Mac</h2>
-          <p>No Cadence accounts, no analytics, no servers. Cadence only talks to the calendar services you connect (like Google and Microsoft 365) and Apple Maps for travel times.</p>
+          <p>No Cadence accounts, no analytics, no servers. Cadence only talks to the calendar services you connect (like Google and Microsoft 365) and Apple Maps for travel times, and assistants reach it through a private local socket with no network port.</p>
           <a href="privacy.html">Read the privacy policy →</a>
         </div>
       </div>
