@@ -6,10 +6,13 @@ private final class FakeBackend: MCPBackend, @unchecked Sendable {
     var calls: [(String, [String: JSONValue], String)] = []
     func callTool(_ name: String, arguments: [String: JSONValue], client: String) async throws -> JSONValue {
         calls.append((name, arguments, client))
-        if name == "respond_to_invite" { throw MCPToolError("The user declined this in Cadence.") }
+        if name == "respond_to_invite" { throw MCPToolError("The user declined this in Cadence.", kind: .denied, note: "Accept · Sync") }
+        if name == "snooze_alert" { return ["done": true, "action": "Snooze its alert for 1 min", "approved_by": "auto", "meeting": ["title": "Sync"]] }
         return ["meetings": [["title": "Standup"]]]
     }
     func readResource(_ uri: String) async throws -> JSONValue { ["uri": .string(uri)] }
+    var records: [MCPActivityEntry] = []
+    func record(_ entry: MCPActivityEntry) async { records.append(entry) }
 }
 
 private func j(_ v: JSONValue) -> JSONValue { v }
@@ -147,5 +150,96 @@ struct MCPEventTests {
         #expect(dto.status == "upcoming")
         #expect(dto.minutes_until_start == 10)
         #expect(dto.start.hasPrefix(String(MeetingDTO.format(base).prefix(10))))
+    }
+}
+
+
+@Suite("MCP activity and client config")
+struct MCPActivityTests {
+    @Test func sessionRecordsCallsWithOutcomes() async throws {
+        let backend = FakeBackend()
+        let s = MCPSession(backend: backend, version: "1.0")
+        _ = await send(s, ["jsonrpc": "2.0", "id": 0, "method": "initialize", "params": ["clientInfo": ["name": "claude-code"]]])
+        _ = await send(s, ["jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": ["name": "get_agenda", "arguments": ["date": "today"]]])
+        _ = await send(s, ["jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": ["name": "respond_to_invite", "arguments": [:]]])
+        _ = await send(s, ["jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": ["name": "snooze_alert", "arguments": [:]]])
+        for _ in 0..<100 where backend.records.count < 3 { try await Task.sleep(for: .milliseconds(5)) }
+        let byTool = Dictionary(backend.records.map { ($0.tool ?? "", $0) }, uniquingKeysWith: { a, _ in a })
+        #expect(byTool["get_agenda"]?.outcome == .ok)
+        #expect(byTool["get_agenda"]?.summary == "today · 1 meeting")
+        #expect(byTool["get_agenda"]?.client == "Claude Code")
+        #expect(byTool["respond_to_invite"]?.outcome == .denied)
+        #expect(byTool["respond_to_invite"]?.summary == "Accept · Sync")
+        #expect(byTool["snooze_alert"]?.outcome == .autoApproved)
+        #expect(byTool["snooze_alert"]?.summary == "Snooze its alert for 1 min · Sync")
+        #expect(byTool["snooze_alert"]?.isAction == true)
+    }
+
+    @Test func statsAggregateLastWeek() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let now = ISO8601DateFormatter().date(from: "2026-11-17T15:00:00Z")!
+        func call(_ tool: String, _ hoursAgo: Double, _ outcome: MCPCallOutcome = .ok, client: String = "Claude", action: Bool = false) -> MCPActivityEntry {
+            MCPActivityEntry(at: now.addingTimeInterval(-hoursAgo * 3600), kind: .call, client: client, tool: tool, isAction: action, outcome: outcome)
+        }
+        let entries = [
+            call("get_agenda", 1), call("get_agenda", 30), call("get_agenda", 24 * 10),  // 10 days ago: excluded
+            call("find_free_time", 2, client: "Cursor"),
+            call("respond_to_invite", 3, .ok, action: true), call("join_meeting", 4, .denied, action: true),
+            call("snooze_alert", 5, .autoApproved, action: true), call("get_status", 6, .error),
+            call("wait_for_event", 1),
+            MCPActivityEntry(at: now.addingTimeInterval(-60), kind: .event, eventType: "meeting.started"),
+            MCPActivityEntry(at: now.addingTimeInterval(-90), kind: .connect, client: "Claude"),
+        ]
+        let s = MCPActivity.stats(entries, now: now, calendar: cal)
+        #expect(s.callsWeek == 7)
+        #expect(s.callsToday == 6)
+        #expect(s.waitsWeek == 1)
+        #expect(s.actionsAllowed == 1 && s.actionsDenied == 1 && s.actionsAuto == 1 && s.errorsWeek == 1)
+        #expect(s.busiestTool == "get_agenda")
+        #expect(s.perClient.first?.client == "Claude" && s.perClient.first?.count == 6)
+        #expect(s.perDay.count == 7 && s.perDay.last?.count == 6 && s.perDay[5].count == 1)
+        #expect(s.eventsWeek == 1 && s.sessionsWeek == 1)
+        let cursor = MCPActivity.stats(entries, now: now, client: "Cursor", calendar: cal)
+        #expect(cursor.callsWeek == 1 && cursor.perTool.first?.tool == "find_free_time")
+    }
+
+    @Test func pruneByAgeAndCount() {
+        let now = Date()
+        let entries = (0..<10).map { MCPActivityEntry(at: now.addingTimeInterval(-Double($0) * 86_400 * 5), kind: .connect) }.reversed()
+        let pruned = MCPActivity.prune(Array(entries), now: now, maxAge: 30 * 86_400, maxCount: 3)
+        #expect(pruned.count == 3)
+        #expect(pruned.last?.at == now)
+    }
+
+    @Test func configMergeKeepsOtherKeysAndServers() throws {
+        let existing = try MCPClientConfig.parse(Data(#"{"preferences":{"x":1},"mcpServers":{"other":{"command":"/bin/other"}}}"#.utf8))
+        #expect(MCPClientConfig.status(existing, helperPath: "/A/cadence-mcp") == .missing)
+        let installed = MCPClientConfig.installing(into: existing, helperPath: "/A/cadence-mcp")
+        #expect(installed["preferences"]?["x"]?.intValue == 1)
+        #expect(installed["mcpServers"]?["other"]?["command"]?.stringValue == "/bin/other")
+        #expect(MCPClientConfig.status(installed, helperPath: "/A/cadence-mcp") == .current)
+        #expect(MCPClientConfig.status(installed, helperPath: "/B/cadence-mcp") == .stale("/A/cadence-mcp"))
+        let removed = MCPClientConfig.removing(from: installed)
+        #expect(removed["mcpServers"]?["cadence"] == nil)
+        #expect(removed["mcpServers"]?["other"] != nil)
+        #expect(removed["preferences"]?["x"]?.intValue == 1)
+    }
+
+    @Test func configParseEdgeCases() throws {
+        #expect(try MCPClientConfig.parse(nil) == nil)
+        #expect(try MCPClientConfig.parse(Data("  \n".utf8)) == nil)
+        #expect(throws: MCPClientConfig.InvalidConfig.self) { try MCPClientConfig.parse(Data("{ nope".utf8)) }
+        #expect(throws: MCPClientConfig.InvalidConfig.self) { try MCPClientConfig.parse(Data("[1,2]".utf8)) }
+        let fresh = MCPClientConfig.installing(into: nil, helperPath: "/A/cadence-mcp")
+        #expect(MCPClientConfig.command(in: fresh) == "/A/cadence-mcp")
+    }
+
+    @Test func friendlyClientNames() {
+        #expect(MCPClientNames.display("claude-ai") == "Claude")
+        #expect(MCPClientNames.display("local-agent-mode-cadence") == "Claude (Code tab)")
+        #expect(MCPClientNames.display("claude-code") == "Claude Code")
+        #expect(MCPClientNames.display("cursor-vscode") == "Cursor")
+        #expect(MCPClientNames.display("my-agent") == "my-agent")
     }
 }

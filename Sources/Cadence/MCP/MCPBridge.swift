@@ -39,9 +39,11 @@ final class MCPBridge {
     @ObservationIgnored private var lastStatus: (presenting: Bool, call: String?)?
     @ObservationIgnored private var pendingStatus: (presenting: Bool, call: String?)?
 
+    let activity = MCPActivityStore()
+
     init(state: AppState, approvals: ApprovalController) {
         self.state = state
-        backend = CadenceBackend(state: state, approvals: approvals)
+        backend = CadenceBackend(state: state, approvals: approvals, activity: activity)
     }
 
     func sync() {
@@ -133,8 +135,13 @@ final class MCPBridge {
                         let out = await session.handle(line)
                         self.send(out, on: conn)
                         if line.contains("\"initialize\"") {
-                            let name = await session.clientName
-                            if let i = self.clients.firstIndex(where: { $0.id == id }) { self.clients[i].name = name }
+                            let name = MCPClientNames.display(await session.clientName)
+                            if let i = self.clients.firstIndex(where: { $0.id == id }) {
+                                if self.clients[i].name == "Connecting…" {
+                                    self.activity.add(MCPActivityEntry(at: Date(), kind: .connect, client: name))
+                                }
+                                self.clients[i].name = name
+                            }
                         }
                     }
                 }
@@ -163,6 +170,9 @@ final class MCPBridge {
     // MARK: Events
 
     private func broadcast(_ event: MCPEvent) {
+        if event.log && !connections.isEmpty {
+            activity.add(MCPActivityEntry(at: event.at, kind: .event, eventType: event.type))
+        }
         for (_, (conn, session)) in connections {
             Task { @MainActor in self.send(await session.deliver(event), on: conn) }
         }

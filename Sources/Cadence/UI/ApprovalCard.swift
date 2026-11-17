@@ -10,19 +10,21 @@ struct ApprovalRequest: Identifiable {
     var meeting: Meeting
 }
 
+enum ApprovalResult { case allowed, denied, timedOut }
+
 /// Asks the user to allow or deny an AI assistant's action, one card at a time (top right).
 /// Unanswered requests are denied after a minute.
 @MainActor
 final class ApprovalController {
     private let state: AppState
     private var panel: FloatingPanel?
-    private var queue: [(ApprovalRequest, CheckedContinuation<Bool, Never>)] = []
-    private var current: (ApprovalRequest, CheckedContinuation<Bool, Never>)?
+    private var queue: [(ApprovalRequest, CheckedContinuation<ApprovalResult, Never>)] = []
+    private var current: (ApprovalRequest, CheckedContinuation<ApprovalResult, Never>)?
     private var timeout: DispatchWorkItem?
 
     init(state: AppState) { self.state = state }
 
-    func request(_ r: ApprovalRequest) async -> Bool {
+    func request(_ r: ApprovalRequest) async -> ApprovalResult {
         await withCheckedContinuation { cont in
             queue.append((r, cont))
             if current == nil { showNext() }
@@ -58,19 +60,23 @@ final class ApprovalController {
         NSSound(named: "Tink")?.play()
         self.panel = panel
 
-        let work = DispatchWorkItem { [weak self] in self?.finish(.deny) }
+        let work = DispatchWorkItem { [weak self] in self?.finish(.timeout) }
         timeout = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: work)
     }
 
-    enum Decision { case allow, deny, always }
+    enum Decision { case allow, deny, always, timeout }
 
     private func finish(_ decision: Decision) {
         guard let (request, cont) = current else { return }
         current = nil
         timeout?.cancel()
         if decision == .always { state.prefs.mcpAutoApprove.insert(request.tool) }
-        cont.resume(returning: decision != .deny)
+        switch decision {
+        case .allow, .always: cont.resume(returning: .allowed)
+        case .deny: cont.resume(returning: .denied)
+        case .timeout: cont.resume(returning: .timedOut)
+        }
         if let panel {
             self.panel = nil
             NSAnimationContext.runAnimationGroup({ $0.duration = 0.18; panel.animator().alphaValue = 0 }, completionHandler: {

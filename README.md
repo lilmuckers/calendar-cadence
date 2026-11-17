@@ -14,7 +14,7 @@ finds the join link wherever it's hiding, and — 30 seconds before you're due �
 <img alt="Swift" src="https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white">
 <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-0A84FF?style=flat-square">
 <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-0-34C759?style=flat-square">
-<img alt="Tests" src="https://img.shields.io/badge/tests-83%20passing-34C759?style=flat-square">
+<img alt="Tests" src="https://img.shields.io/badge/tests-88%20passing-34C759?style=flat-square">
 </p>
 
 <img src="docs/screenshots/menubar.png" width="560" alt="Menu bar showing Cadence: 8m · Design Review">
@@ -94,16 +94,12 @@ Each morning Cadence gathers every invite still waiting for a reply and asks you
 
 Cadence includes a local [MCP](https://modelcontextprotocol.io) server, so Claude (Desktop or Code), Cursor or any other MCP client on your Mac can read your merged calendar, act on it, and hear about things as they happen. It sees exactly what Cadence sees: every source merged, filtered and de-duplicated.
 
-**Connect.** Open *Settings → Assistants* and copy the setup for your client. For Claude Code:
+**Connect.** Open *Settings → Assistants*. Cadence finds Claude Desktop, Claude Code, Cursor and Windsurf on your Mac and shows whether each one is running, set up and connected right now. **Install** adds a `cadence` server to that client's MCP config, leaving the rest of the file alone and keeping a `.cadence-backup` of the old version. Claude Code is set up through its own `claude mcp add` command. Cadence then offers to restart the client so it loads the server. If Cadence isn't in Applications, the tab offers to move it there first, so the configured path keeps working.
+
+Prefer to do it by hand? Each client has a disclosure with the command or JSON to copy. For Claude Code:
 
 ```bash
 claude mcp add --scope user cadence -- "/Applications/Cadence.app/Contents/MacOS/cadence-mcp"
-```
-
-For Claude Desktop, add this to `~/Library/Application Support/Claude/claude_desktop_config.json` and restart Claude:
-
-```json
-{ "mcpServers": { "cadence": { "command": "/Applications/Cadence.app/Contents/MacOS/cadence-mcp" } } }
 ```
 
 `cadence-mcp` is a small stdio relay bundled in the app. It talks to Cadence over a Unix socket only your user can open (`~/Library/Application Support/Cadence/mcp.sock`, mode 0600), starts Cadence if it isn't running, and reconnects if Cadence restarts.
@@ -116,6 +112,8 @@ For Claude Desktop, add this to `~/Library/Application Support/Claude/claude_des
 | **Prompts** | `daily_briefing` · `prepare_for_meeting` · `triage_invites` |
 
 **You stay in charge.** Every action pops a card in Cadence naming the assistant and what it wants to do: **Allow**, **Deny** or **Always allow**. Unanswered requests are denied after a minute. Per-action auto-approval lives in *Settings → Assistants*.
+
+**See what they did.** *Settings → Assistants → Activity* shows calls today and over the last week, actions done and denied, a chart per tool and per day, and a list of recent calls with their outcome. It can be filtered by assistant. The history stays on this Mac for 30 days and can be cleared.
 
 **Events.** Cadence pushes `meeting.starting_soon`, `meeting.started`, `meeting.ending_soon`, `meeting.ended`, `invite.new`, `meeting.changed`, `meeting.canceled`, `clash.new`, `status.presenting` and `status.on_call`. They arrive as MCP log notifications and as `resources/updated` for subscribed resources. Clients differ in what they do with unsolicited notifications, so there's also `wait_for_event`: a long-poll tool (up to 5 minutes) that returns everything since the last call. An agent can loop on it to react to your calendar.
 
@@ -187,7 +185,7 @@ If your build has a Microsoft app built in, skip this and click **Sign in with M
 No Xcode project, no SwiftPM, no dependencies — just the Xcode Command Line Tools on macOS 14+.
 
 ```bash
-scripts/test.sh            # 83 unit tests (Swift Testing)
+scripts/test.sh            # 88 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
 ```
 

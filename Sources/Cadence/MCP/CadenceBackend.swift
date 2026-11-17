@@ -7,11 +7,15 @@ import Foundation
 final class CadenceBackend: MCPBackend {
     private let state: AppState
     private let approvals: ApprovalController
+    private let activity: MCPActivityStore
 
-    init(state: AppState, approvals: ApprovalController) {
+    init(state: AppState, approvals: ApprovalController, activity: MCPActivityStore) {
         self.state = state
         self.approvals = approvals
+        self.activity = activity
     }
+
+    func record(_ entry: MCPActivityEntry) async { activity.add(entry) }
 
     // MARK: Tools
 
@@ -191,12 +195,19 @@ final class CadenceBackend: MCPBackend {
             perform = { self.state.snooze(m, seconds: Double(minutes) * 60) }
         }
 
-        if !state.prefs.mcpAutoApprove.contains(name) {
-            let decision = await approvals.request(ApprovalRequest(client: client, tool: name, summary: summary, meeting: m))
-            guard decision else { throw MCPToolError("The user declined this in Cadence (\(summary.lowercased()) for \(m.title)).") }
+        let auto = state.prefs.mcpAutoApprove.contains(name)
+        if !auto {
+            let note = "\(summary) · \(m.title)"
+            switch await approvals.request(ApprovalRequest(client: client, tool: name, summary: summary, meeting: m)) {
+            case .allowed: break
+            case .denied:
+                throw MCPToolError("The user declined this in Cadence (\(summary.lowercased()) for \(m.title)).", kind: .denied, note: note)
+            case .timedOut:
+                throw MCPToolError("The user didn't answer in Cadence within a minute, so nothing was changed.", kind: .timedOut, note: note)
+            }
         }
         try await perform()
-        return ["done": true, "action": .string(summary), "meeting": state.dto(m)]
+        return ["done": true, "action": .string(summary), "meeting": state.dto(m), "approved_by": auto ? "auto" : "user"]
     }
 
     // MARK: Resources

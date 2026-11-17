@@ -6,11 +6,25 @@ public protocol MCPBackend: Sendable {
     /// failures the model should see (unknown meeting, user declined…).
     func callTool(_ name: String, arguments: [String: JSONValue], client: String) async throws -> JSONValue
     func readResource(_ uri: String) async throws -> JSONValue
+    /// Called after every tools/call, for the activity log.
+    func record(_ entry: MCPActivityEntry) async
+}
+
+extension MCPBackend {
+    public func record(_ entry: MCPActivityEntry) async {}
 }
 
 public struct MCPToolError: LocalizedError, Sendable {
+    public enum Kind: Sendable { case failed, denied, timedOut }
     public var message: String
-    public init(_ message: String) { self.message = message }
+    public var kind: Kind
+    /// Short description for the activity log (defaults to the message).
+    public var note: String?
+    public init(_ message: String, kind: Kind = .failed, note: String? = nil) {
+        self.message = message
+        self.kind = kind
+        self.note = note
+    }
     public var errorDescription: String? { message }
 }
 
@@ -137,6 +151,15 @@ public actor MCPSession {
     }
 
     private func callTool(_ name: String, arguments: [String: JSONValue]) async -> JSONValue {
+        let started = Date()
+        var result: JSONValue?
+        var failure: Error?
+        defer {
+            let entry = MCPActivity.callEntry(tool: name, client: MCPClientNames.display(clientName), arguments: arguments, result: result,
+                                              error: failure, started: started, now: Date())
+            let backend = backend
+            Task { await backend.record(entry) }
+        }
         do {
             let value: JSONValue
             if name == "wait_for_event" {
@@ -147,10 +170,12 @@ public actor MCPSession {
             } else {
                 value = try await backend.callTool(name, arguments: arguments, client: clientName)
             }
+            result = value
             // structuredContent must be an object.
             let structured: JSONValue = value.objectValue != nil ? value : ["result": value]
             return ["content": [["type": "text", "text": .string(value.prettyString)]], "structuredContent": structured]
         } catch {
+            failure = error
             return ["content": [["type": "text", "text": .string(error.localizedDescription)]], "isError": true]
         }
     }
