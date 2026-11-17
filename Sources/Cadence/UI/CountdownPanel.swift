@@ -223,7 +223,10 @@ struct CountdownPanelView: View {
     @ViewBuilder private func menu(_ focus: PanelFocus?) -> some View {
         @Bindable var state = state
         if let m = focus?.meeting {
-            if m.joinLink != nil { Button("Join \(m.title)") { state.join(m) } }
+            if m.joinLink != nil {
+                Button("Join \(m.title)") { state.join(m) }
+                JoinInMenu(meeting: m)
+            }
             PanelVisibilityMenu(meeting: m)
             Divider()
         }
@@ -404,7 +407,7 @@ struct JoinIconButton: View {
                     .shadow(color: meeting.tint.opacity(0.35), radius: 3, y: 1)
             }
             .buttonStyle(PressableStyle())
-            .help("Join on \(link.service.displayName)")
+            .help(state.joinHint(for: meeting) ?? "Join on \(link.service.displayName)")
         }
     }
 }

@@ -111,7 +111,10 @@ struct EventRow: View {
         .onHover { hovering = $0 }
         .contextMenu {
             EventActionsMenu(meeting: meeting)
-            if meeting.joinLink != nil { Button("Join") { state.join(meeting) } }
+            if meeting.joinLink != nil {
+                Button("Join") { state.join(meeting) }
+                JoinInMenu(meeting: meeting)
+            }
             if let link = meeting.joinLink {
                 Button("Copy Meeting Link") {
                     NSPasteboard.general.clearContents()

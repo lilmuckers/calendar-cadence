@@ -84,6 +84,8 @@ struct Preferences: Codable, Equatable {
     /// Single occurrences (Meeting.id) and whole series (Meeting.seriesID) kept off the panel.
     var panelHiddenMeetings: Set<String> = []
     var panelHiddenSeries: Set<String> = []
+    /// Which browser profile opens which meeting (default browser only).
+    var profileRules = ProfileRules()
 
     private static let key = "Cadence.preferences.v1"
 
@@ -148,5 +150,6 @@ extension Preferences {
         panelShowDuringMeetings = try c.decodeIfPresent(Bool.self, forKey: .panelShowDuringMeetings) ?? d.panelShowDuringMeetings
         panelHiddenMeetings = try c.decodeIfPresent(Set<String>.self, forKey: .panelHiddenMeetings) ?? d.panelHiddenMeetings
         panelHiddenSeries = try c.decodeIfPresent(Set<String>.self, forKey: .panelHiddenSeries) ?? d.panelHiddenSeries
+        profileRules = (try? c.decodeIfPresent(ProfileRules.self, forKey: .profileRules)) ?? d.profileRules
     }
 }

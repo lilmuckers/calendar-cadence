@@ -133,11 +133,20 @@ final class EventKitProvider: CalendarProvider {
             notes: event.notes,
             url: event.url,
             organizer: event.organizer?.name,
+            organizerEmail: Self.email(event.organizer?.url),
             attendeeCount: event.attendees?.count ?? 0,
             participation: participation,
             availability: availability,
             joinLink: MeetingLinkDetector.detect(url: event.url, location: event.location, notes: event.notes),
             recurs: event.hasRecurrenceRules || event.isDetached
         )
+    }
+
+    /// EventKit gives participants as `mailto:` URLs.
+    private static func email(_ url: URL?) -> String? {
+        guard let url, url.scheme?.lowercased() == "mailto" else { return nil }
+        let raw = url.absoluteString.dropFirst("mailto:".count)
+        let v = (raw.removingPercentEncoding ?? String(raw)).split(separator: "?").first.map(String.init) ?? ""
+        return v.contains("@") ? v : nil
     }
 }

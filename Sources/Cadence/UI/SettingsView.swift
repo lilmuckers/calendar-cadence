@@ -9,6 +9,7 @@ struct SettingsView: View {
             CalendarsTab().tabItem { Label("Calendars", systemImage: "calendar") }
             FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }
             AlertsTab().tabItem { Label("Alerts", systemImage: "bell.badge") }
+            BrowserTab().tabItem { Label("Browser", systemImage: "globe") }
             AssistantsTab().tabItem { Label("Assistants", systemImage: "sparkles") }
             GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
         }
@@ -44,6 +45,9 @@ private struct CalendarsTab: View {
             }
             ForEach(grouped, id: \.0) { source, calendars in
                 Section {
+                    if state.browsers.supportsProfiles {
+                        accountProfileRow(source)
+                    }
                     ForEach(calendars) { cal in
                         Toggle(isOn: Binding(get: { state.isCalendarEnabled(cal.id) },
                                              set: { state.setCalendar(cal.id, enabled: $0) })) {
@@ -60,6 +64,9 @@ private struct CalendarsTab: View {
                                 }
                                 .buttonStyle(.plain)
                                 .help(asks ? "Invites on this calendar ask for a colour" : "Ask for a colour when reviewing invites on this calendar")
+                                if state.browsers.supportsProfiles {
+                                    calendarProfileMenu(cal.id)
+                                }
                             }
                         }
                     }
@@ -69,6 +76,57 @@ private struct CalendarsTab: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { state.browsers.refresh() }
+    }
+
+    /// A small globe menu per calendar: filled and tinted when the calendar has its own profile.
+    @ViewBuilder private func calendarProfileMenu(_ id: String) -> some View {
+        let store = state.browsers
+        let current = state.prefs.profileRules.calendars[id]
+        let profile = store.profile(id: current)
+        Menu {
+            Button {
+                state.prefs.profileRules.calendars[id] = nil
+            } label: {
+                if current == nil { Label("Same as Account", systemImage: "checkmark") } else { Text("Same as Account") }
+            }
+            Divider()
+            ForEach(store.profiles) { p in
+                Button {
+                    state.prefs.profileRules.calendars[id] = p.id
+                } label: {
+                    if current == p.id { Label(p.title, systemImage: "checkmark") } else { Text(p.title) }
+                }
+            }
+        } label: {
+            Image(systemName: current == nil ? "globe" : "globe.badge.chevron.backward")
+                .foregroundStyle(current == nil ? Color.secondary : Color.accentColor)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(profile.map { "Meeting links open in \($0.title)" } ?? "Meeting links use the account's browser profile")
+    }
+
+    @ViewBuilder private func accountProfileRow(_ source: String) -> some View {
+        let current = state.prefs.profileRules.accounts[source]
+        let suggestion = current == nil ? ProfileResolver.suggest(accountTitle: source, profiles: state.browsers.profiles) : nil
+        LabeledContent {
+            HStack(spacing: 8) {
+                if let suggestion {
+                    Button("Use \(suggestion.title)") { state.prefs.profileRules.accounts[source] = suggestion.id }
+                        .help("This \(state.browsers.defaultBrowserName) profile is signed in as the same account")
+                }
+                Picker("", selection: Binding(get: { state.prefs.profileRules.accounts[source] },
+                                              set: { state.prefs.profileRules.accounts[source] = $0 })) {
+                    ProfilePickerOptions(store: state.browsers, noneLabel: "Default", current: current)
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+        } label: {
+            Label("Open meeting links in", systemImage: "globe")
+        }
     }
 }
 

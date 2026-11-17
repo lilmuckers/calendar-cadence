@@ -43,6 +43,7 @@ public enum MeetingDeduplicator {
         if m.location == nil { m.location = other.location }
         if m.notes == nil { m.notes = other.notes }
         if m.eventColor == nil { m.eventColor = other.eventColor }
+        if m.organizerEmail == nil { m.organizerEmail = other.organizerEmail }
         if m.participation == .unknown { m.participation = other.participation }
         m.attendeeCount = max(m.attendeeCount, other.attendeeCount)
         return m

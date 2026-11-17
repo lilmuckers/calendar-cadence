@@ -14,7 +14,7 @@ finds the join link wherever it's hiding, and — 30 seconds before you're due �
 <img alt="Swift" src="https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white">
 <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-0A84FF?style=flat-square">
 <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-0-34C759?style=flat-square">
-<img alt="Tests" src="https://img.shields.io/badge/tests-88%20passing-34C759?style=flat-square">
+<img alt="Tests" src="https://img.shields.io/badge/tests-101%20passing-34C759?style=flat-square">
 </p>
 
 <img src="docs/screenshots/menubar.png" width="560" alt="Menu bar showing Cadence: 8m · Design Review">
@@ -120,6 +120,7 @@ claude mcp add --scope user cadence -- "/Applications/Cadence.app/Contents/MacOS
 ## ✨ Everything else
 
 - **🔗 Join links from anywhere.** URL field, location, or buried in an HTML invite body. Zoom, Google Meet, Microsoft Teams, Webex, GoTo, Whereby, Jitsi, Chime, Slack huddles, BlueJeans, Skype, Discord, FaceTime, Around, Tuple and RingCentral. Outlook SafeLinks, Google and Proofpoint redirect wrappers are unwrapped, and Zoom/Teams open straight in their apps.
+- **🧭 The right browser profile.** Several clients, several signed-in profiles? Cadence opens each meeting in the right one of your default browser (Chrome, Edge, Brave, Vivaldi or Firefox, including Firefox containers). Pick a profile per account or calendar in *Settings → Calendars*, add organizer rules like *@client.com → Client profile* in *Settings → Browser*, or right-click Join → **Join in** for one meeting or a whole series. You choose per service whether an assigned profile beats the Zoom or Teams app. With Safari as the default, links open as usual.
 - **⌨️ Global join shortcut.** <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>J</kbd> (re-bindable) joins whatever's starting in the next 10 minutes — or the meeting you're already late for.
 - **🚗 "Leave now" reminders.** For in-person meetings, Cadence watches live traffic and pings you at configurable offsets before you need to leave (default: 10 minutes before, and "time to leave").
 - **🔔 Heads-up notifications.** Optional nudge N minutes before each meeting (default 5).

@@ -145,6 +145,7 @@ public enum GoogleMapper {
             notes: e.description,
             url: nil,
             organizer: e.organizer?.displayName ?? e.organizer?.email,
+            organizerEmail: e.organizer?.email,
             attendeeCount: e.attendees?.count ?? 0,
             participation: participation,
             availability: e.transparency == "transparent" ? .free : (participation == .tentative ? .tentative : .busy),

@@ -18,9 +18,15 @@ final class AppState {
             if prefs.inviteHorizon != oldValue.inviteHorizon || prefs.filters.disabledCalendarIDs != oldValue.filters.disabledCalendarIDs {
                 Task { await refreshInvites() }
             }
+            if prefs.profileRules.firefoxContainers != oldValue.profileRules.firefoxContainers {
+                browsers.refresh(containers: prefs.profileRules.firefoxContainers)
+            }
             onPrefsChanged?()
         }
     }
+
+    /// The default browser and its profiles, for opening meeting links in the right one.
+    @ObservationIgnored let browsers = BrowserProfileStore()
 
     private(set) var calendars: [CalendarInfo] = []
     private(set) var allMeetings: [Meeting] = []
@@ -82,6 +88,7 @@ final class AppState {
 
     init() {
         prefs = Preferences.load()
+        browsers.refresh(containers: prefs.profileRules.firefoxContainers)
     }
 
     // MARK: - Lifecycle
@@ -608,13 +615,56 @@ final class AppState {
 
     // MARK: - Actions
 
+    /// The profile `meeting` would open in, if any rule applies to the default browser's profiles.
+    func profileChoice(for meeting: Meeting) -> ProfileChoice? {
+        ProfileResolver.resolve(meeting, rules: prefs.profileRules, profiles: browsers.profiles)
+    }
+
+    /// Where Join would send `meeting` right now.
+    func joinRoute(for meeting: Meeting) -> JoinRoute? {
+        guard let link = meeting.joinLink else { return nil }
+        return ProfileResolver.route(for: link, choice: profileChoice(for: meeting), rules: prefs.profileRules,
+                                     preferNative: prefs.preferNativeApps,
+                                     nativeAvailable: { NSWorkspace.shared.urlForApplication(toOpen: $0) != nil })
+    }
+
     func join(_ meeting: Meeting) {
+        browsers.refresh()
+        guard let route = joinRoute(for: meeting) else { return }
+        switch route {
+        case .native(let url), .defaultBrowser(let url): NSWorkspace.shared.open(url)
+        case .profile(let profile, let url): BrowserLauncher.open(url, in: profile)
+        }
+    }
+
+    enum ProfileMemory { case once, series }
+
+    /// "Join in ▸ <profile>": opens in that profile now, optionally remembering it for this meeting or series.
+    /// A nil profile means the default browser without a profile.
+    func join(_ meeting: Meeting, in profile: BrowserProfile?, remember: ProfileMemory?) {
         guard let link = meeting.joinLink else { return }
-        let ws = NSWorkspace.shared
-        if prefs.preferNativeApps, let native = link.nativeURL, ws.urlForApplication(toOpen: native) != nil {
-            ws.open(native)
-        } else {
-            ws.open(link.url)
+        if let remember, let profile {
+            switch remember {
+            case .once: prefs.profileRules.meetings[meeting.id] = profile.id
+            case .series: prefs.profileRules.series[meeting.seriesID] = profile.id
+            }
+        }
+        if let profile { BrowserLauncher.open(link.url, in: profile) } else { NSWorkspace.shared.open(link.url) }
+    }
+
+    /// Drops any per-meeting or per-series choice for `meeting`.
+    func forgetProfileChoice(_ meeting: Meeting) {
+        prefs.profileRules.meetings[meeting.id] = nil
+        prefs.profileRules.series[meeting.seriesID] = nil
+    }
+
+    /// "Opens in Client A (Chrome)" for tooltips, or nil when nothing special happens.
+    func joinHint(for meeting: Meeting) -> String? {
+        guard let route = joinRoute(for: meeting) else { return nil }
+        switch route {
+        case .profile(let p, _): return "Opens in \(p.title) (\(p.browser.displayName))"
+        case .native: return profileChoice(for: meeting).map { "Opens in the app (\($0.profile.title) is set for the browser)" }
+        case .defaultBrowser: return nil
         }
     }
 

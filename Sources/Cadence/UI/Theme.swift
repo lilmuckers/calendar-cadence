@@ -94,7 +94,7 @@ struct JoinButton: View {
                     .shadow(color: meeting.tint.opacity(0.35), radius: size == .large ? 18 : 4, y: 2)
             }
             .buttonStyle(PressableStyle())
-            .help("Join on \(link.service.displayName)")
+            .help(state.joinHint(for: meeting) ?? "Join on \(link.service.displayName)")
         }
     }
 
