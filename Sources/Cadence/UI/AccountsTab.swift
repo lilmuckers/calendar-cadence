@@ -35,40 +35,41 @@ private struct GoogleSection: View {
     @State private var useOwnClient = false
 
     private var auth: GoogleAuth { state.googleAuth }
+    private var needsClientFields: Bool { !auth.hasBundledClient || useOwnClient }
 
     var body: some View {
         Section {
-            if auth.isSignedIn {
-                LabeledContent("Account", value: state.google.accountEmail ?? "Signed in")
-                LabeledContent("Status") { Text(state.google.status).foregroundStyle(.secondary) }
-                Button("Sign Out", role: .destructive) { state.googleSignOut() }
-            } else if auth.hasBundledClient && !useOwnClient {
-                HStack {
-                    Button(busy ? "Waiting for browser…" : "Sign in with Google") { signIn(custom: false) }
-                        .disabled(busy)
-                    if busy { ProgressView().controlSize(.small) }
-                }
-                Button("Use my own OAuth client…") { useOwnClient = true }
-                    .buttonStyle(.link)
-                    .font(.caption)
-            } else {
+            ForEach(auth.accounts) { account in
+                AccountRow(account: account, busy: busy, reconnect: { signIn(custom: false) })
+            }
+
+            if needsClientFields {
                 TextField("Client ID", text: $clientID, prompt: Text("xxxx.apps.googleusercontent.com"))
                 SecureField("Client secret", text: $clientSecret,
                             prompt: Text(auth.customCredentials == nil ? "Required" : "Saved — leave blank to keep"))
-                HStack {
-                    Button(busy ? "Waiting for browser…" : "Sign in with Google") { signIn(custom: true) }
-                        .disabled(busy || clientID.trimmingCharacters(in: .whitespaces).isEmpty
-                                  || (clientSecret.isEmpty && auth.customCredentials == nil))
-                    if busy { ProgressView().controlSize(.small) }
-                    if auth.hasBundledClient {
-                        Spacer()
+            }
+            HStack {
+                Button {
+                    signIn(custom: needsClientFields)
+                } label: {
+                    Label(busy ? "Waiting for browser…" : (auth.accounts.isEmpty ? "Sign in with Google" : "Add Another Account"),
+                          systemImage: "person.crop.circle.badge.plus")
+                }
+                .disabled(busy || (needsClientFields && !clientFieldsValid))
+                if busy { ProgressView().controlSize(.small) }
+                Spacer()
+                if auth.hasBundledClient {
+                    if useOwnClient {
                         Button("Use built-in client") {
-                            auth.clearCustomCredentials()
+                            state.googleUseBuiltInClient()
                             clientID = ""
                             clientSecret = ""
                             useOwnClient = false
                         }
                         .buttonStyle(.link)
+                    } else {
+                        Button("Use my own OAuth client…") { useOwnClient = true }
+                            .buttonStyle(.link)
                     }
                 }
             }
@@ -83,10 +84,17 @@ private struct GoogleSection: View {
         .onAppear { useOwnClient = auth.customCredentials != nil }
     }
 
+    private var clientFieldsValid: Bool {
+        !clientID.trimmingCharacters(in: .whitespaces).isEmpty && (!clientSecret.isEmpty || auth.customCredentials != nil)
+    }
+
     private var footer: String {
-        let base = "Optional — gives Meet links and RSVP status straight from Google. Events that also arrive via macOS Calendar are merged, not duplicated."
-        if auth.hasBundledClient && !useOwnClient { return base }
-        return base + " Needs a Google Cloud OAuth client of type \"Desktop app\" with the Google Calendar API enabled — see the README."
+        var text = "Optional — Meet links and RSVP status straight from Google. Add as many accounts as you like; "
+            + "Google shows its account chooser each time. Events that also arrive via macOS Calendar or another account are merged."
+        if needsClientFields {
+            text += " Needs a Google Cloud OAuth client of type \"Desktop app\" with the Google Calendar API enabled — see the README."
+        }
+        return text
     }
 
     private func signIn(custom: Bool) {
@@ -104,6 +112,49 @@ private struct GoogleSection: View {
                 self.error = error.localizedDescription
             }
             busy = false
+        }
+    }
+}
+
+private struct AccountRow: View {
+    @Environment(AppState.self) private var state
+    let account: GoogleAccount
+    let busy: Bool
+    let reconnect: () -> Void
+    @State private var confirmingSignOut = false
+
+    private var provider: GoogleCalendarProvider? { state.googleProviders.first { $0.accountID == account.id } }
+    private var needsReconnect: Bool { state.googleAuth.needsReconnect.contains(account.id) }
+
+    var body: some View {
+        // Provider status isn't observable; every fetch triggers a refresh, so read this to redraw.
+        let _ = state.lastRefresh
+        HStack(spacing: 10) {
+            ZStack {
+                Circle().fill(Color.accentColor.gradient)
+                Text(String(account.label.prefix(1)).uppercased())
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 28, height: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(account.label)
+                Text(provider?.status ?? "Connecting…")
+                    .font(.caption)
+                    .foregroundStyle(needsReconnect || (provider?.status.hasPrefix("Error") ?? false) ? Color.orange : Color.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            if needsReconnect {
+                Button("Reconnect", action: reconnect).disabled(busy)
+                    .help("Sign in again and pick \(account.label)")
+            }
+            Button("Sign Out") { confirmingSignOut = true }
+                .confirmationDialog("Sign out of \(account.label)?", isPresented: $confirmingSignOut) {
+                    Button("Sign Out", role: .destructive) { state.googleSignOut(account) }
+                } message: {
+                    Text("Its calendars will disappear from Cadence. You can add it again any time.")
+                }
         }
     }
 }

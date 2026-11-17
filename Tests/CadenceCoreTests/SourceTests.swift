@@ -194,3 +194,13 @@ struct DedupTests {
         #expect(!MeetingDeduplicator.isSameMeeting(m("1", "A"), m("2", "B")))
     }
 }
+
+@Suite("JWT")
+struct JWTTests {
+    @Test func readsEmailClaim() {
+        // {"alg":"none"} . {"email":"me@example.com","sub":"1"} . (no signature)
+        let token = "eyJhbGciOiJub25lIn0.eyJlbWFpbCI6Im1lQGV4YW1wbGUuY29tIiwic3ViIjoiMSJ9."
+        #expect(JWT.email(in: token) == "me@example.com")
+        #expect(JWT.email(in: "garbage") == nil)
+    }
+}

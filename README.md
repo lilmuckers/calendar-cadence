@@ -14,7 +14,7 @@ finds the join link wherever it's hiding, and — 30 seconds before you're due �
 <img alt="Swift" src="https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white">
 <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-0A84FF?style=flat-square">
 <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-0-34C759?style=flat-square">
-<img alt="Tests" src="https://img.shields.io/badge/tests-53%20passing-34C759?style=flat-square">
+<img alt="Tests" src="https://img.shields.io/badge/tests-54%20passing-34C759?style=flat-square">
 </p>
 
 <img src="docs/screenshots/menubar.png" width="560" alt="Menu bar showing Cadence: 8m · Design Review">
@@ -91,7 +91,7 @@ The moment Cadence spots two meetings that overlap — real clashes, not the sam
 |---|---|
 | **macOS Calendar** | Everything you've added in *System Settings → Internet Accounts*: iCloud, Google, Exchange/Outlook, CalDAV, subscriptions. Just grant access. |
 | **ICS / webcal feeds** | *Settings → Accounts → Subscribed calendars.* Paste any iCalendar link — Google's "secret address in iCal format", Outlook's published ICS, team rotas, sports, holidays. Recurrence, exceptions and Windows time zones are handled. |
-| **Google Calendar (direct)** | *Settings → Accounts → Google → Sign in with Google.* Optional; gives Meet links and RSVPs straight from Google. Builds with a built-in OAuth client need nothing else; otherwise bring your own (see below). |
+| **Google Calendar (direct)** | *Settings → Accounts → Google → Sign in with Google.* Optional, and you can add **multiple accounts** (work, personal…); gives Meet links and RSVPs straight from Google. Builds with a built-in OAuth client need nothing else; otherwise bring your own (see below). |
 
 The same meeting arriving from several sources is merged automatically.
 
@@ -116,7 +116,7 @@ About five minutes in [Google Cloud Console](https://console.cloud.google.com/):
 >
 > To stop the weekly re-sign-in, click **Publish app** under *Audience* so its status becomes *In production*. You don't need Google's verification for personal use. Sign-in then shows *"Google hasn't verified this app"*: choose **Advanced → Go to Cadence (unsafe)**. That's expected, because the OAuth client is your own.
 
-Cadence uses the loopback redirect + PKCE flow and asks only for `calendar.readonly`. It keeps the client secret and refresh token in your Keychain; after an ad-hoc-signed rebuild, macOS may ask to allow Keychain access, so choose **Always Allow**. It connects one direct Google account at a time. If that account is also in macOS Calendar, duplicate meetings are merged automatically.
+Cadence uses the loopback redirect + PKCE flow and asks only for `calendar.readonly`. It keeps the client secret and refresh token in your Keychain; after an ad-hoc-signed rebuild, macOS may ask to allow Keychain access, so choose **Always Allow**. Add as many Google accounts as you like with **Add Another Account**; Google shows its account chooser each time. If one stops working (for example, after the 7-day Testing-mode expiry), it's marked **Reconnect** rather than removed. Meetings that appear in several accounts, or in macOS Calendar too, are merged automatically.
 </details>
 
 ## 🛠️ Build & run
@@ -124,7 +124,7 @@ Cadence uses the loopback redirect + PKCE flow and asks only for `calendar.reado
 No Xcode project, no SwiftPM, no dependencies — just the Xcode Command Line Tools on macOS 14+.
 
 ```bash
-scripts/test.sh            # 53 unit tests (Swift Testing)
+scripts/test.sh            # 54 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
 ```
 

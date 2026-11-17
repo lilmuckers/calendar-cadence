@@ -8,17 +8,23 @@ final class GoogleCalendarProvider: CalendarProvider {
     let name = "Google Calendar"
     var onChange: (() -> Void)?
     let auth: GoogleAuth
+    let accountID: String
 
-    private(set) var accountEmail: String?
     private(set) var lastError: String?
     private(set) var lastFetch: Date?
     private var cachedCalendars: [CalendarInfo] = []
     private var cachedMeetings: [Meeting] = []
 
-    init(auth: GoogleAuth) { self.auth = auth }
+    init(accountID: String, auth: GoogleAuth) {
+        self.accountID = accountID
+        self.auth = auth
+    }
 
-    var isAuthorized: Bool { auth.isSignedIn }
-    func requestAccess() async -> Bool { auth.isSignedIn }
+    var account: GoogleAccount? { auth.accounts.first { $0.id == accountID } }
+    var accountEmail: String? { account?.email }
+
+    var isAuthorized: Bool { account != nil }
+    func requestAccess() async -> Bool { isAuthorized }
 
     func calendars() -> [CalendarInfo] { cachedCalendars }
 
@@ -27,20 +33,21 @@ final class GoogleCalendarProvider: CalendarProvider {
     }
 
     func refreshRemote() async {
-        guard auth.isSignedIn else {
+        guard let account else {
             cachedCalendars = []
             cachedMeetings = []
             onChange?()
             return
         }
         do {
-            let token = try await auth.validAccessToken()
+            let token = try await auth.validAccessToken(for: account)
             let list: GoogleCalendarList = try await get("users/me/calendarList", query: ["minAccessRole": "reader"], token: token)
             let entries = (list.items ?? []).filter { $0.selected != false }
-            accountEmail = entries.first(where: { $0.primary == true })?.id ?? accountEmail
-            let source = "Google · \(accountEmail ?? "direct")"
+            if let primary = entries.first(where: { $0.primary == true })?.id { auth.setEmail(primary, for: accountID) }
+            let source = "Google · \(accountEmail ?? "account")"
+            // Calendar IDs are scoped per account: two accounts can both see the same shared calendar.
             cachedCalendars = entries.map {
-                CalendarInfo(id: "gcal:\($0.id)", title: $0.title, sourceTitle: source, color: GoogleMapper.color(hex: $0.backgroundColor))
+                CalendarInfo(id: "gcal:\(accountID):\($0.id)", title: $0.title, sourceTitle: source, color: GoogleMapper.color(hex: $0.backgroundColor))
             }
 
             let cal = Calendar.current
@@ -86,7 +93,8 @@ final class GoogleCalendarProvider: CalendarProvider {
     }
 
     var status: String {
-        if !auth.isSignedIn { return "Not signed in" }
+        if account == nil { return "Not signed in" }
+        if auth.needsReconnect.contains(accountID) { return "Needs reconnecting" }
         if let lastError { return "Error: \(lastError)" }
         guard lastFetch != nil else { return "Connecting…" }
         return "\(cachedCalendars.count) calendars · \(cachedMeetings.count) events in the next 2 days"

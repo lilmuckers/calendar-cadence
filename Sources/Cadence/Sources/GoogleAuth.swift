@@ -1,11 +1,25 @@
 import AppKit
 import CryptoKit
 import Foundation
+import CadenceCore
 import Network
+import Observation
 
-/// OAuth 2.0 for installed apps: system browser + loopback redirect + PKCE.
-/// Uses the user's own "Desktop app" OAuth client from Google Cloud Console.
+/// A signed-in Google account. The refresh token lives in the Keychain under `refreshKey`.
+struct GoogleAccount: Codable, Identifiable, Equatable {
+    var id: String = UUID().uuidString
+    var email: String?
+    /// The OAuth client that issued this account's refresh token (tokens only work with that client).
+    var clientID: String
+
+    var refreshKey: String { "google.refreshToken.\(id)" }
+    var label: String { email ?? "Google account" }
+}
+
+/// OAuth 2.0 for installed apps (system browser + loopback redirect + PKCE), for any number of
+/// Google accounts. Uses the client built into the app, or one the user entered in Settings.
 @MainActor
+@Observable
 final class GoogleAuth {
     struct Credentials: Equatable {
         var clientID: String
@@ -13,7 +27,7 @@ final class GoogleAuth {
     }
 
     enum AuthError: LocalizedError {
-        case missingCredentials, denied(String), badResponse(String), notSignedIn
+        case missingCredentials, denied(String), badResponse(String), notSignedIn, clientChanged
 
         var errorDescription: String? {
             switch self {
@@ -21,18 +35,32 @@ final class GoogleAuth {
             case .denied(let why): "Google sign-in was cancelled: \(why)"
             case .badResponse(let why): "Google sign-in failed: \(why)"
             case .notSignedIn: "Not signed in to Google."
+            case .clientChanged: "This account was connected with a different OAuth client. Reconnect it."
             }
         }
     }
 
-    static let scope = "https://www.googleapis.com/auth/calendar.readonly"
-    private static let refreshKey = "google.refreshToken"
+    static let scope = "openid email https://www.googleapis.com/auth/calendar.readonly"
+    private static let accountsKey = "Cadence.google.accounts"
+    private static let legacyRefreshKey = "google.refreshToken"
     private static let secretKey = "google.clientSecret"
 
-    private var accessToken: String?
-    private var expiry = Date.distantPast
+    private(set) var accounts: [GoogleAccount] = []
+    /// Accounts whose refresh token was rejected (revoked, or expired in Testing mode).
+    private(set) var needsReconnect: Set<String> = []
+    @ObservationIgnored private var tokens: [String: (token: String, expiry: Date)] = [:]
 
-    /// The client in use: one the user entered in Settings wins over the one built into the app.
+    init() {
+        if let data = UserDefaults.standard.data(forKey: Self.accountsKey),
+           let saved = try? JSONDecoder().decode([GoogleAccount].self, from: data) {
+            accounts = saved
+        }
+        migrateSingleAccount()
+    }
+
+    // MARK: Clients
+
+    /// The client used for new sign-ins: one the user entered in Settings wins over the built-in one.
     var credentials: Credentials? { customCredentials ?? Self.bundledCredentials }
 
     /// A client the user entered themselves (Settings → Accounts → "Use my own OAuth client").
@@ -57,30 +85,65 @@ final class GoogleAuth {
         Keychain.set(clientSecret.trimmingCharacters(in: .whitespaces), for: Self.secretKey)
     }
 
-    /// Go back to the built-in client. Signs out, since refresh tokens belong to the client that issued them.
+    /// Go back to the built-in client. Accounts connected through the custom client are signed out,
+    /// since refresh tokens only work with the client that issued them.
     func clearCustomCredentials() {
-        signOut()
+        if let custom = customCredentials {
+            for account in accounts where account.clientID == custom.clientID { signOut(account) }
+        }
         UserDefaults.standard.removeObject(forKey: "Cadence.google.clientID")
         Keychain.set(nil, for: Self.secretKey)
     }
 
-    var isSignedIn: Bool { Keychain.get(Self.refreshKey) != nil }
+    /// The client that issued an account's token, if it's still available.
+    private func credentials(for account: GoogleAccount) -> Credentials? {
+        [customCredentials, Self.bundledCredentials].compactMap { $0 }.first { $0.clientID == account.clientID }
+    }
 
-    func signOut() {
-        if let token = Keychain.get(Self.refreshKey),
+    // MARK: Accounts
+
+    var isSignedIn: Bool { !accounts.isEmpty }
+
+    func signOut(_ account: GoogleAccount) {
+        if let token = Keychain.get(account.refreshKey),
            let url = URL(string: "https://oauth2.googleapis.com/revoke?token=\(token)") {
             var req = URLRequest(url: url)
             req.httpMethod = "POST"
             URLSession.shared.dataTask(with: req).resume()
         }
-        Keychain.set(nil, for: Self.refreshKey)
-        accessToken = nil
-        expiry = .distantPast
+        Keychain.set(nil, for: account.refreshKey)
+        tokens[account.id] = nil
+        needsReconnect.remove(account.id)
+        accounts.removeAll { $0.id == account.id }
+        saveAccounts()
+    }
+
+    /// Fill in an email learned later (e.g. from the primary calendar of a migrated account).
+    func setEmail(_ email: String, for id: String) {
+        guard let i = accounts.firstIndex(where: { $0.id == id }), accounts[i].email == nil else { return }
+        accounts[i].email = email
+        saveAccounts()
+    }
+
+    private func saveAccounts() {
+        if let data = try? JSONEncoder().encode(accounts) { UserDefaults.standard.set(data, forKey: Self.accountsKey) }
+    }
+
+    /// Earlier versions stored one token under a fixed key; turn it into the first account.
+    private func migrateSingleAccount() {
+        guard let legacy = Keychain.get(Self.legacyRefreshKey) else { return }
+        let account = GoogleAccount(email: nil, clientID: credentials?.clientID ?? "")
+        Keychain.set(legacy, for: account.refreshKey)
+        Keychain.set(nil, for: Self.legacyRefreshKey)
+        accounts.append(account)
+        saveAccounts()
     }
 
     // MARK: Sign in
 
-    func signIn() async throws {
+    /// Opens Google's account chooser and adds (or reconnects) whichever account the user picks.
+    @discardableResult
+    func signIn() async throws -> GoogleAccount {
         guard let creds = credentials else { throw AuthError.missingCredentials }
         let verifier = Self.randomURLSafe(64)
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64URL
@@ -100,7 +163,8 @@ final class GoogleAuth {
             .init(name: "code_challenge_method", value: "S256"),
             .init(name: "state", value: state),
             .init(name: "access_type", value: "offline"),
-            .init(name: "prompt", value: "consent"),
+            // Always show the account chooser so a second account can be added.
+            .init(name: "prompt", value: "select_account consent"),
         ]
         NSWorkspace.shared.open(comps.url!)
 
@@ -112,7 +176,7 @@ final class GoogleAuth {
             throw AuthError.badResponse("missing code")
         }
 
-        let tokens = try await tokenRequest([
+        let response = try await tokenRequest([
             "code": code,
             "client_id": creds.clientID,
             "client_secret": creds.clientSecret,
@@ -120,23 +184,44 @@ final class GoogleAuth {
             "grant_type": "authorization_code",
             "code_verifier": verifier,
         ])
-        guard let refresh = tokens.refresh_token else { throw AuthError.badResponse("no refresh token") }
-        Keychain.set(refresh, for: Self.refreshKey)
-        store(tokens)
+        guard let refresh = response.refresh_token else { throw AuthError.badResponse("no refresh token") }
+        let email = response.id_token.flatMap(JWT.email(in:))
+
+        // Same Google account signing in again replaces its old token instead of adding a duplicate.
+        var account = accounts.first { $0.email != nil && $0.email == email }
+            ?? GoogleAccount(email: email, clientID: creds.clientID)
+        account.clientID = creds.clientID
+        Keychain.set(refresh, for: account.refreshKey)
+        if let i = accounts.firstIndex(where: { $0.id == account.id }) { accounts[i] = account } else { accounts.append(account) }
+        needsReconnect.remove(account.id)
+        tokens[account.id] = (response.access_token, Date().addingTimeInterval(response.expires_in ?? 3600))
+        saveAccounts()
+        return account
     }
 
-    /// A valid access token, refreshing it when it is about to expire.
-    func validAccessToken() async throws -> String {
-        if let accessToken, expiry.timeIntervalSinceNow > 60 { return accessToken }
-        guard let creds = credentials, let refresh = Keychain.get(Self.refreshKey) else { throw AuthError.notSignedIn }
-        let tokens = try await tokenRequest([
-            "client_id": creds.clientID,
-            "client_secret": creds.clientSecret,
-            "refresh_token": refresh,
-            "grant_type": "refresh_token",
-        ])
-        store(tokens)
-        return tokens.access_token
+    /// A valid access token for the account, refreshing it when it is about to expire.
+    func validAccessToken(for account: GoogleAccount) async throws -> String {
+        if let cached = tokens[account.id], cached.expiry.timeIntervalSinceNow > 60 { return cached.token }
+        guard let refresh = Keychain.get(account.refreshKey) else { throw AuthError.notSignedIn }
+        guard let creds = credentials(for: account) else {
+            needsReconnect.insert(account.id)
+            throw AuthError.clientChanged
+        }
+        do {
+            let response = try await tokenRequest([
+                "client_id": creds.clientID,
+                "client_secret": creds.clientSecret,
+                "refresh_token": refresh,
+                "grant_type": "refresh_token",
+            ])
+            tokens[account.id] = (response.access_token, Date().addingTimeInterval(response.expires_in ?? 3600))
+            needsReconnect.remove(account.id)
+            return response.access_token
+        } catch TokenError.invalidGrant {
+            // Revoked, or a Testing-mode token past its 7 days. Keep the account listed so it can be reconnected.
+            needsReconnect.insert(account.id)
+            throw AuthError.badResponse("access expired — reconnect this account")
+        }
     }
 
     // MARK: Helpers
@@ -145,12 +230,10 @@ final class GoogleAuth {
         var access_token: String
         var expires_in: Double?
         var refresh_token: String?
+        var id_token: String?
     }
 
-    private func store(_ t: TokenResponse) {
-        accessToken = t.access_token
-        expiry = Date().addingTimeInterval(t.expires_in ?? 3600)
-    }
+    private enum TokenError: Error { case invalidGrant }
 
     private func tokenRequest(_ form: [String: String]) async throws -> TokenResponse {
         var req = URLRequest(url: URL(string: "https://oauth2.googleapis.com/token")!)
@@ -162,10 +245,9 @@ final class GoogleAuth {
             .joined(separator: "&").data(using: .utf8)
         let (data, response) = try await URLSession.shared.data(for: req)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            if (response as? HTTPURLResponse)?.statusCode == 400, form["grant_type"] == "refresh_token" {
-                Keychain.set(nil, for: Self.refreshKey) // revoked or expired: force re-sign-in
-            }
-            throw AuthError.badResponse(String(data: data, encoding: .utf8) ?? "HTTP error")
+            let body = String(data: data, encoding: .utf8) ?? "HTTP error"
+            if form["grant_type"] == "refresh_token", body.contains("invalid_grant") { throw TokenError.invalidGrant }
+            throw AuthError.badResponse(body)
         }
         return try JSONDecoder().decode(TokenResponse.self, from: data)
     }

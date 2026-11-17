@@ -48,9 +48,10 @@ final class AppState {
 
     @ObservationIgnored private let eventKit = EventKitProvider()
     @ObservationIgnored let googleAuth = GoogleAuth()
-    @ObservationIgnored private(set) lazy var google = GoogleCalendarProvider(auth: googleAuth)
+    /// One provider per signed-in Google account.
+    private(set) var googleProviders: [GoogleCalendarProvider] = []
     private(set) var icsProviders: [ICSProvider] = []
-    @ObservationIgnored private var providers: [CalendarProvider] { [eventKit, google] + icsProviders }
+    @ObservationIgnored private var providers: [CalendarProvider] { [eventKit] + googleProviders + icsProviders }
     @ObservationIgnored private var planner = AlertPlanner()
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
@@ -63,7 +64,7 @@ final class AppState {
 
     func start() {
         eventKit.onChange = { [weak self] in self?.refresh() }
-        google.onChange = { [weak self] in self?.refresh() }
+        syncGoogle(fetch: false)
         syncFeeds(fetch: false)
         Task {
             await requestAccess()
@@ -234,17 +235,44 @@ final class AppState {
         if fetch { for p in fresh { Task { await p.refreshRemote() } } }
     }
 
-    var hasRemoteSources: Bool { googleAuth.isSignedIn || !icsProviders.isEmpty }
-    var canShowAgenda: Bool { access == .granted || hasRemoteSources }
-
-    func googleSignIn() async throws {
-        try await googleAuth.signIn()
-        await google.refreshRemote()
+    /// Keep one provider per Google account, reusing existing ones so their cache survives.
+    private func syncGoogle(fetch: Bool) {
+        var next: [GoogleCalendarProvider] = []
+        var fresh: [GoogleCalendarProvider] = []
+        for account in googleAuth.accounts {
+            if let existing = googleProviders.first(where: { $0.accountID == account.id }) {
+                next.append(existing)
+            } else {
+                let provider = GoogleCalendarProvider(accountID: account.id, auth: googleAuth)
+                provider.onChange = { [weak self] in self?.refresh() }
+                next.append(provider)
+                fresh.append(provider)
+            }
+        }
+        googleProviders = next
+        refresh()
+        if fetch { for p in fresh { Task { await p.refreshRemote() } } }
     }
 
-    func googleSignOut() {
-        googleAuth.signOut()
-        Task { await google.refreshRemote() }
+    var hasRemoteSources: Bool { !googleProviders.isEmpty || !icsProviders.isEmpty }
+    var canShowAgenda: Bool { access == .granted || hasRemoteSources }
+
+    /// Adds a Google account (or reconnects one, if the user picks an account that's already listed).
+    func googleSignIn() async throws {
+        let account = try await googleAuth.signIn()
+        syncGoogle(fetch: false)
+        await googleProviders.first { $0.accountID == account.id }?.refreshRemote()
+    }
+
+    func googleSignOut(_ account: GoogleAccount) {
+        googleAuth.signOut(account)
+        prefs.filters.disabledCalendarIDs = prefs.filters.disabledCalendarIDs.filter { !$0.hasPrefix("gcal:\(account.id):") }
+        syncGoogle(fetch: false)
+    }
+
+    func googleUseBuiltInClient() {
+        googleAuth.clearCustomCredentials()
+        syncGoogle(fetch: false)
     }
 
     private func tick() {
