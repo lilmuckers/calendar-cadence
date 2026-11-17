@@ -14,7 +14,7 @@ finds the join link wherever it's hiding, and — 30 seconds before you're due �
 <img alt="Swift" src="https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white">
 <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-0A84FF?style=flat-square">
 <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-0-34C759?style=flat-square">
-<img alt="Tests" src="https://img.shields.io/badge/tests-73%20passing-34C759?style=flat-square">
+<img alt="Tests" src="https://img.shields.io/badge/tests-83%20passing-34C759?style=flat-square">
 </p>
 
 <img src="docs/screenshots/menubar.png" width="560" alt="Menu bar showing Cadence: 8m · Design Review">
@@ -90,6 +90,35 @@ Each morning Cadence gathers every invite still waiting for a reply and asks you
 
 <br clear="right">
 
+## 🤖 Ask your assistant about your day
+
+Cadence includes a local [MCP](https://modelcontextprotocol.io) server, so Claude (Desktop or Code), Cursor or any other MCP client on your Mac can read your merged calendar, act on it, and hear about things as they happen. It sees exactly what Cadence sees: every source merged, filtered and de-duplicated.
+
+**Connect.** Open *Settings → Assistants* and copy the setup for your client. For Claude Code:
+
+```bash
+claude mcp add --scope user cadence -- "/Applications/Cadence.app/Contents/MacOS/cadence-mcp"
+```
+
+For Claude Desktop, add this to `~/Library/Application Support/Claude/claude_desktop_config.json` and restart Claude:
+
+```json
+{ "mcpServers": { "cadence": { "command": "/Applications/Cadence.app/Contents/MacOS/cadence-mcp" } } }
+```
+
+`cadence-mcp` is a small stdio relay bundled in the app. It talks to Cadence over a Unix socket only your user can open (`~/Library/Application Support/Cadence/mcp.sock`, mode 0600), starts Cadence if it isn't running, and reconnects if Cadence restarts.
+
+| | |
+|---|---|
+| **Read** | `get_agenda` · `get_next_meeting` · `get_current_meeting` · `list_invites` · `list_clashes` · `find_free_time` · `list_calendars` · `get_status` (presenting / on a call) |
+| **Act** | `respond_to_invite` · `set_event_color` · `join_meeting` · `hide_from_panel` · `snooze_alert` |
+| **Resources** | `cadence://agenda/today` · `agenda/tomorrow` · `next` · `invites` · `clashes` · `status` (subscribable) |
+| **Prompts** | `daily_briefing` · `prepare_for_meeting` · `triage_invites` |
+
+**You stay in charge.** Every action pops a card in Cadence naming the assistant and what it wants to do: **Allow**, **Deny** or **Always allow**. Unanswered requests are denied after a minute. Per-action auto-approval lives in *Settings → Assistants*.
+
+**Events.** Cadence pushes `meeting.starting_soon`, `meeting.started`, `meeting.ending_soon`, `meeting.ended`, `invite.new`, `meeting.changed`, `meeting.canceled`, `clash.new`, `status.presenting` and `status.on_call`. They arrive as MCP log notifications and as `resources/updated` for subscribed resources. Clients differ in what they do with unsolicited notifications, so there's also `wait_for_event`: a long-poll tool (up to 5 minutes) that returns everything since the last call. An agent can loop on it to react to your calendar.
+
 ## ✨ Everything else
 
 - **🔗 Join links from anywhere.** URL field, location, or buried in an HTML invite body. Zoom, Google Meet, Microsoft Teams, Webex, GoTo, Whereby, Jitsi, Chime, Slack huddles, BlueJeans, Skype, Discord, FaceTime, Around, Tuple and RingCentral. Outlook SafeLinks, Google and Proofpoint redirect wrappers are unwrapped, and Zoom/Teams open straight in their apps.
@@ -158,7 +187,7 @@ If your build has a Microsoft app built in, skip this and click **Sign in with M
 No Xcode project, no SwiftPM, no dependencies — just the Xcode Command Line Tools on macOS 14+.
 
 ```bash
-scripts/test.sh            # 73 unit tests (Swift Testing)
+scripts/test.sh            # 83 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
 ```
 
@@ -192,7 +221,7 @@ build/Cadence.app/Contents/MacOS/Cadence --screenshots docs/screenshots   # rege
 
 ## 🔒 Privacy
 
-Everything runs locally. Cadence talks only to the services you connect (Google's and Microsoft's APIs, your ICS feed hosts) and Apple Maps for travel times. Presentation and call detection read window positions and microphone *usage* — never screen contents or audio — and need no Screen Recording or Microphone permission.
+Everything runs locally. Cadence talks only to the services you connect (Google's and Microsoft's APIs, your ICS feed hosts) and Apple Maps for travel times. Presentation and call detection read window positions and microphone *usage* — never screen contents or audio — and need no Screen Recording or Microphone permission. The assistant server listens only on a private Unix socket (no network port). What an assistant reads goes wherever that assistant sends it, so connect only ones you trust.
 
 ## 🧬 How it's built
 
@@ -209,11 +238,14 @@ Sources/
 │   ├── MicrosoftGraphModels  Microsoft Graph → Meeting
 │   ├── Invites               RSVP horizon, invite merging, event colour palette
 │   ├── Reminders             heads-up, leave-now, wrap-up, morning summary, clashes
-│   └── PanelPlanner          what the countdown panel shows, and how big
+│   ├── PanelPlanner          what the countdown panel shows, and how big
+│   └── MCP*                  MCP protocol, tools catalogue, events, free-time finder
 └── Cadence/              The app
     ├── Sources/              EventKit, ICS, Google and Microsoft providers, OAuth, Keychain
     ├── Engine/               system context, alert routing, travel, hotkey, notifications
-    └── UI/                   menu, panel, takeover, banner, clash and invite cards, settings
+    ├── MCP/                  Unix-socket bridge and tool implementations for assistants
+    └── UI/                   menu, panel, takeover, banner, clash, invite and approval cards, settings
+Sources/CadenceMCP/       cadence-mcp, the stdio relay bundled in the app
 ```
 
 New sources plug in by conforming to `CalendarProvider`. Ideas that are parked live in [BACKLOG.md](BACKLOG.md).

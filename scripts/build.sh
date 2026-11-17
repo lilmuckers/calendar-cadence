@@ -40,6 +40,14 @@ else
   echo "No Microsoft app registration bundled; users enter their own in Settings → Accounts"
 fi
 
+# stdio MCP helper for AI assistants (relays to the app's Unix socket).
+swiftc -target "$TARGET" "${OPT[@]}" -module-name CadenceMCP \
+  -I "$BUILD/core" -L "$BUILD/core" -lCadenceCore \
+  -o "$APP/Contents/MacOS/cadence-mcp" \
+  "$ROOT/Sources/CadenceMCP/main.swift"
+codesign --force --options runtime --identifier com.cadence.calendarmonitor.mcp \
+  --sign "${CODESIGN_IDENTITY:--}" "$APP/Contents/MacOS/cadence-mcp"
+
 codesign --force --options runtime --sign "${CODESIGN_IDENTITY:--}" \
   --entitlements "$ROOT/Support/Cadence.entitlements" "$APP"
 

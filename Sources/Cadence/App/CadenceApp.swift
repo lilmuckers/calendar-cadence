@@ -26,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var router: AlertRouter?
     private var clashPrompt: ClashPromptController?
     private var inviteReview: InviteReviewController?
+    private var approvals: ApprovalController?
+    private var bridge: MCPBridge?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let i = CommandLine.arguments.firstIndex(of: "--screenshots") {
@@ -60,13 +62,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKey.action = { [weak self] in self?.state.joinFromHotKey() }
         hotKey.register(state.prefs.joinHotKey)
         var registered = state.prefs.joinHotKey
+        let approvals = ApprovalController(state: state)
+        let bridge = MCPBridge(state: state, approvals: approvals)
+        self.approvals = approvals
+        self.bridge = bridge
+        MCPBridge.current = bridge
         state.onPrefsChanged = { [weak self] in
             panel.update()
+            bridge.sync()
             guard let self, self.state.prefs.joinHotKey != registered else { return }
             registered = self.state.prefs.joinHotKey
             hotKey.register(registered)
         }
         state.start()
+        bridge.sync()
 
         // Re-evaluate panel visibility whenever the observed state it depends on changes.
         observePanel()

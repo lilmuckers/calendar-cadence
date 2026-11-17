@@ -9,6 +9,7 @@ struct SettingsView: View {
             CalendarsTab().tabItem { Label("Calendars", systemImage: "calendar") }
             FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }
             AlertsTab().tabItem { Label("Alerts", systemImage: "bell.badge") }
+            AssistantsTab().tabItem { Label("Assistants", systemImage: "sparkles") }
             GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
         }
         .frame(width: 580, height: 520)

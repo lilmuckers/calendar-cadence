@@ -21,7 +21,15 @@ enum Theme {
         date.formatted(date: .omitted, time: .shortened)
     }
 
-    static func range(_ m: Meeting) -> String {
+    /// "Today 14:00", "Tomorrow 09:30", "Thu 20 Nov 10:00".
+    static func dayTime(_ date: Date) -> String {
+        let cal = Calendar.current
+        let day = cal.isDateInToday(date) ? "today" : cal.isDateInTomorrow(date) ? "tomorrow"
+            : date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+        return "\(day) \(time(date))"
+    }
+
+        static func range(_ m: Meeting) -> String {
         m.isAllDay ? "All day" : "\(time(m.start)) – \(time(m.end))"
     }
 }

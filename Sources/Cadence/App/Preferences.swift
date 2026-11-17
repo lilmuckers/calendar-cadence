@@ -50,6 +50,13 @@ struct Preferences: Codable, Equatable {
     var leaveOffsets: [Int] = [10, 0]
     var clashPromptEnabled = true
     var panelStyle: PanelStyle = .standard
+    /// Let AI assistants on this Mac connect through cadence-mcp.
+    var mcpEnabled = true
+    /// Assistant actions (tool names) that run without asking.
+    var mcpAutoApprove: Set<String> = []
+    /// Working hours for find_free_time, minutes after midnight.
+    var workStart = 9 * 60
+    var workEnd = 17 * 60 + 30
     var inviteHorizon: InviteHorizon = .twoDays
     /// Ask about unanswered invites once a day, at the morning summary time.
     var inviteReviewDaily = true
@@ -119,6 +126,10 @@ extension Preferences {
         leaveOffsets = try c.decodeIfPresent([Int].self, forKey: .leaveOffsets) ?? d.leaveOffsets
         clashPromptEnabled = try c.decodeIfPresent(Bool.self, forKey: .clashPromptEnabled) ?? d.clashPromptEnabled
         useEventColors = try c.decodeIfPresent(Bool.self, forKey: .useEventColors) ?? d.useEventColors
+        mcpEnabled = try c.decodeIfPresent(Bool.self, forKey: .mcpEnabled) ?? d.mcpEnabled
+        mcpAutoApprove = try c.decodeIfPresent(Set<String>.self, forKey: .mcpAutoApprove) ?? d.mcpAutoApprove
+        workStart = try c.decodeIfPresent(Int.self, forKey: .workStart) ?? d.workStart
+        workEnd = try c.decodeIfPresent(Int.self, forKey: .workEnd) ?? d.workEnd
         inviteHorizon = (try? c.decodeIfPresent(InviteHorizon.self, forKey: .inviteHorizon)) ?? d.inviteHorizon
         inviteReviewDaily = try c.decodeIfPresent(Bool.self, forKey: .inviteReviewDaily) ?? d.inviteReviewDaily
         newInviteAlert = (try? c.decodeIfPresent(InviteAlertStyle.self, forKey: .newInviteAlert)) ?? d.newInviteAlert
