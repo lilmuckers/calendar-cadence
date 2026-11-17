@@ -46,6 +46,7 @@
         <tr><td data-label="What">Each connected account's profile photo, if it has one</td><td data-label="Why">Show which account is which in Settings and on calendar badges</td><td data-label="Where it's kept">Cached in Cadence's Application Support folder on your Mac; refreshed at most once a day and deleted when you disconnect the account</td></tr>
         <tr><td data-label="What">Your own Google OAuth client or Microsoft app registration (only if you enter one)</td><td data-label="Why">Sign in with your own client instead of the one built into the app</td><td data-label="Where it's kept">Client IDs in macOS user defaults; Google client secret in your macOS Keychain</td></tr>
         <tr><td data-label="What">Events you've hidden from the countdown panel</td><td data-label="Why">Keep them off the panel</td><td data-label="Where it's kept">macOS user defaults on your Mac</td></tr>
+        <tr><td data-label="What">Your default browser's profile list: profile names and, for Chromium browsers, the email each profile is signed in with</td><td data-label="Why">Let you choose which profile opens each meeting, and match profiles to your calendar accounts</td><td data-label="Where it's kept">Read from the browser's own files on your Mac (Chrome's <code>Local State</code>, Firefox's <code>profiles.ini</code>) and held in memory; the rules you set are saved in macOS user defaults</td></tr>
         <tr><td data-label="What">A log of what connected AI assistants asked Cadence for (assistant name, tool, time, outcome and a one-line summary)</td><td data-label="Why">Show you what each assistant did in <em>Settings → Assistants → Activity</em></td><td data-label="Where it's kept">A file only your user can read, in Cadence's Application Support folder; kept for 30 days and clearable any time</td></tr>
         <tr><td data-label="What">Which apps have windows on screen and whether the microphone is in use</td><td data-label="Why">Avoid covering your screen while you present or are on a call</td><td data-label="Where it's kept">Checked in the moment; never stored</td></tr>
       </tbody>
@@ -60,7 +61,7 @@
       <li><strong>AI assistants you connect</strong>: only if you set one up in <em>Settings → Assistants</em>. See below.</li>
       <li><strong>ICS / webcal feed hosts</strong> — whatever calendar subscription URLs you add.</li>
       <li><strong>Apple Maps</strong> — when estimating travel time, Cadence sends the meeting location and your approximate position to Apple's MapKit service. See <a href="https://www.apple.com/legal/privacy/">Apple's Privacy Policy</a>.</li>
-      <li><strong>Meeting services</strong> — when you click Join, the meeting link opens in your browser or the relevant app (Zoom, Teams, etc.).</li>
+      <li><strong>Meeting services</strong>: when you click Join, the meeting link opens in your browser (in the profile you picked, if any) or the relevant app (Zoom, Teams, etc.).</li>
     </ul>
     <p>Calendars you've added in macOS Calendar are read locally through Apple's EventKit framework; Cadence doesn't contact those providers itself.</p>
 
