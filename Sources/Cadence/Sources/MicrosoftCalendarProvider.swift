@@ -47,6 +47,13 @@ final class MicrosoftCalendarProvider: CalendarProvider {
             if account.email == nil, let me = try? await getJSON("me?$select=mail,userPrincipalName", token: token) {
                 if let mail = (me["mail"] as? String) ?? (me["userPrincipalName"] as? String) { auth.setEmail(mail, for: accountID) }
             }
+            // Profile photo (many accounts have none: Graph answers 404).
+            AvatarStore.shared.refresh(account.avatarKey) { [weak self] in
+                guard let self else { return nil }
+                guard let (data, response) = try? await URLSession.shared.data(for: self.request("me/photo/$value", token: token)),
+                      (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+                return data
+            }
             // Category colours are optional (MailboxSettings.Read may be blocked by an admin).
             if let cats: GraphList<GraphCategory> = try? await get("me/outlook/masterCategories", token: token) {
                 categoryColors = Dictionary(cats.value.compactMap { c in GraphMapper.categoryColor(c.color).map { (c.displayName, $0) } },
@@ -55,7 +62,7 @@ final class MicrosoftCalendarProvider: CalendarProvider {
             let cals: GraphList<GraphCalendar> = try await get("me/calendars?$select=id,name,color,hexColor,isDefaultCalendar&$top=100", token: token)
             let source = "Microsoft · \(account.label)"
             let pairs = cals.value.map { c in
-                (c, CalendarInfo(id: "msft:\(accountID):\(c.id)", title: c.name ?? "Calendar", sourceTitle: source, color: GraphMapper.calendarColor(c)))
+                (c, CalendarInfo(id: "msft:\(accountID):\(c.id)", title: c.name ?? "Calendar", sourceTitle: source, color: GraphMapper.calendarColor(c), kind: .microsoft))
             }
             cachedCalendars = pairs.map(\.1)
             defaultCalendar = pairs.first { $0.0.isDefaultCalendar == true }.map { ($0.0.id, $0.1) }

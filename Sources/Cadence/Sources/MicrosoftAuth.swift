@@ -13,6 +13,7 @@ struct MicrosoftAccount: Codable, Identifiable, Equatable {
     var canWrite: Bool?
 
     var refreshKey: String { "microsoft.refreshToken.\(id)" }
+    var avatarKey: String { "microsoft-\(id)" }
     var label: String { email ?? "Microsoft account" }
 }
 
@@ -89,6 +90,7 @@ final class MicrosoftAuth {
     func signOut(_ account: MicrosoftAccount) {
         // Microsoft has no token revocation endpoint for public clients; forgetting the token is enough.
         Keychain.set(nil, for: account.refreshKey)
+        AvatarStore.shared.remove(account.avatarKey)
         tokens[account.id] = nil
         needsReconnect.remove(account.id)
         accounts.removeAll { $0.id == account.id }

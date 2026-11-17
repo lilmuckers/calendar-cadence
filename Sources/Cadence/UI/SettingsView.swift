@@ -42,7 +42,7 @@ private struct CalendarsTab: View {
                 }
             }
             ForEach(grouped, id: \.0) { source, calendars in
-                Section(source) {
+                Section {
                     ForEach(calendars) { cal in
                         Toggle(isOn: Binding(get: { state.isCalendarEnabled(cal.id) },
                                              set: { state.setCalendar(cal.id, enabled: $0) })) {
@@ -62,6 +62,8 @@ private struct CalendarsTab: View {
                             }
                         }
                     }
+                } header: {
+                    Text(source)
                 }
             }
         }

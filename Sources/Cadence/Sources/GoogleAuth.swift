@@ -13,8 +13,11 @@ struct GoogleAccount: Codable, Identifiable, Equatable {
     var clientID: String
     /// Whether the token allows replying to invites and setting colours (nil = not known yet).
     var canWrite: Bool?
+    /// Profile photo URL from the ID token's `picture` claim.
+    var pictureURL: String?
 
     var refreshKey: String { "google.refreshToken.\(id)" }
+    var avatarKey: String { "google-\(id)" }
     var label: String { email ?? "Google account" }
 }
 
@@ -43,7 +46,7 @@ final class GoogleAuth {
     }
 
     static let writeScope = "https://www.googleapis.com/auth/calendar.events"
-    static let scope = "openid email https://www.googleapis.com/auth/calendar.readonly \(writeScope)"
+    static let scope = "openid email profile https://www.googleapis.com/auth/calendar.readonly \(writeScope)"
     private static let accountsKey = "Cadence.google.accounts"
     private static let legacyRefreshKey = "google.refreshToken"
     private static let secretKey = "google.clientSecret"
@@ -115,6 +118,7 @@ final class GoogleAuth {
             URLSession.shared.dataTask(with: req).resume()
         }
         Keychain.set(nil, for: account.refreshKey)
+        AvatarStore.shared.remove(account.avatarKey)
         tokens[account.id] = nil
         needsReconnect.remove(account.id)
         accounts.removeAll { $0.id == account.id }
@@ -125,6 +129,12 @@ final class GoogleAuth {
     func setEmail(_ email: String, for id: String) {
         guard let i = accounts.firstIndex(where: { $0.id == id }), accounts[i].email == nil else { return }
         accounts[i].email = email
+        saveAccounts()
+    }
+
+    func setPicture(_ url: String, for id: String) {
+        guard let i = accounts.firstIndex(where: { $0.id == id }), accounts[i].pictureURL != url else { return }
+        accounts[i].pictureURL = url
         saveAccounts()
     }
 
@@ -201,6 +211,7 @@ final class GoogleAuth {
             ?? GoogleAccount(email: email, clientID: creds.clientID)
         account.clientID = creds.clientID
         account.canWrite = response.scope.map { $0.contains(Self.writeScope) }
+        account.pictureURL = response.id_token.flatMap { JWT.payload($0)?["picture"] as? String } ?? account.pictureURL
         Keychain.set(refresh, for: account.refreshKey)
         if let i = accounts.firstIndex(where: { $0.id == account.id }) { accounts[i] = account } else { accounts.append(account) }
         needsReconnect.remove(account.id)
@@ -227,6 +238,7 @@ final class GoogleAuth {
             tokens[account.id] = (response.access_token, Date().addingTimeInterval(response.expires_in ?? 3600))
             needsReconnect.remove(account.id)
             if let scope = response.scope { setCanWrite(scope.contains(Self.writeScope), for: account.id) }
+            if let picture = response.id_token.flatMap({ JWT.payload($0)?["picture"] as? String }) { setPicture(picture, for: account.id) }
             return response.access_token
         } catch TokenError.invalidGrant {
             // Revoked, or a Testing-mode token past its 7 days. Keep the account listed so it can be reconnected.

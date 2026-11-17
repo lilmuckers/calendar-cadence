@@ -39,7 +39,7 @@ final class ICSProvider: CalendarProvider {
     func requestAccess() async -> Bool { true }
 
     private var info: CalendarInfo {
-        CalendarInfo(id: feed.calendarID, title: feed.name, sourceTitle: "Subscribed feeds", color: feed.color)
+        CalendarInfo(id: feed.calendarID, title: feed.name, sourceTitle: "Subscribed feeds", color: feed.color, kind: .ics)
     }
 
     func calendars() -> [CalendarInfo] { [info] }

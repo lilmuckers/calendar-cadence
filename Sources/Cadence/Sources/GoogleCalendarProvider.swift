@@ -47,10 +47,15 @@ final class GoogleCalendarProvider: CalendarProvider {
             let list: GoogleCalendarList = try await get("users/me/calendarList", query: ["minAccessRole": "reader"], token: token)
             let entries = (list.items ?? []).filter { $0.selected != false }
             if let primary = entries.first(where: { $0.primary == true })?.id { auth.setEmail(primary, for: accountID) }
+            if let current = self.account {
+                // Ask for a larger photo than the default 96px thumbnail.
+                let url = current.pictureURL.map { $0.replacingOccurrences(of: "=s96-c", with: "=s128-c") }
+                AvatarStore.shared.refresh(current.avatarKey, from: url.flatMap(URL.init(string:)))
+            }
             let source = "Google · \(accountEmail ?? "account")"
             // Calendar IDs are scoped per account: two accounts can both see the same shared calendar.
             cachedCalendars = entries.map {
-                CalendarInfo(id: "gcal:\(accountID):\($0.id)", title: $0.title, sourceTitle: source, color: GoogleMapper.color(hex: $0.backgroundColor))
+                CalendarInfo(id: "gcal:\(accountID):\($0.id)", title: $0.title, sourceTitle: source, color: GoogleMapper.color(hex: $0.backgroundColor), kind: .google)
             }
             primary = zip(entries, cachedCalendars).first { $0.0.primary == true }.map { ($0.0, $0.1) }
 

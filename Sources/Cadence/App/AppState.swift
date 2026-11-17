@@ -71,6 +71,7 @@ final class AppState {
     @ObservationIgnored private var providers: [CalendarProvider] { [eventKit] + googleProviders + microsoftProviders + icsProviders }
     @ObservationIgnored private var planner = AlertPlanner()
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var menuOpen = false
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
     init() {
@@ -104,6 +105,12 @@ final class AppState {
                 self?.refresh()
                 Task { await self?.refreshRemote() }
             }
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.menuOpen = true }
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.menuOpen = false }
         })
         observers.append(NotificationCenter.default.addObserver(forName: .NSCalendarDayChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
@@ -449,6 +456,9 @@ final class AppState {
     }
 
     private func tick() {
+        // While a menu is open, don't touch observed state: SwiftUI would rebuild the open
+        // context menu every second, which collapses submenus. Alerts catch up once it closes.
+        guard !menuOpen else { return }
         now = Date()
         // Belt and braces: EventKit notifies on change, but refetch every 5 minutes anyway.
         if let last = lastRefresh, now.timeIntervalSince(last) > 300 { refresh() }

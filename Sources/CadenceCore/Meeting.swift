@@ -49,18 +49,45 @@ public enum Availability: String, Codable, Sendable {
     case busy, free, tentative, unavailable, unknown
 }
 
+/// Where a calendar comes from, for showing a source badge.
+public enum CalendarKind: String, Codable, Sendable {
+    /// Signed in directly in Cadence.
+    case google, microsoft, ics
+    /// Accounts in macOS Calendar (System Settings → Internet Accounts).
+    case iCloud, googleViaMac, exchange, calDAV, subscribed, birthdays, local
+    case other
+
+    public var label: String {
+        switch self {
+        case .google: "Google Calendar (signed in to Cadence)"
+        case .microsoft: "Microsoft 365 / Outlook (signed in to Cadence)"
+        case .ics: "Subscribed ICS feed (added in Cadence)"
+        case .iCloud: "iCloud, via macOS Calendar"
+        case .googleViaMac: "Google, via macOS Calendar"
+        case .exchange: "Exchange / Outlook, via macOS Calendar"
+        case .calDAV: "CalDAV, via macOS Calendar"
+        case .subscribed: "Subscribed calendar, via macOS Calendar"
+        case .birthdays: "Contacts birthdays"
+        case .local: "On this Mac"
+        case .other: "Calendar"
+        }
+    }
+}
+
 /// A calendar the user can toggle on or off.
 public struct CalendarInfo: Identifiable, Hashable, Sendable {
     public var id: String
     public var title: String
     public var sourceTitle: String
     public var color: RGBAColor
+    public var kind: CalendarKind
 
-    public init(id: String, title: String, sourceTitle: String, color: RGBAColor) {
+    public init(id: String, title: String, sourceTitle: String, color: RGBAColor, kind: CalendarKind = .other) {
         self.id = id
         self.title = title
         self.sourceTitle = sourceTitle
         self.color = color
+        self.kind = kind
     }
 }
 

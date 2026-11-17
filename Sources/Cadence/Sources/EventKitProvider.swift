@@ -75,8 +75,26 @@ final class EventKitProvider: CalendarProvider {
             id: cal.calendarIdentifier,
             title: cal.title,
             sourceTitle: cal.source?.title ?? "Other",
-            color: rgba(cal.color)
+            color: rgba(cal.color),
+            kind: kind(cal)
         )
+    }
+
+    private static func kind(_ cal: EKCalendar) -> CalendarKind {
+        if cal.type == .birthday { return .birthdays }
+        if cal.type == .subscription { return .subscribed }
+        let title = (cal.source?.title ?? "").lowercased()
+        switch cal.source?.sourceType {
+        case .local?: return .local
+        case .exchange?: return .exchange
+        case .birthdays?: return .birthdays
+        case .subscribed?: return .subscribed
+        case .calDAV?:
+            if title.contains("icloud") { return .iCloud }
+            if title.contains("google") || title.contains("gmail") { return .googleViaMac }
+            return .calDAV
+        default: return .other
+        }
     }
 
     private static func rgba(_ color: NSColor?) -> RGBAColor {

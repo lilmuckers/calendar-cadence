@@ -10,9 +10,24 @@ struct AccountsTab: View {
         let _ = state.lastRefresh
         Form {
             Section {
-                LabeledContent("macOS Calendar") {
+                LabeledContent {
                     Text(state.access == .granted ? "Connected" : "No access")
                         .foregroundStyle(state.access == .granted ? Color.secondary : Color.orange)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "calendar").font(.system(size: 16)).foregroundStyle(.red).frame(width: 22)
+                        Text("macOS Calendar")
+                    }
+                }
+                ForEach(macSources, id: \.title) { source in
+                    HStack(spacing: 10) {
+                        CalendarKindBadge(kind: source.kind, size: 18).frame(width: 22)
+                        Text(source.title)
+                        Spacer()
+                        Text(source.count == 1 ? "1 calendar" : "\(source.count) calendars")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(.leading, 14)
                 }
             } footer: {
                 Text("Includes every account in System Settings → Internet Accounts (iCloud, Google, Exchange, CalDAV).")
@@ -23,6 +38,26 @@ struct AccountsTab: View {
             FeedsSection()
         }
         .formStyle(.grouped)
+    }
+
+    /// Accounts that reach Cadence through macOS Calendar, with their type.
+    private var macSources: [(title: String, kind: CalendarKind, count: Int)] {
+        let direct: Set<CalendarKind> = [.google, .microsoft, .ics]
+        return Dictionary(grouping: state.calendars.filter { !direct.contains($0.kind) }, by: \.sourceTitle)
+            .map { (title: $0.key, kind: $0.value.first?.kind ?? .other, count: $0.value.count) }
+            .sorted { $0.title < $1.title }
+    }
+}
+
+/// Section header with a source badge.
+private struct BadgedHeader: View {
+    let kind: CalendarKind
+    let title: String
+    var body: some View {
+        HStack(spacing: 6) {
+            CalendarKindBadge(kind: kind, size: 14)
+            Text(title)
+        }
     }
 }
 
@@ -78,7 +113,7 @@ private struct GoogleSection: View {
                 Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
             }
         } header: {
-            Text("Google Calendar (direct)")
+            BadgedHeader(kind: .google, title: "Google Calendar (direct)")
         } footer: {
             Text(footer).foregroundStyle(.secondary)
         }
@@ -131,13 +166,7 @@ private struct AccountRow: View {
         // Provider status isn't observable; every fetch triggers a refresh, so read this to redraw.
         let _ = state.lastRefresh
         HStack(spacing: 10) {
-            ZStack {
-                Circle().fill(Color.accentColor.gradient)
-                Text(String(account.label.prefix(1)).uppercased())
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-            }
-            .frame(width: 28, height: 28)
+            AccountAvatar(key: account.avatarKey, label: account.label, kind: .google)
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.label)
                 Text(provider?.status ?? "Connecting…")
@@ -183,13 +212,7 @@ private struct MicrosoftSection: View {
                 let provider = state.microsoftProviders.first { $0.accountID == account.id }
                 let reconnect = auth.needsReconnect.contains(account.id) || account.canWrite == false
                 HStack(spacing: 10) {
-                    ZStack {
-                        Circle().fill(Color(red: 0.0, green: 0.47, blue: 0.84).gradient)
-                        Text(String(account.label.prefix(1)).uppercased())
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-                    }
-                    .frame(width: 28, height: 28)
+                    AccountAvatar(key: account.avatarKey, label: account.label, kind: .microsoft)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(account.label)
                         Text(provider?.status ?? "Connecting…")
@@ -230,7 +253,7 @@ private struct MicrosoftSection: View {
                 Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
             }
         } header: {
-            Text("Microsoft 365 / Outlook (direct)")
+            BadgedHeader(kind: .microsoft, title: "Microsoft 365 / Outlook (direct)")
         } footer: {
             Text("Optional — Teams links, RSVP status and replies straight from Outlook, for work, school or personal Microsoft accounts."
                  + (needsClientField ? " Needs an Azure app registration (public client, redirect http://localhost) — see the README." : ""))
@@ -296,7 +319,7 @@ private struct FeedsSection: View {
                     .disabled(!isValid)
             }
         } header: {
-            Text("Subscribed calendars (ICS)")
+            BadgedHeader(kind: .ics, title: "Subscribed calendars (ICS)")
         } footer: {
             Text("Any iCalendar link works: Google \"Secret address in iCal format\", Outlook \"Publish calendar\" ICS, iCloud public calendars, sports and holiday feeds. Refreshed every 10 minutes.")
                 .foregroundStyle(.secondary)
