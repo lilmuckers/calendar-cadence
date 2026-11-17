@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy — Cadence</title>
+  <meta name="description" content="How Cadence handles your calendar data: everything stays on your Mac.">
+  <link rel="canonical" href="https://cadence.patrick-mckinley.com/privacy.html">
+  <link rel="icon" type="image/png" href="assets/AppIcon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="assets/AppIcon.png" alt="">Cadence</a>
+      <nav>
+        <a href="./">Home</a>
+        <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap narrow prose">
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: 17 November 2026</p>
+
+    <div class="summary">
+      <strong>The short version:</strong> Cadence runs entirely on your Mac. It has no servers, no accounts, no analytics and no tracking. The developer never receives your calendar data or anything else about you.
+    </div>
+
+    <h2>Who we are</h2>
+    <p>Cadence is a macOS menu-bar app developed by Patrick McKinley ("we", "us"). This policy explains what information the app uses and where it goes.</p>
+
+    <h2>Information Cadence uses</h2>
+    <p>To do its job, Cadence reads the following on your device. None of it is sent to us.</p>
+    <table>
+      <thead><tr><th>What</th><th>Why</th><th>Where it's kept</th></tr></thead>
+      <tbody>
+        <tr><td>Calendar events (title, time, location, attendees, notes, join links)</td><td>Show your agenda, countdowns, join buttons, reminders and clash prompts</td><td>In memory on your Mac; read from macOS Calendar, your ICS feeds or Google Calendar</td></tr>
+        <tr><td>Your approximate location (only if you allow it)</td><td>Estimate travel time to in-person meetings</td><td>In memory on your Mac</td></tr>
+        <tr><td>Settings and preferences, including ICS feed URLs</td><td>Remember how you've configured the app</td><td>macOS user defaults on your Mac</td></tr>
+        <tr><td>Google OAuth client ID, secret and refresh token (only if you connect Google directly)</td><td>Fetch your Google Calendar</td><td>Your macOS Keychain</td></tr>
+        <tr><td>Which apps have windows on screen and whether the microphone is in use</td><td>Avoid covering your screen while you present or are on a call</td><td>Checked in the moment; never stored</td></tr>
+      </tbody>
+    </table>
+    <p>Presentation and call detection look at window positions and whether the microphone is <em>in use</em>. Cadence never reads your screen contents and never records or listens to audio, and it does not need Screen Recording or Microphone permission.</p>
+
+    <h2>Services Cadence connects to</h2>
+    <p>Cadence connects only to services you choose to use, directly from your Mac:</p>
+    <ul>
+      <li><strong>Google Calendar API</strong> — if you sign in with Google. Cadence requests read-only calendar access (<code>calendar.readonly</code>) using your own OAuth client. Google's handling of that data is covered by the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</li>
+      <li><strong>ICS / webcal feed hosts</strong> — whatever calendar subscription URLs you add.</li>
+      <li><strong>Apple Maps</strong> — when estimating travel time, Cadence sends the meeting location and your approximate position to Apple's MapKit service. See <a href="https://www.apple.com/legal/privacy/">Apple's Privacy Policy</a>.</li>
+      <li><strong>Meeting services</strong> — when you click Join, the meeting link opens in your browser or the relevant app (Zoom, Teams, etc.).</li>
+    </ul>
+    <p>Calendars you've added in macOS Calendar are read locally through Apple's EventKit framework; Cadence doesn't contact those providers itself.</p>
+
+    <h2>What we don't do</h2>
+    <ul>
+      <li>No analytics, telemetry, crash reporting or advertising.</li>
+      <li>No accounts and no Cadence servers.</li>
+      <li>We don't sell, share or receive any of your data.</li>
+    </ul>
+
+    <h2>Your choices</h2>
+    <ul>
+      <li>Calendar and location access can be granted or revoked any time in <em>System Settings → Privacy &amp; Security</em>.</li>
+      <li>Disconnect Google or remove ICS feeds in <em>Cadence → Settings → Accounts</em>. You can also revoke access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+      <li>Deleting the app and its preferences removes everything Cadence stores. Its Keychain items can be removed in Keychain Access (search for <code>com.cadence.calendarmonitor</code>).</li>
+    </ul>
+
+    <h2>Children</h2>
+    <p>Cadence isn't directed at children and doesn't knowingly collect information from anyone.</p>
+
+    <h2>Changes</h2>
+    <p>If this policy changes, the updated version will be posted on this page with a new "last updated" date.</p>
+
+    <h2>Contact</h2>
+    <p>Questions? Open an issue on <a href="https://github.com/lilmuckers/calendar-cadence/issues">GitHub</a>.</p>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Patrick McKinley</span>
+      <nav>
+        <a href="./">Home</a>
+        <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

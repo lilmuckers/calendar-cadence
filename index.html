@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cadence — your calendar, gently panicking on your behalf</title>
+  <meta name="description" content="Cadence is a tiny native macOS menu-bar app that counts down to your next meeting, finds the join link, and takes over your screen 30 seconds before you're due.">
+  <link rel="canonical" href="https://cadence.patrick-mckinley.com/">
+  <link rel="icon" type="image/png" href="assets/AppIcon.png">
+  <link rel="apple-touch-icon" href="assets/AppIcon.png">
+  <meta property="og:title" content="Cadence">
+  <meta property="og:description" content="Your calendar, gently panicking on your behalf.">
+  <meta property="og:image" content="https://cadence.patrick-mckinley.com/assets/takeover.jpg">
+  <meta property="og:url" content="https://cadence.patrick-mckinley.com/">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="assets/AppIcon.png" alt="">Cadence</a>
+      <nav>
+        <a href="#features">Features</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap hero">
+      <img class="icon" src="assets/AppIcon.png" alt="Cadence app icon: a panicking calendar page with googly eyes shouting LATE!">
+      <h1>Cadence</h1>
+      <p class="tagline">Your calendar, gently panicking on your behalf. A tiny native macOS menu-bar app that makes sure you're never late for a meeting again.</p>
+      <div class="badges">
+        <span class="badge">macOS 14+</span>
+        <span class="badge">Native Swift &amp; SwiftUI</span>
+        <span class="badge">Zero dependencies</span>
+        <span class="badge">Runs locally</span>
+      </div>
+      <a class="cta" href="https://github.com/lilmuckers/calendar-cadence">Get Cadence on GitHub</a>
+      <img class="shot" src="assets/menubar.png" alt="Menu bar showing Cadence: 8m · Design Review">
+    </div>
+
+    <section id="features">
+      <div class="wrap feature">
+        <div class="media"><img src="assets/takeover.jpg" alt="Full-screen alert: Starting in 0:23, Design Review, Join Google Meet"></div>
+        <div>
+          <h2>A full-screen nudge you can't miss</h2>
+          <p>30 seconds before a meeting (configurable), Cadence covers every display with a countdown and a big <strong>Join</strong> button.</p>
+          <p><kbd>Return</kbd> joins · <kbd>Esc</kbd> dismisses · <strong>Snooze</strong> nags you again a minute later.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap feature flip">
+        <div class="media"><img src="assets/banner.jpg" alt="Compact banner: Design Review, starts in 0:23, Join" style="max-width:420px"></div>
+        <div>
+          <h2>…but never while you're presenting</h2>
+          <p>Sharing your screen in Zoom or Teams, or running a Keynote or PowerPoint slideshow? Displays being shown are never covered — a small banner appears elsewhere instead.</p>
+          <p>On a call? You get a quiet banner with no focus stealing.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap feature">
+        <div class="media"><img src="assets/menu.jpg" alt="Today's agenda dropdown with colour-coded meetings and Join buttons" style="max-width:440px"></div>
+        <div>
+          <h2>Today, at a glance</h2>
+          <p>Click the menu bar for a colour-coded agenda with times, attendees, a live <strong>NOW</strong> badge and one-click <strong>Join</strong> on everything joinable.</p>
+          <p>In-person meetings get a map, live travel time and a "leave in 12m" hint.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap feature flip">
+        <div class="media"><img src="assets/clash.jpg" alt="Double-booked! Which one should I alert you for?" style="max-width:380px"></div>
+        <div>
+          <h2>Double-booked? It asks.</h2>
+          <p>When two real meetings overlap, Cadence asks which one you want alerts for. Your choice sticks; the other is quietly muted.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2 class="section-title">Everything else</h2>
+        <div class="grid">
+          <div class="card"><h3>🔗 Join links from anywhere</h3><p>Zoom, Meet, Teams, Webex, Slack huddles, FaceTime and more — even buried in HTML invites or wrapped in SafeLinks.</p></div>
+          <div class="card"><h3>⌨️ Global join shortcut</h3><p><kbd>⌃⌥⌘J</kbd> joins whatever's starting in the next 10 minutes, or the one you're late for.</p></div>
+          <div class="card"><h3>⏱️ Floating countdown</h3><p>A glass pill above every window, on every Space. Drag it anywhere — it snaps to edges.</p></div>
+          <div class="card"><h3>🗂️ Every calendar</h3><p>macOS Calendar (iCloud, Google, Exchange, CalDAV), ICS/webcal feeds and direct Google Calendar. Duplicates merged.</p></div>
+          <div class="card"><h3>🧹 Filters</h3><p>Hide all-day, declined, tentative or link-less events; include or exclude by keyword.</p></div>
+          <div class="card"><h3>😰 An icon with feelings</h3><p>Calm, nervous at 15 minutes, sweating at 5.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="privacy-callout">
+          <h2>🔒 Your calendar stays on your Mac</h2>
+          <p>No accounts, no analytics, no servers. Cadence only talks to the calendar services you connect and Apple Maps for travel times.</p>
+          <a href="privacy.html">Read the privacy policy →</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Patrick McKinley</span>
+      <nav>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>
