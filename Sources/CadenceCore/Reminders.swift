@@ -6,6 +6,10 @@ public struct Reminder: Equatable, Sendable {
         case headsUp(minutes: Int)
         /// `offset` minutes before you need to leave; 0 = time to leave.
         case leave(offset: Int, travel: TimeInterval)
+        /// `minutes` before a live meeting ends; `next` is a meeting starting right after it.
+        case wrapUp(minutes: Int, next: Meeting?)
+        /// Morning digest of the day ahead.
+        case summary(day: Date, meetings: [Meeting])
     }
 
     public var key: String
@@ -18,6 +22,26 @@ public struct Reminder: Equatable, Sendable {
         self.meeting = meeting
         self.kind = kind
         self.fireAt = fireAt
+    }
+
+    /// After this the reminder is pointless: a meeting's start, or its end for wrap-ups.
+    public var deadline: Date {
+        switch kind {
+        case .wrapUp: meeting.end
+        case .summary(let day, _): Calendar.current.date(byAdding: .hour, value: 4, to: fireAt) ?? day
+        default: meeting.start
+        }
+    }
+
+    public var isSummary: Bool {
+        if case .summary = kind { return true }
+        return false
+    }
+
+    /// What a "Join" action on this reminder should open.
+    public var joinTarget: Meeting {
+        if case .wrapUp(_, let next?) = kind { return next }
+        return meeting
     }
 }
 
@@ -39,12 +63,32 @@ public enum ReminderPlanner {
         }
     }
 
+    /// Gap that still counts as "straight after" for the wrap-up nudge.
+    public static let backToBackGap: TimeInterval = 5 * 60
+
+    /// A wrap-up nudge `minutes` before each live meeting ends, naming the meeting that starts straight
+    /// after it, if any. With `onlyBackToBack`, meetings with nothing after them are skipped.
+    public static func wrapUps(live: [Meeting], all: [Meeting], minutes: Int, onlyBackToBack: Bool) -> [Reminder] {
+        live.filter { !$0.isAllDay && $0.duration > Double(minutes) * 60 }.compactMap { m in
+            let next = all
+                .filter { n in
+                    !n.isAllDay && n.id != m.id && n.participation != .declined && !n.isCanceled
+                        && n.start >= m.end.addingTimeInterval(-60) && n.start.timeIntervalSince(m.end) <= backToBackGap
+                        && !MeetingDeduplicator.isSameMeeting(n, m)
+                }
+                .min { $0.start < $1.start }
+            if onlyBackToBack && next == nil { return nil }
+            return Reminder(key: "wrap:\(minutes):\(m.id)", meeting: m, kind: .wrapUp(minutes: minutes, next: next),
+                            fireAt: m.end.addingTimeInterval(-Double(minutes) * 60))
+        }
+    }
+
     /// Reminders whose time has come and that haven't been sent. A reminder only fires before the
     /// meeting starts, and at most `staleness` late (e.g. the Mac was asleep), so nothing stale pops up.
     public static func due(_ reminders: [Reminder], now: Date, sent: Set<String>, staleness: TimeInterval = 120) -> [Reminder] {
         reminders.filter { r in
-            !sent.contains(r.key) && r.fireAt <= now && now < r.meeting.start
-                && now.timeIntervalSince(r.fireAt) <= staleness
+            !sent.contains(r.key) && r.fireAt <= now && now < r.deadline
+                && (r.isSummary || now.timeIntervalSince(r.fireAt) <= staleness)
         }
     }
 
@@ -57,7 +101,42 @@ public enum ReminderPlanner {
             return offset == 0
                 ? ("Time to leave for \(r.meeting.title)", trip)
                 : ("Leave in \(offset) min for \(r.meeting.title)", trip)
+        case .wrapUp(let minutes, let next):
+            guard let next else {
+                return ("\(r.meeting.title) ends in \(minutes) min", "Time to start wrapping up.")
+            }
+            let toNext = max(1, Int((next.start.timeIntervalSince(r.fireAt) / 60).rounded()))
+            let via = next.joinLink?.service.displayName ?? next.physicalLocation
+            return ("Dude, you have \(toNext) minutes to the next meeting and you're still talking",
+                    "Next: \(next.title) at \(timeString(next.start))" + (via.map { " · \($0)" } ?? ""))
+        case .summary(_, let meetings):
+            let timed = meetings.filter { !$0.isAllDay }
+            guard let first = timed.first else {
+                return ("Good morning — no meetings today", "Enjoy the deep work.")
+            }
+            let count = timed.count == 1 ? "1 meeting" : "\(timed.count) meetings"
+            let pending = meetings.filter { $0.participation == .pending }.count
+            var body = "First up: \(first.title) at \(timeString(first.start))"
+            if let last = timed.last, timed.count > 1 { body += " · done by \(timeString(last.end))" }
+            if pending > 0 { body += " · \(pending) to RSVP" }
+            return ("Good morning — \(count) today", body)
         }
+    }
+
+    static func timeString(_ d: Date) -> String {
+        d.formatted(date: .omitted, time: .shortened)
+    }
+
+    /// The once-a-day summary, due from `hour:minute` for 4 hours so a late wake still gets it.
+    public static func morningSummary(meetings: [Meeting], now: Date, hour: Int, minute: Int) -> Reminder? {
+        let cal = Calendar.current
+        guard let at = cal.date(bySettingHour: hour, minute: minute, second: 0, of: now) else { return nil }
+        let day = cal.startOfDay(for: now)
+        let today = meetings.filter { cal.isDate($0.start, inSameDayAs: now) && !$0.isCanceled && $0.participation != .declined }
+        let anchor = Meeting(id: "summary", title: "Today", start: at, end: at,
+                             calendar: CalendarInfo(id: "summary", title: "", sourceTitle: "", color: .gray))
+        let key = "summary:\(Int(day.timeIntervalSince1970))"
+        return Reminder(key: key, meeting: anchor, kind: .summary(day: day, meetings: today), fireAt: at)
     }
 }
 

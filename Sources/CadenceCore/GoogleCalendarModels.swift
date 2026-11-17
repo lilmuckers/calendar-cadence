@@ -62,6 +62,8 @@ public struct GoogleEvent: Decodable, Sendable {
     public var conferenceData: Conference?
     public var eventType: String?
     public var colorId: String?
+    public var recurringEventId: String?
+    public var recurrence: [String]?
 }
 
 public enum GoogleMapper {
@@ -147,7 +149,8 @@ public enum GoogleMapper {
             participation: participation,
             availability: e.transparency == "transparent" ? .free : (participation == .tentative ? .tentative : .busy),
             joinLink: link,
-            eventColor: eventColor(id: e.colorId)
+            eventColor: eventColor(id: e.colorId),
+            recurs: e.recurringEventId != nil || e.recurrence?.isEmpty == false
         )
     }
 }

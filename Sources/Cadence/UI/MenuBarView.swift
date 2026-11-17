@@ -70,6 +70,17 @@ struct MenuBarView: View {
                     .font(.system(size: 22, weight: .bold, design: .rounded))
             }
             Spacer()
+            if !state.invites.isEmpty {
+                Button { state.reviewInvites() } label: {
+                    Label("\(state.invites.count)", systemImage: "envelope.badge")
+                        .font(.system(size: 11, weight: .semibold))
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(Capsule().fill(Color.accentColor.opacity(0.18)))
+                }
+                .buttonStyle(.plain)
+                .help("\(state.invites.count) invite\(state.invites.count == 1 ? "" : "s") waiting for a reply")
+                .padding(.trailing, 6)
+            }
             if let next = state.next, state.isNextToday {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("Next in")
@@ -110,7 +121,7 @@ struct MenuBarView: View {
             EmptyState(symbol: "calendar", title: "Connecting…", message: "Waiting for calendar access.",
                        actionTitle: "Grant Access", action: { Task { await state.requestAccess() } })
         case .granted:
-            if state.todayMeetings.isEmpty {
+            if state.todayMeetings.isEmpty && !state.showsTomorrow {
                 EmptyState(symbol: "sun.max", title: "Nothing today", message: tomorrowHint, actionTitle: nil, action: {})
             } else {
                 if Self.screenshotMode {
@@ -129,13 +140,39 @@ struct MenuBarView: View {
 
     private var agenda: some View {
         LazyVStack(spacing: 4) {
-            ForEach(state.todayMeetings) { meeting in
-                EventRow(meeting: meeting, expanded: expanded == meeting.id) {
-                    withAnimation(Theme.spring) { expanded = expanded == meeting.id ? nil : meeting.id }
+            if state.todayMeetings.isEmpty {
+                Text("Nothing else today")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+            }
+            rows(state.todayMeetings)
+            if state.showsTomorrow {
+                HStack(spacing: 6) {
+                    Text("TOMORROW")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.8)
+                    Text(state.tomorrowMeetings.first.map { $0.start.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)) } ?? "")
+                        .font(.system(size: 10, weight: .medium))
+                    Rectangle().fill(.primary.opacity(0.1)).frame(height: 1)
                 }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.top, state.todayMeetings.isEmpty ? 0 : 10)
+                .padding(.bottom, 2)
+                rows(state.tomorrowMeetings)
             }
         }
         .padding(10)
+    }
+
+    private func rows(_ meetings: [Meeting]) -> some View {
+        ForEach(meetings) { meeting in
+            EventRow(meeting: meeting, expanded: expanded == meeting.id) {
+                withAnimation(Theme.spring) { expanded = expanded == meeting.id ? nil : meeting.id }
+            }
+        }
     }
 
     private var tomorrowHint: String {

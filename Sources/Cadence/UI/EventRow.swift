@@ -110,6 +110,7 @@ struct EventRow: View {
         .opacity(isPast && !expanded ? 0.45 : 1)
         .onHover { hovering = $0 }
         .contextMenu {
+            EventActionsMenu(meeting: meeting)
             if meeting.joinLink != nil { Button("Join") { state.join(meeting) } }
             if let link = meeting.joinLink {
                 Button("Copy Meeting Link") {

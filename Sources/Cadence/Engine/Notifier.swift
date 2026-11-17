@@ -7,6 +7,9 @@ import UserNotifications
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     private static let category = "cadence.meeting"
     private static let joinAction = "cadence.join"
+    private static let inviteCategory = "cadence.invite"
+    private static let inviteViewCategory = "cadence.invite.view"
+    private static let rsvpPrefix = "cadence.rsvp."
 
     private let center = UNUserNotificationCenter.current()
     private let state: AppState
@@ -16,8 +19,14 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         super.init()
         center.delegate = self
         let join = UNNotificationAction(identifier: Self.joinAction, title: "Join", options: [.foreground])
+        let replies = RSVP.allCases.map {
+            UNNotificationAction(identifier: Self.rsvpPrefix + $0.rawValue, title: $0.label,
+                                 options: $0 == .decline ? [.destructive] : [])
+        }
         center.setNotificationCategories([
             UNNotificationCategory(identifier: Self.category, actions: [join], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.inviteCategory, actions: replies, intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.inviteViewCategory, actions: [], intentIdentifiers: []),
         ])
     }
 
@@ -47,9 +56,25 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             content.body = message.body
             content.sound = .default
             content.interruptionLevel = .timeSensitive
-            content.userInfo = ["meetingID": reminder.meeting.id]
-            if reminder.meeting.joinLink != nil { content.categoryIdentifier = Self.category }
+            content.userInfo = ["meetingID": reminder.joinTarget.id]
+            if reminder.joinTarget.joinLink != nil, !reminder.isSummary { content.categoryIdentifier = Self.category }
+            if reminder.isSummary { content.interruptionLevel = .active }
             try? await center.add(UNNotificationRequest(identifier: reminder.key, content: content, trigger: nil))
+        }
+    }
+
+    func notify(invite m: Meeting) {
+        let canReply = state.canRespond(m)
+        Task {
+            guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "New invite: \(m.title)"
+            let day = m.start.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute())
+            content.body = [day, m.organizer.map { "from \($0)" }, m.calendar.title].compactMap { $0 }.joined(separator: " · ")
+            content.sound = .default
+            content.userInfo = ["inviteID": m.id]
+            content.categoryIdentifier = canReply ? Self.inviteCategory : Self.inviteViewCategory
+            try? await center.add(UNNotificationRequest(identifier: "invite:\(m.id)", content: content, trigger: nil))
         }
     }
 
@@ -65,8 +90,18 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse
     ) async {
         let id = response.notification.request.content.userInfo["meetingID"] as? String
+        let inviteID = response.notification.request.content.userInfo["inviteID"] as? String
         let action = response.actionIdentifier
         await MainActor.run {
+            if let inviteID {
+                guard let invite = state.invites.first(where: { $0.id == inviteID }) else { return }
+                if action.hasPrefix(Self.rsvpPrefix), let reply = RSVP(rawValue: String(action.dropFirst(Self.rsvpPrefix.count))) {
+                    Task { try? await state.respond(invite, reply) }
+                } else if action == UNNotificationDefaultActionIdentifier {
+                    state.reviewInvites()
+                }
+                return
+            }
             guard let id, let meeting = state.allMeetings.first(where: { $0.id == id }) else { return }
             if action == Self.joinAction || (action == UNNotificationDefaultActionIdentifier && meeting.joinLink != nil) {
                 state.join(meeting)

@@ -1,6 +1,18 @@
 import CadenceCore
 import Foundation
 
+enum InviteAlertStyle: String, Codable, CaseIterable, Identifiable {
+    case off, notification, card
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .off: "Don't alert"
+        case .notification: "Notification"
+        case .card: "Pop-up card"
+        }
+    }
+}
+
 enum TravelMode: String, Codable, CaseIterable, Identifiable {
     case driving, walking, transit
     var id: String { rawValue }
@@ -38,6 +50,23 @@ struct Preferences: Codable, Equatable {
     var leaveOffsets: [Int] = [10, 0]
     var clashPromptEnabled = true
     var panelStyle: PanelStyle = .standard
+    var inviteHorizon: InviteHorizon = .twoDays
+    /// Ask about unanswered invites once a day, at the morning summary time.
+    var inviteReviewDaily = true
+    var newInviteAlert: InviteAlertStyle = .card
+    /// Calendars whose invites also ask for an event colour.
+    var colorPromptCalendarIDs: Set<String> = []
+    /// Colours Cadence keeps itself (for sources that can't store one): seriesID or meeting id → palette id.
+    var localEventColors: [String: String] = [:]
+    var wrapUpEnabled = true
+    var wrapUpMinutes = 5
+    var wrapUpOnlyBackToBack = false
+    var summaryEnabled = true
+    /// Minutes after midnight.
+    var summaryTime = 8 * 60 + 30
+    var tomorrowPreview = true
+    /// Hour from which the agenda also shows tomorrow (it always does once today is done).
+    var tomorrowFromHour = 17
     /// Use colours set on individual events (Google, ICS) instead of the calendar colour.
     var useEventColors = true
     /// Step up to a bigger style 15 and 5 minutes before the meeting.
@@ -90,6 +119,18 @@ extension Preferences {
         leaveOffsets = try c.decodeIfPresent([Int].self, forKey: .leaveOffsets) ?? d.leaveOffsets
         clashPromptEnabled = try c.decodeIfPresent(Bool.self, forKey: .clashPromptEnabled) ?? d.clashPromptEnabled
         useEventColors = try c.decodeIfPresent(Bool.self, forKey: .useEventColors) ?? d.useEventColors
+        inviteHorizon = (try? c.decodeIfPresent(InviteHorizon.self, forKey: .inviteHorizon)) ?? d.inviteHorizon
+        inviteReviewDaily = try c.decodeIfPresent(Bool.self, forKey: .inviteReviewDaily) ?? d.inviteReviewDaily
+        newInviteAlert = (try? c.decodeIfPresent(InviteAlertStyle.self, forKey: .newInviteAlert)) ?? d.newInviteAlert
+        colorPromptCalendarIDs = try c.decodeIfPresent(Set<String>.self, forKey: .colorPromptCalendarIDs) ?? d.colorPromptCalendarIDs
+        localEventColors = try c.decodeIfPresent([String: String].self, forKey: .localEventColors) ?? d.localEventColors
+        wrapUpEnabled = try c.decodeIfPresent(Bool.self, forKey: .wrapUpEnabled) ?? d.wrapUpEnabled
+        wrapUpMinutes = try c.decodeIfPresent(Int.self, forKey: .wrapUpMinutes) ?? d.wrapUpMinutes
+        wrapUpOnlyBackToBack = try c.decodeIfPresent(Bool.self, forKey: .wrapUpOnlyBackToBack) ?? d.wrapUpOnlyBackToBack
+        summaryEnabled = try c.decodeIfPresent(Bool.self, forKey: .summaryEnabled) ?? d.summaryEnabled
+        summaryTime = try c.decodeIfPresent(Int.self, forKey: .summaryTime) ?? d.summaryTime
+        tomorrowPreview = try c.decodeIfPresent(Bool.self, forKey: .tomorrowPreview) ?? d.tomorrowPreview
+        tomorrowFromHour = try c.decodeIfPresent(Int.self, forKey: .tomorrowFromHour) ?? d.tomorrowFromHour
         panelStyle = (try? c.decodeIfPresent(PanelStyle.self, forKey: .panelStyle)) ?? d.panelStyle
         panelGrow = try c.decodeIfPresent(Bool.self, forKey: .panelGrow) ?? d.panelGrow
         panelWithinMinutes = try c.decodeIfPresent(Int.self, forKey: .panelWithinMinutes) ?? d.panelWithinMinutes

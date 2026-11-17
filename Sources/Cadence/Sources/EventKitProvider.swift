@@ -53,6 +53,21 @@ final class EventKitProvider: CalendarProvider {
         return store.events(matching: predicate).map(Self.meeting)
     }
 
+    /// Pending invitations, one per series (EventKit expands recurrences, and can't search past 4 years).
+    func fetchInvites(until: Date?) async -> [Meeting] {
+        guard isAuthorized else { return [] }
+        let cal = Calendar.current
+        let from = cal.startOfDay(for: Date())
+        let to = until ?? cal.date(byAdding: .year, value: 1, to: from)!
+        let predicate = store.predicateForEvents(withStart: from, end: to, calendars: nil)
+        var seen: Set<String> = []
+        return store.events(matching: predicate)
+            .filter { $0.attendees?.first(where: \.isCurrentUser)?.participantStatus == .pending }
+            .sorted { $0.startDate < $1.startDate }
+            .filter { seen.insert($0.calendarItemIdentifier).inserted }
+            .map(Self.meeting)
+    }
+
     // MARK: - Mapping
 
     private static func info(_ cal: EKCalendar) -> CalendarInfo {
@@ -103,7 +118,8 @@ final class EventKitProvider: CalendarProvider {
             attendeeCount: event.attendees?.count ?? 0,
             participation: participation,
             availability: availability,
-            joinLink: MeetingLinkDetector.detect(url: event.url, location: event.location, notes: event.notes)
+            joinLink: MeetingLinkDetector.detect(url: event.url, location: event.location, notes: event.notes),
+            recurs: event.hasRecurrenceRules || event.isDetached
         )
     }
 }

@@ -11,6 +11,8 @@ struct GoogleAccount: Codable, Identifiable, Equatable {
     var email: String?
     /// The OAuth client that issued this account's refresh token (tokens only work with that client).
     var clientID: String
+    /// Whether the token allows replying to invites and setting colours (nil = not known yet).
+    var canWrite: Bool?
 
     var refreshKey: String { "google.refreshToken.\(id)" }
     var label: String { email ?? "Google account" }
@@ -40,7 +42,8 @@ final class GoogleAuth {
         }
     }
 
-    static let scope = "openid email https://www.googleapis.com/auth/calendar.readonly"
+    static let writeScope = "https://www.googleapis.com/auth/calendar.events"
+    static let scope = "openid email https://www.googleapis.com/auth/calendar.readonly \(writeScope)"
     private static let accountsKey = "Cadence.google.accounts"
     private static let legacyRefreshKey = "google.refreshToken"
     private static let secretKey = "google.clientSecret"
@@ -125,6 +128,12 @@ final class GoogleAuth {
         saveAccounts()
     }
 
+    func setCanWrite(_ value: Bool, for id: String) {
+        guard let i = accounts.firstIndex(where: { $0.id == id }), accounts[i].canWrite != value else { return }
+        accounts[i].canWrite = value
+        saveAccounts()
+    }
+
     private func saveAccounts() {
         if let data = try? JSONEncoder().encode(accounts) { UserDefaults.standard.set(data, forKey: Self.accountsKey) }
     }
@@ -191,6 +200,7 @@ final class GoogleAuth {
         var account = accounts.first { $0.email != nil && $0.email == email }
             ?? GoogleAccount(email: email, clientID: creds.clientID)
         account.clientID = creds.clientID
+        account.canWrite = response.scope.map { $0.contains(Self.writeScope) }
         Keychain.set(refresh, for: account.refreshKey)
         if let i = accounts.firstIndex(where: { $0.id == account.id }) { accounts[i] = account } else { accounts.append(account) }
         needsReconnect.remove(account.id)
@@ -216,6 +226,7 @@ final class GoogleAuth {
             ])
             tokens[account.id] = (response.access_token, Date().addingTimeInterval(response.expires_in ?? 3600))
             needsReconnect.remove(account.id)
+            if let scope = response.scope { setCanWrite(scope.contains(Self.writeScope), for: account.id) }
             return response.access_token
         } catch TokenError.invalidGrant {
             // Revoked, or a Testing-mode token past its 7 days. Keep the account listed so it can be reconnected.
@@ -231,6 +242,7 @@ final class GoogleAuth {
         var expires_in: Double?
         var refresh_token: String?
         var id_token: String?
+        var scope: String?
     }
 
     private enum TokenError: Error { case invalidGrant }
@@ -252,29 +264,31 @@ final class GoogleAuth {
         return try JSONDecoder().decode(TokenResponse.self, from: data)
     }
 
-    private static func randomURLSafe(_ bytes: Int) -> String {
+    static func randomURLSafe(_ bytes: Int) -> String {
         var data = Data(count: bytes)
         _ = data.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, bytes, $0.baseAddress!) }
         return data.base64URL
     }
 }
 
-private extension Data {
+extension Data {
     var base64URL: String {
         base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
     }
 }
 
-/// One-shot HTTP server on 127.0.0.1 that captures the OAuth redirect.
+/// One-shot HTTP server on the loopback interface that captures the OAuth redirect.
 final class LoopbackServer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "cadence.oauth.loopback")
     private var listener: NWListener?
 
     func start() async throws -> UInt16 {
+        // Listen on every loopback address (IPv4 and IPv6) so both http://127.0.0.1 and
+        // http://localhost redirects reach us; nothing off this Mac can connect.
         let params = NWParameters.tcp
-        params.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
-        let listener = try NWListener(using: params)
+        params.acceptLocalOnly = true
+        let listener = try NWListener(using: params, on: .any)
         self.listener = listener
         return try await withCheckedThrowingContinuation { cont in
             let once = Once()
@@ -320,7 +334,7 @@ final class LoopbackServer: @unchecked Sendable {
 }
 
 /// Runs a closure at most once, from any thread (continuations must resume exactly once).
-private final class Once: @unchecked Sendable {
+final class Once: @unchecked Sendable {
     private let lock = NSLock()
     private var done = false
 

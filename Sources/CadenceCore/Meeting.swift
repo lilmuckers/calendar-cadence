@@ -84,6 +84,10 @@ public struct Meeting: Identifiable, Hashable, Sendable {
     public var joinLink: MeetingLink?
     /// A colour set on this event itself (Google's per-event colour, ICS COLOR), overriding the calendar's.
     public var eventColor: RGBAColor?
+    /// Part of a recurring series.
+    public var recurs: Bool
+    /// Explicit series identity, for sources whose ids don't encode it (Microsoft Graph).
+    public var series: String?
 
     public init(
         id: String,
@@ -101,7 +105,9 @@ public struct Meeting: Identifiable, Hashable, Sendable {
         participation: Participation = .unknown,
         availability: Availability = .busy,
         joinLink: MeetingLink? = nil,
-        eventColor: RGBAColor? = nil
+        eventColor: RGBAColor? = nil,
+        recurs: Bool = false,
+        series: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -119,6 +125,8 @@ public struct Meeting: Identifiable, Hashable, Sendable {
         self.availability = availability
         self.joinLink = joinLink
         self.eventColor = eventColor
+        self.recurs = recurs
+        self.series = series
     }
 
     /// The event's own colour if it has one, else its calendar's.

@@ -13,7 +13,11 @@ final class AppState {
             guard prefs != oldValue else { return }
             if persistPrefs { prefs.save() }
             if prefs.icsFeeds != oldValue.icsFeeds { syncFeeds(fetch: true) }
-            if prefs.filters != oldValue.filters || prefs.useEventColors != oldValue.useEventColors { recompute() }
+            if prefs.filters != oldValue.filters || prefs.useEventColors != oldValue.useEventColors
+                || prefs.localEventColors != oldValue.localEventColors { recompute() }
+            if prefs.inviteHorizon != oldValue.inviteHorizon || prefs.filters.disabledCalendarIDs != oldValue.filters.disabledCalendarIDs {
+                Task { await refreshInvites() }
+            }
             onPrefsChanged?()
         }
     }
@@ -34,12 +38,22 @@ final class AppState {
     /// Off while rendering screenshots so demo tweaks never touch the user's saved settings.
     @ObservationIgnored var persistPrefs = true
     @ObservationIgnored var onReminder: ((Reminder) -> Void)?
+    /// Invites to show: `.daily` review, `.new` arrivals, or `.manual` from the menu or Settings.
+    @ObservationIgnored var onInvites: (([Meeting], InvitePromptReason) -> Void)?
     /// A newly found clash the user hasn't decided on yet.
     @ObservationIgnored var onClash: ((Clash) -> Void)?
 
     /// Clash key → chosen meeting id (or "all"). Persisted so a decision sticks across refreshes.
     private(set) var clashChoices: [String: String] = UserDefaults.standard.dictionary(forKey: "Cadence.clashChoices") as? [String: String] ?? [:]
     private(set) var clashes: [Clash] = []
+    /// Unanswered invitations within the chosen horizon, soonest first.
+    private(set) var invites: [Meeting] = []
+    /// Ids of every invite we've already told the user about (nil until the first fetch).
+    @ObservationIgnored private var knownInvites: Set<String>? =
+        (UserDefaults.standard.array(forKey: "Cadence.knownInvites") as? [String]).map(Set.init)
+    @ObservationIgnored private var rawInvites: [Meeting] = []
+    /// Replies sent this session, so a stale fetch doesn't resurrect them.
+    @ObservationIgnored private var answered: Set<String> = []
     @ObservationIgnored private var promptedClashes: Set<String> = []
     @ObservationIgnored private var sentReminders: Set<String> = []
     @ObservationIgnored private var travelTimes: [String: (eta: TimeInterval, at: Date)] = [:]
@@ -48,10 +62,13 @@ final class AppState {
 
     @ObservationIgnored private let eventKit = EventKitProvider()
     @ObservationIgnored let googleAuth = GoogleAuth()
+    @ObservationIgnored let microsoftAuth = MicrosoftAuth()
+    /// One provider per signed-in Microsoft account.
+    private(set) var microsoftProviders: [MicrosoftCalendarProvider] = []
     /// One provider per signed-in Google account.
     private(set) var googleProviders: [GoogleCalendarProvider] = []
     private(set) var icsProviders: [ICSProvider] = []
-    @ObservationIgnored private var providers: [CalendarProvider] { [eventKit] + googleProviders + icsProviders }
+    @ObservationIgnored private var providers: [CalendarProvider] { [eventKit] + googleProviders + microsoftProviders + icsProviders }
     @ObservationIgnored private var planner = AlertPlanner()
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
@@ -63,8 +80,12 @@ final class AppState {
     // MARK: - Lifecycle
 
     func start() {
-        eventKit.onChange = { [weak self] in self?.refresh() }
+        eventKit.onChange = { [weak self] in
+            self?.refresh()
+            Task { await self?.refreshInvites() }
+        }
         syncGoogle(fetch: false)
+        syncMicrosoft(fetch: false)
         syncFeeds(fetch: false)
         Task {
             await requestAccess()
@@ -130,7 +151,102 @@ final class AppState {
     private func visibleMeetings() -> [Meeting] {
         var shown = allMeetings.filter { prefs.filters.allows($0) }
         if !prefs.useEventColors { shown = shown.map { var m = $0; m.eventColor = nil; return m } }
+        shown = shown.map(applyLocalColor)
         return MeetingDeduplicator.dedupe(shown)
+    }
+
+    private func applyLocalColor(_ m: Meeting) -> Meeting {
+        guard let id = prefs.localEventColors[colorKey(m)], let choice = EventColorChoice.choice(id: id) else { return m }
+        var m = m
+        m.eventColor = choice.color
+        return m
+    }
+
+    private func colorKey(_ m: Meeting) -> String { m.recurs ? m.seriesID : m.id }
+
+    // MARK: - Invites
+
+    /// Re-read unanswered invites from every source, and announce ones we haven't seen.
+    func refreshInvites() async {
+        let until = prefs.inviteHorizon.end(from: Date())
+        var raw: [Meeting] = []
+        for provider in providers { raw += await provider.fetchInvites(until: until) }
+        rawInvites = raw
+        rebuildInvites(announce: true)
+    }
+
+    private func rebuildInvites(announce: Bool) {
+        let enabled = rawInvites.filter { isCalendarEnabled($0.calendar.id) && !answered.contains($0.seriesID) }
+            .map(applyLocalColor)
+        let merged = InvitePlanner.merge(enabled) { [unowned self] in canRespond($0) }
+        invites = InvitePlanner.pending(merged, now: Date(), horizon: prefs.inviteHorizon)
+
+        let fresh = InvitePlanner.newInvites(invites, known: knownInvites)
+        knownInvites = (knownInvites ?? []).union(invites.map(\.seriesID))
+        UserDefaults.standard.set(Array(knownInvites ?? []), forKey: "Cadence.knownInvites")
+        if announce, !fresh.isEmpty, prefs.newInviteAlert != .off { onInvites?(fresh, .new) }
+    }
+
+    func reviewInvites() { onInvites?(invites, .manual) }
+
+    func provider(for meeting: Meeting) -> CalendarProvider? { providers.first { $0.owns(meeting) } }
+
+    /// The copy of `meeting` (it may have been merged with others) that a source can act on.
+    private func actionable(_ meeting: Meeting, _ test: (CalendarProvider, Meeting) -> Bool) -> (CalendarProvider, Meeting)? {
+        let candidates = [meeting] + (rawInvites + allMeetings).filter {
+            $0.id != meeting.id && (MeetingDeduplicator.isSameMeeting($0, meeting) || $0.seriesID == meeting.seriesID)
+        }
+        for m in candidates {
+            if let p = provider(for: m), test(p, m) { return (p, m) }
+        }
+        return nil
+    }
+
+    func canRespond(_ meeting: Meeting) -> Bool { demoMode || actionable(meeting) { $0.canRespond($1) } != nil }
+
+    /// Screenshot rendering: pretend every invite can be answered.
+    @ObservationIgnored var demoMode = false
+
+    /// Send an RSVP. Sources that can't (macOS Calendar) open the event in Calendar instead.
+    func respond(_ meeting: Meeting, _ reply: RSVP) async throws {
+        guard let (provider, target) = actionable(meeting, { $0.canRespond($1) }) else {
+            openInCalendar(meeting)
+            return
+        }
+        try await provider.respond(target, reply)
+        answered.insert(meeting.seriesID)
+        allMeetings = allMeetings.map { m in
+            guard m.seriesID == meeting.seriesID || MeetingDeduplicator.isSameMeeting(m, meeting) else { return m }
+            var m = m
+            m.participation = reply.participation
+            return m
+        }
+        recompute()
+        rebuildInvites(announce: false)
+    }
+
+    /// Colour an event: stored in Google when possible, otherwise kept by Cadence. nil = back to the calendar colour.
+    func setColor(_ meeting: Meeting, _ choice: EventColorChoice?) async throws {
+        if let (provider, target) = actionable(meeting, { $0.canSetColor($1) }) {
+            try await provider.setColor(target, choice)
+            prefs.localEventColors[colorKey(meeting)] = nil
+        } else {
+            prefs.localEventColors[colorKey(meeting)] = choice?.id
+        }
+        rebuildInvites(announce: false)
+    }
+
+    func wantsColorPrompt(_ meeting: Meeting) -> Bool { prefs.colorPromptCalendarIDs.contains(meeting.calendar.id) }
+
+    private func checkDailyReview() {
+        guard prefs.inviteReviewDaily, !invites.isEmpty else { return }
+        let cal = Calendar.current
+        guard let at = cal.date(bySettingHour: prefs.summaryTime / 60, minute: prefs.summaryTime % 60, second: 0, of: now),
+              now >= at, now.timeIntervalSince(at) < 4 * 3600 else { return }
+        let key = "review:\(Int(cal.startOfDay(for: now).timeIntervalSince1970))"
+        guard UserDefaults.standard.string(forKey: "Cadence.lastInviteReview") != key else { return }
+        UserDefaults.standard.set(key, forKey: "Cadence.lastInviteReview")
+        onInvites?(invites, .daily)
     }
 
     func resolveClash(_ clash: Clash, choice: String?) {
@@ -188,8 +304,20 @@ final class AppState {
                 }
             }
         }
+        if prefs.wrapUpEnabled {
+            let live = current.filter { $0.participation != .declined && !suppressedByClash.contains($0.id) }
+            reminders += ReminderPlanner.wrapUps(live: live, all: meetings, minutes: prefs.wrapUpMinutes,
+                                                 onlyBackToBack: prefs.wrapUpOnlyBackToBack)
+        }
+        if prefs.summaryEnabled, canShowAgenda, lastRefresh != nil,
+           let summary = ReminderPlanner.morningSummary(meetings: meetings, now: now,
+                                                        hour: prefs.summaryTime / 60, minute: prefs.summaryTime % 60),
+           UserDefaults.standard.string(forKey: "Cadence.lastSummary") != summary.key {
+            reminders.append(summary)
+        }
         for r in ReminderPlanner.due(reminders, now: now, sent: sentReminders) {
             sentReminders.insert(r.key)
+            if r.isSummary { UserDefaults.standard.set(r.key, forKey: "Cadence.lastSummary") }
             onReminder?(r)
         }
     }
@@ -219,6 +347,7 @@ final class AppState {
             for provider in providers { group.addTask { await provider.refreshRemote() } }
         }
         refresh()
+        await refreshInvites()
     }
 
     /// Keep one ICSProvider per enabled feed, reusing unchanged ones so their cache survives.
@@ -260,7 +389,44 @@ final class AppState {
         if fetch { for p in fresh { Task { await p.refreshRemote() } } }
     }
 
-    var hasRemoteSources: Bool { !googleProviders.isEmpty || !icsProviders.isEmpty }
+    /// Keep one provider per Microsoft account, reusing existing ones so their cache survives.
+    private func syncMicrosoft(fetch: Bool) {
+        var next: [MicrosoftCalendarProvider] = []
+        var fresh: [MicrosoftCalendarProvider] = []
+        for account in microsoftAuth.accounts {
+            if let existing = microsoftProviders.first(where: { $0.accountID == account.id }) {
+                next.append(existing)
+            } else {
+                let provider = MicrosoftCalendarProvider(accountID: account.id, auth: microsoftAuth)
+                provider.onChange = { [weak self] in self?.refresh() }
+                next.append(provider)
+                fresh.append(provider)
+            }
+        }
+        microsoftProviders = next
+        refresh()
+        if fetch { for p in fresh { Task { await p.refreshRemote() } } }
+    }
+
+    func microsoftSignIn() async throws {
+        let account = try await microsoftAuth.signIn()
+        syncMicrosoft(fetch: false)
+        await microsoftProviders.first { $0.accountID == account.id }?.refreshRemote()
+        await refreshInvites()
+    }
+
+    func microsoftSignOut(_ account: MicrosoftAccount) {
+        microsoftAuth.signOut(account)
+        prefs.filters.disabledCalendarIDs = prefs.filters.disabledCalendarIDs.filter { !$0.hasPrefix("msft:\(account.id):") }
+        syncMicrosoft(fetch: false)
+    }
+
+    func microsoftUseBuiltInClient() {
+        microsoftAuth.clearCustomClient()
+        syncMicrosoft(fetch: false)
+    }
+
+    var hasRemoteSources: Bool { !googleProviders.isEmpty || !microsoftProviders.isEmpty || !icsProviders.isEmpty }
     var canShowAgenda: Bool { access == .granted || hasRemoteSources }
 
     /// Adds a Google account (or reconnects one, if the user picks an account that's already listed).
@@ -268,6 +434,7 @@ final class AppState {
         let account = try await googleAuth.signIn()
         syncGoogle(fetch: false)
         await googleProviders.first { $0.accountID == account.id }?.refreshRemote()
+        await refreshInvites()
     }
 
     func googleSignOut(_ account: GoogleAccount) {
@@ -287,7 +454,10 @@ final class AppState {
         if let last = lastRefresh, now.timeIntervalSince(last) > 300 { refresh() }
         if let last = lastRemoteRefresh, now.timeIntervalSince(last) > 600 { Task { await refreshRemote() } }
         checkAlert()
-        if Int(now.timeIntervalSince1970) % 5 == 0 { checkReminders() }
+        if Int(now.timeIntervalSince1970) % 5 == 0 {
+            checkReminders()
+            checkDailyReview()
+        }
     }
 
     // MARK: - Derived
@@ -297,6 +467,20 @@ final class AppState {
         let start = cal.startOfDay(for: now)
         let end = cal.date(byAdding: .day, value: 1, to: start) ?? start
         return meetings.filter { $0.end > start && $0.start < end }
+    }
+
+    /// Tomorrow's meetings, shown under today's in the evening or once today is done.
+    var tomorrowMeetings: [Meeting] {
+        let cal = Calendar.current
+        guard let start = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: now)),
+              let end = cal.date(byAdding: .day, value: 1, to: start) else { return [] }
+        return meetings.filter { $0.end > start && $0.start < end }
+    }
+
+    var showsTomorrow: Bool {
+        guard prefs.tomorrowPreview, !tomorrowMeetings.isEmpty else { return false }
+        let doneToday = !todayMeetings.contains { !$0.isAllDay && $0.end > now }
+        return doneToday || Calendar.current.component(.hour, from: now) >= prefs.tomorrowFromHour
     }
 
     /// Timed meetings happening right now.
@@ -385,7 +569,7 @@ final class AppState {
     }
 
     /// Whether `m` repeats (so "all occurrences" makes sense).
-    func isRecurring(_ m: Meeting) -> Bool { m.seriesID != m.id }
+    func isRecurring(_ m: Meeting) -> Bool { m.recurs }
 
     func hideFromPanel(_ m: Meeting, series: Bool) {
         if series { prefs.panelHiddenSeries.insert(m.seriesID) } else { prefs.panelHiddenMeetings.insert(m.id) }
@@ -402,3 +586,5 @@ final class AppState {
         if enabled { prefs.filters.disabledCalendarIDs.remove(id) } else { prefs.filters.disabledCalendarIDs.insert(id) }
     }
 }
+
+enum InvitePromptReason { case daily, new, manual }

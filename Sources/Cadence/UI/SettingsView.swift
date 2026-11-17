@@ -49,6 +49,16 @@ private struct CalendarsTab: View {
                             HStack(spacing: 8) {
                                 Circle().fill(Color(cal.color)).frame(width: 10, height: 10)
                                 Text(cal.title)
+                                Spacer()
+                                let asks = state.prefs.colorPromptCalendarIDs.contains(cal.id)
+                                Button {
+                                    if asks { state.prefs.colorPromptCalendarIDs.remove(cal.id) } else { state.prefs.colorPromptCalendarIDs.insert(cal.id) }
+                                } label: {
+                                    Image(systemName: asks ? "paintpalette.fill" : "paintpalette")
+                                        .foregroundStyle(asks ? Color.accentColor : Color.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help(asks ? "Invites on this calendar ask for a colour" : "Ask for a colour when reviewing invites on this calendar")
                             }
                         }
                     }
@@ -164,10 +174,46 @@ private struct AlertsTab: View {
                 OffsetsField(offsets: $state.prefs.leaveOffsets)
                     .disabled(!state.prefs.leaveEnabled)
                 Toggle("Ask which meeting to alert for when two clash", isOn: $state.prefs.clashPromptEnabled)
+                Toggle(isOn: $state.prefs.wrapUpEnabled) {
+                    Text("Wrap-up nudge before meetings end")
+                    Text("Names the next meeting when one starts straight after.")
+                }
+                Stepper(value: $state.prefs.wrapUpMinutes, in: 1...30) {
+                    Text("\(state.prefs.wrapUpMinutes) min before the end")
+                }
+                .disabled(!state.prefs.wrapUpEnabled)
+                Toggle("Only when another meeting follows", isOn: $state.prefs.wrapUpOnlyBackToBack)
+                    .disabled(!state.prefs.wrapUpEnabled)
+                Toggle("Morning summary", isOn: $state.prefs.summaryEnabled)
+                DatePicker("Send at", selection: summaryTime, displayedComponents: .hourAndMinute)
+                    .disabled(!state.prefs.summaryEnabled)
             } header: {
                 Text("Reminders")
             } footer: {
                 Text("Leave reminders use live travel time (Settings → General → Travel time by) and re-check traffic every 15 minutes. Offsets are minutes before you need to leave; 0 means \"time to leave\".")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                Picker("Look for invites", selection: $state.prefs.inviteHorizon) {
+                    ForEach(InviteHorizon.allCases, id: \.self) { Text($0.label).tag($0) }
+                }
+                Toggle(isOn: $state.prefs.inviteReviewDaily) {
+                    Text("Ask me to RSVP each morning")
+                    Text("At the morning summary time, if anything is waiting for a reply.")
+                }
+                Picker("When a new invite arrives", selection: $state.prefs.newInviteAlert) {
+                    ForEach(InviteAlertStyle.allCases) { Text($0.label).tag($0) }
+                }
+                LabeledContent("Waiting for a reply") {
+                    HStack {
+                        Text("\(state.invites.count)").foregroundStyle(.secondary)
+                        Button("Review Now") { state.reviewInvites() }.disabled(state.invites.isEmpty)
+                    }
+                }
+            } header: {
+                Text("Invitations")
+            } footer: {
+                Text("Replies go straight to Google or Microsoft 365 for accounts signed in under Accounts; macOS Calendar invites open in Calendar to reply. Turn on the palette next to a calendar (Calendars tab) to pick a colour while you reply.")
                     .foregroundStyle(.secondary)
             }
             Section {
@@ -192,6 +238,16 @@ private struct AlertsTab: View {
     }
 
     @State private var status = "Checking…"
+
+    private var summaryTime: Binding<Date> {
+        Binding(
+            get: { Calendar.current.date(bySettingHour: state.prefs.summaryTime / 60, minute: state.prefs.summaryTime % 60, second: 0, of: Date()) ?? Date() },
+            set: {
+                let c = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                state.prefs.summaryTime = (c.hour ?? 8) * 60 + (c.minute ?? 30)
+            }
+        )
+    }
 }
 
 private struct GeneralTab: View {
@@ -237,6 +293,13 @@ private struct GeneralTab: View {
             }
             Section("Menu bar") {
                 Toggle("Show next meeting title and countdown", isOn: $state.prefs.showMenuBarTitle)
+                Toggle("Show tomorrow's meetings in the evening", isOn: $state.prefs.tomorrowPreview)
+                Picker("From", selection: $state.prefs.tomorrowFromHour) {
+                    ForEach([12, 15, 16, 17, 18, 19, 20, 21], id: \.self) { h in
+                        Text(Calendar.current.date(bySettingHour: h, minute: 0, second: 0, of: Date())!.formatted(date: .omitted, time: .shortened)).tag(h)
+                    }
+                }
+                .disabled(!state.prefs.tomorrowPreview)
             }
             Section("Meetings") {
                 LabeledContent("Join next meeting") {

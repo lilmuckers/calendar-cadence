@@ -14,7 +14,7 @@ finds the join link wherever it's hiding, and — 30 seconds before you're due �
 <img alt="Swift" src="https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white">
 <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-0A84FF?style=flat-square">
 <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-0-34C759?style=flat-square">
-<img alt="Tests" src="https://img.shields.io/badge/tests-63%20passing-34C759?style=flat-square">
+<img alt="Tests" src="https://img.shields.io/badge/tests-73%20passing-34C759?style=flat-square">
 </p>
 
 <img src="docs/screenshots/menubar.png" width="560" alt="Menu bar showing Cadence: 8m · Design Review">
@@ -78,12 +78,26 @@ The moment Cadence spots two meetings that overlap — real clashes, not the sam
 
 <br clear="right">
 
+## 💌 RSVP without opening your calendar
+
+<img align="right" src="docs/screenshots/invites.jpg" width="340" alt="Good morning! RSVP time — three invites with Accept, Maybe and Decline buttons and a colour picker">
+
+Each morning Cadence gathers every invite still waiting for a reply and asks you, in one card: **Accept**, **Maybe** or **Decline**. The organiser gets your reply as usual. A new invite gets the same card (or a notification with reply buttons) as soon as it arrives.
+
+- **How far ahead to look:** today, the next 2 days, a week, or all time.
+- **Colour while you're at it.** Turn on the 🎨 palette next to a calendar and its invites show Google's eleven event colours too. Right-click any event for **Colour ▸** at any time.
+- Replies go straight to **Google** and **Microsoft 365** accounts signed in under *Accounts*. Invites that only come through macOS Calendar open in Calendar, because Apple doesn't let other apps reply.
+
+<br clear="right">
+
 ## ✨ Everything else
 
 - **🔗 Join links from anywhere.** URL field, location, or buried in an HTML invite body. Zoom, Google Meet, Microsoft Teams, Webex, GoTo, Whereby, Jitsi, Chime, Slack huddles, BlueJeans, Skype, Discord, FaceTime, Around, Tuple and RingCentral. Outlook SafeLinks, Google and Proofpoint redirect wrappers are unwrapped, and Zoom/Teams open straight in their apps.
 - **⌨️ Global join shortcut.** <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>J</kbd> (re-bindable) joins whatever's starting in the next 10 minutes — or the meeting you're already late for.
 - **🚗 "Leave now" reminders.** For in-person meetings, Cadence watches live traffic and pings you at configurable offsets before you need to leave (default: 10 minutes before, and "time to leave").
 - **🔔 Heads-up notifications.** Optional nudge N minutes before each meeting (default 5).
+- **🗣️ Wrap-up nudge.** Five minutes before a meeting ends (configurable). If another one starts straight after, it says so: *"Dude, you have 5 minutes to the next meeting and you're still talking."* Its Join button opens the next meeting.
+- **☀️ Morning summary & tomorrow.** A good-morning notification with how many meetings you have, when the first starts, when you're done and how many invites need a reply. In the evening (or once today is over) the agenda shows tomorrow too.
 - **🎨 Event colours.** Colour an event in Google Calendar (or give it a `COLOR` in an ICS feed) and Cadence uses that colour instead of the calendar's. Toggle in *Settings → Calendars*.
 - **🧹 Filters.** Toggle calendars; hide all-day, declined, tentative, free or link-less events; include/exclude by title keyword; minimum duration.
 - **😰 A menu bar icon with feelings.** Calm, nervous at 15 minutes, sweating at 5.
@@ -96,6 +110,7 @@ The moment Cadence spots two meetings that overlap — real clashes, not the sam
 |---|---|
 | **macOS Calendar** | Everything you've added in *System Settings → Internet Accounts*: iCloud, Google, Exchange/Outlook, CalDAV, subscriptions. Just grant access. |
 | **ICS / webcal feeds** | *Settings → Accounts → Subscribed calendars.* Paste any iCalendar link — Google's "secret address in iCal format", Outlook's published ICS, team rotas, sports, holidays. Recurrence, exceptions and Windows time zones are handled. |
+| **Microsoft 365 / Outlook (direct)** | *Settings → Accounts → Sign in with Microsoft.* Work, school or personal accounts, as many as you like. Teams links, RSVP status, replies, and Outlook category colours. Needs an app registration (see below). |
 | **Google Calendar (direct)** | *Settings → Accounts → Google → Sign in with Google.* Optional, and you can add **multiple accounts** (work, personal…); gives Meet links and RSVPs straight from Google. Builds with a built-in OAuth client need nothing else; otherwise bring your own (see below). |
 
 The same meeting arriving from several sources is merged automatically.
@@ -112,7 +127,7 @@ About five minutes in [Google Cloud Console](https://console.cloud.google.com/):
 3. **Consent screen:** *Google Auth Platform → Get started* (older consoles: *APIs & Services → OAuth consent screen*). App name `Cadence`, your email as support contact, then pick an **Audience**:
    - **Internal**: Google Workspace accounts only, signing in within your own domain. Simplest option: no test users, and sign-ins don't expire.
    - **External**: personal `@gmail.com` accounts, or more than one domain. See the note below.
-4. *(Optional)* **Data Access → Add or remove scopes →** `.../auth/calendar.readonly`. Cadence requests this scope anyway; adding it here makes the consent screen accurate.
+4. *(Optional)* **Data Access → Add or remove scopes →** `.../auth/calendar.readonly` and `.../auth/calendar.events`. Cadence requests both anyway (the second lets it reply to invites and set event colours); adding them here makes the consent screen accurate.
 5. **Create the client:** *Clients → Create client →* Application type **Desktop app**. Copy the **Client ID** and **Client secret**. You don't need a redirect URI: Desktop clients accept Cadence's `http://127.0.0.1:<port>` loopback automatically.
 6. Either **build it in** for everyone who uses your build (next section), or paste both values into **Cadence → Settings → Accounts → Use my own OAuth client…**. Then click **Sign in with Google**, choose your account and **Allow**. The browser tab says *"Cadence is connected"* when it's done.
 
@@ -121,7 +136,21 @@ About five minutes in [Google Cloud Console](https://console.cloud.google.com/):
 >
 > To stop the weekly re-sign-in, click **Publish app** under *Audience* so its status becomes *In production*. You don't need Google's verification for personal use. Sign-in then shows *"Google hasn't verified this app"*: choose **Advanced → Go to Cadence (unsafe)**. That's expected, because the OAuth client is your own.
 
-Cadence uses the loopback redirect + PKCE flow and asks only for `calendar.readonly`. It keeps the client secret and refresh token in your Keychain; after an ad-hoc-signed rebuild, macOS may ask to allow Keychain access, so choose **Always Allow**. Add as many Google accounts as you like with **Add Another Account**; Google shows its account chooser each time. If one stops working (for example, after the 7-day Testing-mode expiry), it's marked **Reconnect** rather than removed. Meetings that appear in several accounts, or in macOS Calendar too, are merged automatically.
+Cadence uses the loopback redirect + PKCE flow and asks for `calendar.readonly` plus `calendar.events` (to reply to invites and colour events). Accounts connected before replies existed are read-only until you click **Reconnect**. It keeps the client secret and refresh token in your Keychain; after an ad-hoc-signed rebuild, macOS may ask to allow Keychain access, so choose **Always Allow**. Add as many Google accounts as you like with **Add Another Account**; Google shows its account chooser each time. If one stops working (for example, after the 7-day Testing-mode expiry), it's marked **Reconnect** rather than removed. Meetings that appear in several accounts, or in macOS Calendar too, are merged automatically.
+</details>
+
+<details>
+<summary><b>Setting up the Microsoft app registration</b></summary>
+
+If your build has a Microsoft app built in, skip this and click **Sign in with Microsoft**. Otherwise, about three minutes in the [Microsoft Entra admin center](https://entra.microsoft.com/) (or Azure portal → *App registrations*):
+
+1. **New registration.** Name `Cadence`. Supported account types: **Accounts in any organizational directory and personal Microsoft accounts** (or just your organisation, if that's all you need).
+2. **Redirect URI:** platform **Public client/native (mobile & desktop)**, URI `http://localhost`. Microsoft accepts any port on localhost, which Cadence picks at sign-in.
+3. **Register**, then copy the **Application (client) ID**. There's no secret: Cadence is a public client and signs in with PKCE.
+4. *(Optional)* **API permissions → Add → Microsoft Graph → Delegated:** `Calendars.ReadWrite`, `MailboxSettings.Read`, `User.Read`, `offline_access`. Cadence requests these at sign-in anyway; some organisations need an admin to approve them first.
+5. Paste the ID into **Settings → Accounts → Use my own app registration…**, or build it in with `MICROSOFT_CLIENT_ID` (next section).
+
+`Calendars.ReadWrite` is only used to reply to invites; Cadence never edits or deletes events. `MailboxSettings.Read` reads your Outlook category colours.
 </details>
 
 ## 🛠️ Build & run
@@ -129,7 +158,7 @@ Cadence uses the loopback redirect + PKCE flow and asks only for `calendar.reado
 No Xcode project, no SwiftPM, no dependencies — just the Xcode Command Line Tools on macOS 14+.
 
 ```bash
-scripts/test.sh            # 63 unit tests (Swift Testing)
+scripts/test.sh            # 73 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
 ```
 
@@ -140,9 +169,10 @@ Save the client as `Support/Secrets.env` (git-ignored; `Support/Secrets.env.exam
 ```bash
 GOOGLE_CLIENT_ID=1234-abc.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-…
+MICROSOFT_CLIENT_ID=00000000-0000-0000-0000-000000000000   # optional
 ```
 
-`scripts/build.sh` writes them into the app's `Info.plist`, so users only see **Sign in with Google**. A client someone enters in Settings still takes priority.
+`scripts/build.sh` writes them into the app's `Info.plist`, so users only see **Sign in with Google** / **Sign in with Microsoft**. A client someone enters in Settings still takes priority.
 
 > [!NOTE]
 > Google treats Desktop-app client secrets as non-confidential: PKCE protects the sign-in itself, and anyone with the `.app` can read the secret. Keep it out of git anyway, so nobody else's builds use your project's quota.
@@ -162,7 +192,7 @@ build/Cadence.app/Contents/MacOS/Cadence --screenshots docs/screenshots   # rege
 
 ## 🔒 Privacy
 
-Everything runs locally. Cadence talks only to the services you connect (Google's API, your ICS feed hosts) and Apple Maps for travel times. Presentation and call detection read window positions and microphone *usage* — never screen contents or audio — and need no Screen Recording or Microphone permission.
+Everything runs locally. Cadence talks only to the services you connect (Google's and Microsoft's APIs, your ICS feed hosts) and Apple Maps for travel times. Presentation and call detection read window positions and microphone *usage* — never screen contents or audio — and need no Screen Recording or Microphone permission.
 
 ## 🧬 How it's built
 
@@ -176,15 +206,17 @@ Sources/
 │   ├── FilterSettings        user filters
 │   ├── AlertPlanner          when the takeover fires (snooze, late wake)
 │   ├── AlertPolicy           presenting/call detection → how to alert
-│   ├── Reminders             heads-up, leave-now, clash detection
+│   ├── MicrosoftGraphModels  Microsoft Graph → Meeting
+│   ├── Invites               RSVP horizon, invite merging, event colour palette
+│   ├── Reminders             heads-up, leave-now, wrap-up, morning summary, clashes
 │   └── PanelPlanner          what the countdown panel shows, and how big
 └── Cadence/              The app
-    ├── Sources/              EventKit, ICS and Google providers, OAuth, Keychain
+    ├── Sources/              EventKit, ICS, Google and Microsoft providers, OAuth, Keychain
     ├── Engine/               system context, alert routing, travel, hotkey, notifications
-    └── UI/                   menu, panel, takeover, banner, clash prompt, settings
+    └── UI/                   menu, panel, takeover, banner, clash and invite cards, settings
 ```
 
-New sources plug in by conforming to `CalendarProvider`.
+New sources plug in by conforming to `CalendarProvider`. Ideas that are parked live in [BACKLOG.md](BACKLOG.md).
 
 <div align="center">
 <br>

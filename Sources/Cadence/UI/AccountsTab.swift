@@ -19,6 +19,7 @@ struct AccountsTab: View {
                     .foregroundStyle(.secondary)
             }
             GoogleSection()
+            MicrosoftSection()
             FeedsSection()
         }
         .formStyle(.grouped)
@@ -143,9 +144,14 @@ private struct AccountRow: View {
                     .font(.caption)
                     .foregroundStyle(needsReconnect || (provider?.status.hasPrefix("Error") ?? false) ? Color.orange : Color.secondary)
                     .lineLimit(1)
+                if account.canWrite == false && !needsReconnect {
+                    Text("Read-only — reconnect to reply to invites and set colours")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
             }
             Spacer()
-            if needsReconnect {
+            if needsReconnect || account.canWrite == false {
                 Button("Reconnect", action: reconnect).disabled(busy)
                     .help("Sign in again and pick \(account.label)")
             }
@@ -155,6 +161,100 @@ private struct AccountRow: View {
                 } message: {
                     Text("Its calendars will disappear from Cadence. You can add it again any time.")
                 }
+        }
+    }
+}
+
+private struct MicrosoftSection: View {
+    @Environment(AppState.self) private var state
+    @State private var clientID = UserDefaults.standard.string(forKey: "Cadence.microsoft.clientID") ?? ""
+    @State private var busy = false
+    @State private var error: String?
+    @State private var useOwnClient = false
+    @State private var confirmingSignOut: MicrosoftAccount?
+
+    private var auth: MicrosoftAuth { state.microsoftAuth }
+    private var needsClientField: Bool { !auth.hasBundledClient || useOwnClient }
+
+    var body: some View {
+        let _ = state.lastRefresh
+        Section {
+            ForEach(auth.accounts) { account in
+                let provider = state.microsoftProviders.first { $0.accountID == account.id }
+                let reconnect = auth.needsReconnect.contains(account.id) || account.canWrite == false
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle().fill(Color(red: 0.0, green: 0.47, blue: 0.84).gradient)
+                        Text(String(account.label.prefix(1)).uppercased())
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: 28, height: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(account.label)
+                        Text(provider?.status ?? "Connecting…")
+                            .font(.caption)
+                            .foregroundStyle(reconnect || (provider?.status.hasPrefix("Error") ?? false) ? Color.orange : Color.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    if reconnect { Button("Reconnect") { signIn() }.disabled(busy) }
+                    Button("Sign Out") { confirmingSignOut = account }
+                }
+            }
+            if needsClientField {
+                TextField("Application (client) ID", text: $clientID, prompt: Text("00000000-0000-0000-0000-000000000000"))
+            }
+            HStack {
+                Button(action: signIn) {
+                    Label(busy ? "Waiting for browser…" : (auth.accounts.isEmpty ? "Sign in with Microsoft" : "Add Another Account"),
+                          systemImage: "person.crop.circle.badge.plus")
+                }
+                .disabled(busy || (needsClientField && clientID.trimmingCharacters(in: .whitespaces).isEmpty))
+                if busy { ProgressView().controlSize(.small) }
+                Spacer()
+                if auth.hasBundledClient {
+                    if useOwnClient {
+                        Button("Use built-in app") {
+                            state.microsoftUseBuiltInClient()
+                            clientID = ""
+                            useOwnClient = false
+                        }
+                        .buttonStyle(.link)
+                    } else {
+                        Button("Use my own app registration…") { useOwnClient = true }.buttonStyle(.link)
+                    }
+                }
+            }
+            if let error {
+                Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+            }
+        } header: {
+            Text("Microsoft 365 / Outlook (direct)")
+        } footer: {
+            Text("Optional — Teams links, RSVP status and replies straight from Outlook, for work, school or personal Microsoft accounts."
+                 + (needsClientField ? " Needs an Azure app registration (public client, redirect http://localhost) — see the README." : ""))
+                .foregroundStyle(.secondary)
+        }
+        .onAppear { useOwnClient = auth.customClientID != nil }
+        .confirmationDialog("Sign out of \(confirmingSignOut?.label ?? "")?", isPresented: Binding(
+            get: { confirmingSignOut != nil }, set: { if !$0 { confirmingSignOut = nil } })
+        ) {
+            Button("Sign Out", role: .destructive) {
+                if let account = confirmingSignOut { state.microsoftSignOut(account) }
+            }
+        } message: {
+            Text("Its calendars will disappear from Cadence. You can add it again any time.")
+        }
+    }
+
+    private func signIn() {
+        if needsClientField { auth.saveClientID(clientID) }
+        busy = true
+        error = nil
+        Task {
+            do { try await state.microsoftSignIn() } catch { self.error = error.localizedDescription }
+            busy = false
         }
     }
 }

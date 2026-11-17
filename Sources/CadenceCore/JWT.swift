@@ -1,6 +1,6 @@
 import Foundation
 
-/// Reads claims from an ID token returned directly by Google's token endpoint over TLS.
+/// Reads claims from an ID token returned directly by Google's or Microsoft's token endpoint over TLS.
 /// No signature check: the token never passes through anyone else, it's only used as a display label.
 public enum JWT {
     public static func payload(_ token: String) -> [String: Any]? {
@@ -13,6 +13,8 @@ public enum JWT {
     }
 
     public static func email(in token: String) -> String? {
-        payload(token)?["email"] as? String
+        let claims = payload(token)
+        // Microsoft work accounts often carry the address only as preferred_username.
+        return claims?["email"] as? String ?? (claims?["preferred_username"] as? String).flatMap { $0.contains("@") ? $0 : nil }
     }
 }

@@ -21,6 +21,10 @@ final class AlertRouter {
         notifier.notify(reminder)
     }
 
+    func notifyInvites(_ invites: [Meeting]) {
+        for m in invites { notifier.notify(invite: m) }
+    }
+
     func alert(_ meeting: Meeting, forcing style: BusyAlertStyle? = nil) {
         let context = SystemContext.current()
         let prefs = state.prefs

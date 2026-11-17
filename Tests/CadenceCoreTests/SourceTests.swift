@@ -234,3 +234,39 @@ struct JWTTests {
         #expect(JWT.email(in: "garbage") == nil)
     }
 }
+
+@Suite("Microsoft Graph mapping")
+struct GraphMapperTests {
+    @Test func mapsInviteWithTeamsLinkAndCategory() throws {
+        let json = """
+        {"value":[{"id":"AAMk1","subject":"Quarterly review","type":"occurrence","seriesMasterId":"AAMkM",
+          "start":{"dateTime":"2026-11-17T10:00:00.0000000","timeZone":"UTC"},
+          "end":{"dateTime":"2026-11-17T11:00:00.0000000","timeZone":"UTC"},
+          "isAllDay":false,"isCancelled":false,"isOrganizer":false,"showAs":"tentative",
+          "responseStatus":{"response":"notResponded"},
+          "onlineMeeting":{"joinUrl":"https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc%40thread.v2/0"},
+          "organizer":{"emailAddress":{"name":"Ann","address":"ann@x.com"}},
+          "attendees":[{"emailAddress":{"address":"me@x.com"}},{"emailAddress":{"address":"b@x.com"}}],
+          "categories":["Red category"]}],
+         "@odata.nextLink":"https://graph.microsoft.com/v1.0/next"}
+        """
+        let list = try JSONDecoder().decode(GraphList<GraphEvent>.self, from: Data(json.utf8))
+        #expect(list.nextLink != nil)
+        let cal = CalendarInfo(id: "msft:a:c", title: "Calendar", sourceTitle: "Microsoft", color: .gray)
+        let utc = TimeZone(identifier: "UTC")!
+        let m = try #require(GraphMapper.meeting(list.value[0], calendar: cal, timeZone: utc,
+                                                 categoryColors: ["Red category": GraphMapper.categoryColor("preset0")!]))
+        #expect(m.participation == .pending)
+        #expect(m.joinLink?.service == .teams)
+        #expect(m.availability == .tentative)
+        #expect(m.recurs)
+        #expect(m.seriesID == "msft:msft:a:c:AAMkM")
+        #expect(m.eventColor == GoogleMapper.color(hex: "#e74c3c"))
+        #expect(m.start == Date(timeIntervalSince1970: 1_794_909_600))
+    }
+
+    @Test func calendarColours() {
+        #expect(GraphMapper.calendarColor(GraphCalendar(id: "a", hexColor: "#ff0000")) == RGBAColor(red: 1, green: 0, blue: 0))
+        #expect(GraphMapper.categoryColor("preset99") == nil)
+    }
+}

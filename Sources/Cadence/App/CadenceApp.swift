@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: CountdownPanelController?
     private var router: AlertRouter?
     private var clashPrompt: ClashPromptController?
+    private var inviteReview: InviteReviewController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let i = CommandLine.arguments.firstIndex(of: "--screenshots") {
@@ -44,6 +45,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.onAlert = { meeting, style in router.alert(meeting, forcing: style) }
         state.onReminder = { reminder in router.remind(reminder) }
         state.onClash = { clash in clashPrompt.enqueue(clash) }
+        let inviteReview = InviteReviewController(state: state)
+        self.inviteReview = inviteReview
+        state.onInvites = { [weak self] invites, reason in
+            guard let self else { return }
+            if reason == .new && self.state.prefs.newInviteAlert == .notification {
+                router.notifyInvites(invites)
+            } else {
+                inviteReview.show(invites, reason: reason)
+            }
+        }
 
         let hotKey = GlobalHotKey.shared
         hotKey.action = { [weak self] in self?.state.joinFromHotKey() }

@@ -214,7 +214,8 @@ public enum ICSParser {
             participation: .unknown,
             availability: e.transparent ? .free : (e.status?.uppercased() == "TENTATIVE" ? .tentative : .busy),
             joinLink: MeetingLinkDetector.detect(url: e.url, location: e.location, notes: e.description),
-            eventColor: e.color
+            eventColor: e.color,
+            recurs: e.rrule != nil || e.recurrenceID != nil
         )
     }
 

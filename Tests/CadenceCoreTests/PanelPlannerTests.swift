@@ -56,6 +56,7 @@ struct PanelPlannerTests {
     func seriesID(id: String, expected: String) {
         var meeting = m("x", at: 0)
         meeting.id = id
+        meeting.recurs = id.contains("@") || id.contains("_")
         #expect(meeting.seriesID == expected)
     }
 }

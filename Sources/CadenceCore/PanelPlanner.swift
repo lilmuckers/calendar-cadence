@@ -35,6 +35,8 @@ public extension Meeting {
     /// Identifies every occurrence of a recurring event, for "hide all occurrences".
     /// EventKit and ICS ids are "<series>@<start>"; Google instance ids are "<series>_<start>".
     var seriesID: String {
+        if let series { return series }
+        if id.hasPrefix("gcal:"), recurs == false { return id }
         if let at = id.lastIndex(of: "@"), id[id.index(after: at)...].allSatisfy(\.isNumber) {
             return String(id[..<at])
         }

@@ -11,6 +11,7 @@ enum ScreenshotRenderer {
         VisualEffect.screenshotFill = Color(white: 0.13, opacity: 0.86)
         MenuBarView.screenshotMode = true
         state.persistPrefs = false
+        state.demoMode = true
         state.prefs.takeoverLeadSeconds = 30
 
         let demo = Demo()
@@ -41,6 +42,15 @@ enum ScreenshotRenderer {
             render(ClashPromptView(clash: clash, choose: { _ in }), state: state, name: "clash", to: dir,
                    size: CGSize(width: 340, height: CGFloat(118 + clash.meetings.count * 54)), wallpaper: true, pad: 28)
         }
+
+        // Invite review card.
+        let model = InviteReviewModel()
+        model.items = demo.invites
+        model.reason = .daily
+        state.prefs.colorPromptCalendarIDs = [demo.work.id]
+        render(InviteReviewView(model: model, close: {}, changed: {}), state: state, name: "invites", to: dir,
+               size: CGSize(width: 360, height: 76 + 116 + 84 + 84), wallpaper: true, pad: 28)
+        state.prefs.colorPromptCalendarIDs = []
 
         // The three moods of the menu bar icon, big.
         render(Moods(), state: state, name: "moods", to: dir, size: CGSize(width: 360, height: 110), wallpaper: false, pad: 0)
@@ -127,6 +137,19 @@ private struct Demo {
     let team = CalendarInfo(id: "team", title: "Team", sourceTitle: "Subscribed feeds", color: RGBAColor(red: 0.75, green: 0.45, blue: 1.0))
 
     var calendars: [CalendarInfo] { [work, sales, personal, team] }
+
+    var invites: [Meeting] {
+        func inv(_ title: String, days: Int, _ h: Int, _ cal: CalendarInfo, from: String, recurs: Bool = false) -> Meeting {
+            let start = day.addingTimeInterval(Double(days * 86_400 + h * 3600))
+            return Meeting(id: "invite-\(title)", title: title, start: start, end: start.addingTimeInterval(1800), calendar: cal,
+                           organizer: from, attendeeCount: 6, participation: .pending, recurs: recurs)
+        }
+        return [
+            inv("Q1 Kick-off", days: 0, 15, work, from: "Priya Shah"),
+            inv("Pricing Workshop", days: 1, 10, sales, from: "Jordan Lee"),
+            inv("Weekly Design Crit", days: 1, 14, team, from: "Sam Okafor", recurs: true),
+        ]
+    }
 
     var meetings: [Meeting] {
         func m(_ title: String, _ h: Int, _ min: Int, _ len: Int, _ cal: CalendarInfo, link: String? = nil,
