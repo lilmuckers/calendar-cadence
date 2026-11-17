@@ -71,6 +71,12 @@ section { padding: 40px 0; }
 .feature h2 { font-size: 30px; letter-spacing: -0.02em; line-height: 1.2; margin: 0 0 12px; }
 .feature p { color: var(--muted); margin: 0 0 12px; }
 .media img { border-radius: 14px; box-shadow: var(--shadow); margin: 0 auto; }
+.panels { display: flex; flex-direction: column; gap: 16px; }
+.panels > img { max-width: 440px; }
+.panel-row { display: flex; gap: 16px; justify-content: center; align-items: center; }
+.panel-row img { margin: 0; min-width: 0; }
+.panel-row img:first-child { flex: 1.8; max-width: 284px; }
+.panel-row img:last-child { flex: 1; max-width: 158px; }
 kbd { font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 3px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 6px; background: var(--surface); color: var(--text); }
 
 .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }

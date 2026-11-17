@@ -39,7 +39,9 @@
         <tr><td>Calendar events (title, time, location, attendees, notes, join links)</td><td>Show your agenda, countdowns, join buttons, reminders and clash prompts</td><td>In memory on your Mac; read from macOS Calendar, your ICS feeds or Google Calendar</td></tr>
         <tr><td>Your approximate location (only if you allow it)</td><td>Estimate travel time to in-person meetings</td><td>In memory on your Mac</td></tr>
         <tr><td>Settings and preferences, including ICS feed URLs</td><td>Remember how you've configured the app</td><td>macOS user defaults on your Mac</td></tr>
-        <tr><td>Google OAuth client ID, secret and refresh token (only if you connect Google directly)</td><td>Fetch your Google Calendar</td><td>Your macOS Keychain</td></tr>
+        <tr><td>For each Google account you connect: its email address and a refresh token</td><td>Fetch that account's calendars, and label the account in Settings</td><td>Email in macOS user defaults; refresh token in your macOS Keychain</td></tr>
+        <tr><td>Your own Google OAuth client ID and secret (only if you enter one)</td><td>Sign in with your own client instead of the one built into the app</td><td>Client ID in macOS user defaults; secret in your macOS Keychain</td></tr>
+        <tr><td>Events you've hidden from the countdown panel</td><td>Keep them off the panel</td><td>macOS user defaults on your Mac</td></tr>
         <tr><td>Which apps have windows on screen and whether the microphone is in use</td><td>Avoid covering your screen while you present or are on a call</td><td>Checked in the moment; never stored</td></tr>
       </tbody>
     </table>
@@ -48,12 +50,22 @@
     <h2>Services Cadence connects to</h2>
     <p>Cadence connects only to services you choose to use, directly from your Mac:</p>
     <ul>
-      <li><strong>Google Calendar API</strong> — if you sign in with Google. Cadence requests read-only calendar access (<code>calendar.readonly</code>) using your own OAuth client. Google's handling of that data is covered by the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</li>
+      <li><strong>Google</strong>: only if you sign in with Google. Cadence talks to Google's sign-in service and the Google Calendar API directly from your Mac. Google's handling of your data is covered by the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</li>
       <li><strong>ICS / webcal feed hosts</strong> — whatever calendar subscription URLs you add.</li>
       <li><strong>Apple Maps</strong> — when estimating travel time, Cadence sends the meeting location and your approximate position to Apple's MapKit service. See <a href="https://www.apple.com/legal/privacy/">Apple's Privacy Policy</a>.</li>
       <li><strong>Meeting services</strong> — when you click Join, the meeting link opens in your browser or the relevant app (Zoom, Teams, etc.).</li>
     </ul>
     <p>Calendars you've added in macOS Calendar are read locally through Apple's EventKit framework; Cadence doesn't contact those providers itself.</p>
+
+    <h2>Google user data</h2>
+    <p>When you choose <strong>Sign in with Google</strong>, Cadence asks for these permissions and nothing else:</p>
+    <ul>
+      <li><code>openid</code> and <code>email</code>: your Google account's email address, used only to label the account in Settings so you can tell your accounts apart.</li>
+      <li><code>calendar.readonly</code>: read-only access to your calendars and events, used only to show your meetings, countdowns, join links, reminders and clash prompts inside the app. Cadence can't create, change or delete anything in your calendar.</li>
+    </ul>
+    <p>This data goes straight from Google to the app on your Mac. It never passes through or is stored on any server we run, and it isn't shared with anyone. It isn't used for advertising or to train AI or machine-learning models, and no person reads it.</p>
+    <p>Cadence's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+    <p>You can disconnect an account at any time in <em>Cadence → Settings → Accounts</em>. Disconnecting revokes the token with Google and removes it from your Keychain.</p>
 
     <h2>What we don't do</h2>
     <ul>
@@ -65,7 +77,7 @@
     <h2>Your choices</h2>
     <ul>
       <li>Calendar and location access can be granted or revoked any time in <em>System Settings → Privacy &amp; Security</em>.</li>
-      <li>Disconnect Google or remove ICS feeds in <em>Cadence → Settings → Accounts</em>. You can also revoke access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+      <li>Disconnect Google accounts or remove ICS feeds in <em>Cadence → Settings → Accounts</em>. You can also revoke Google access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
       <li>Deleting the app and its preferences removes everything Cadence stores. Its Keychain items can be removed in Keychain Access (search for <code>com.cadence.calendarmonitor</code>).</li>
     </ul>
 
