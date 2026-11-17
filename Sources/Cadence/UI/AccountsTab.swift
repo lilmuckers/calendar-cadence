@@ -31,42 +31,69 @@ private struct GoogleSection: View {
     @State private var clientSecret = ""
     @State private var busy = false
     @State private var error: String?
+    /// Show the client ID/secret fields: always when no client is built in, otherwise on request.
+    @State private var useOwnClient = false
+
+    private var auth: GoogleAuth { state.googleAuth }
 
     var body: some View {
         Section {
-            if state.googleAuth.isSignedIn {
+            if auth.isSignedIn {
                 LabeledContent("Account", value: state.google.accountEmail ?? "Signed in")
                 LabeledContent("Status") { Text(state.google.status).foregroundStyle(.secondary) }
                 Button("Sign Out", role: .destructive) { state.googleSignOut() }
-            } else {
-                TextField("Client ID", text: $clientID, prompt: Text("xxxx.apps.googleusercontent.com"))
-                SecureField("Client secret", text: $clientSecret, prompt: Text(state.googleAuth.credentials == nil ? "Required" : "Saved — leave blank to keep"))
+            } else if auth.hasBundledClient && !useOwnClient {
                 HStack {
-                    Button(busy ? "Waiting for browser…" : "Sign in with Google") { signIn() }
-                        .disabled(busy || clientID.trimmingCharacters(in: .whitespaces).isEmpty
-                                  || (clientSecret.isEmpty && state.googleAuth.credentials == nil))
+                    Button(busy ? "Waiting for browser…" : "Sign in with Google") { signIn(custom: false) }
+                        .disabled(busy)
                     if busy { ProgressView().controlSize(.small) }
                 }
-                if let error {
-                    Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                Button("Use my own OAuth client…") { useOwnClient = true }
+                    .buttonStyle(.link)
+                    .font(.caption)
+            } else {
+                TextField("Client ID", text: $clientID, prompt: Text("xxxx.apps.googleusercontent.com"))
+                SecureField("Client secret", text: $clientSecret,
+                            prompt: Text(auth.customCredentials == nil ? "Required" : "Saved — leave blank to keep"))
+                HStack {
+                    Button(busy ? "Waiting for browser…" : "Sign in with Google") { signIn(custom: true) }
+                        .disabled(busy || clientID.trimmingCharacters(in: .whitespaces).isEmpty
+                                  || (clientSecret.isEmpty && auth.customCredentials == nil))
+                    if busy { ProgressView().controlSize(.small) }
+                    if auth.hasBundledClient {
+                        Spacer()
+                        Button("Use built-in client") {
+                            auth.clearCustomCredentials()
+                            clientID = ""
+                            clientSecret = ""
+                            useOwnClient = false
+                        }
+                        .buttonStyle(.link)
+                    }
                 }
+            }
+            if let error {
+                Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
             }
         } header: {
             Text("Google Calendar (direct)")
         } footer: {
-            Text("""
-            Optional — gives Meet links and RSVP status straight from Google. Needs your own OAuth client: \
-            Google Cloud Console → enable the Google Calendar API → Credentials → Create OAuth client ID → \
-            Application type "Desktop app". Add yourself as a test user on the consent screen. \
-            Events that also arrive via macOS Calendar are merged, not duplicated.
-            """)
-            .foregroundStyle(.secondary)
+            Text(footer).foregroundStyle(.secondary)
         }
+        .onAppear { useOwnClient = auth.customCredentials != nil }
     }
 
-    private func signIn() {
-        let secret = clientSecret.isEmpty ? (state.googleAuth.credentials?.clientSecret ?? "") : clientSecret
-        state.googleAuth.saveCredentials(clientID: clientID, clientSecret: secret)
+    private var footer: String {
+        let base = "Optional — gives Meet links and RSVP status straight from Google. Events that also arrive via macOS Calendar are merged, not duplicated."
+        if auth.hasBundledClient && !useOwnClient { return base }
+        return base + " Needs a Google Cloud OAuth client of type \"Desktop app\" with the Google Calendar API enabled — see the README."
+    }
+
+    private func signIn(custom: Bool) {
+        if custom {
+            let secret = clientSecret.isEmpty ? (auth.customCredentials?.clientSecret ?? "") : clientSecret
+            auth.saveCredentials(clientID: clientID, clientSecret: secret)
+        }
         busy = true
         error = nil
         Task {

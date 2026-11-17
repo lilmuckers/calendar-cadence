@@ -91,19 +91,32 @@ The moment Cadence spots two meetings that overlap — real clashes, not the sam
 |---|---|
 | **macOS Calendar** | Everything you've added in *System Settings → Internet Accounts*: iCloud, Google, Exchange/Outlook, CalDAV, subscriptions. Just grant access. |
 | **ICS / webcal feeds** | *Settings → Accounts → Subscribed calendars.* Paste any iCalendar link — Google's "secret address in iCal format", Outlook's published ICS, team rotas, sports, holidays. Recurrence, exceptions and Windows time zones are handled. |
-| **Google Calendar (direct)** | *Settings → Accounts → Google.* Optional; gives Meet links and RSVPs straight from Google. Uses your own OAuth client (see below). |
+| **Google Calendar (direct)** | *Settings → Accounts → Google → Sign in with Google.* Optional; gives Meet links and RSVPs straight from Google. Builds with a built-in OAuth client need nothing else; otherwise bring your own (see below). |
 
 The same meeting arriving from several sources is merged automatically.
 
 <details>
-<summary><b>Setting up direct Google Calendar access</b></summary>
+<summary><b>Setting up the Google OAuth client</b></summary>
 
-1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and enable the **Google Calendar API**.
-2. Configure the **OAuth consent screen** (External, testing) and add yourself as a test user.
-3. **Credentials → Create credentials → OAuth client ID → Desktop app.**
-4. Paste the client ID and secret into *Cadence → Settings → Accounts* and click **Sign in with Google**.
+If the build you're using has a Google client built in, skip this: just click **Sign in with Google**. These steps are for building Cadence yourself, or for using your own client (*Settings → Accounts → Use my own OAuth client…*).
 
-Cadence uses the loopback redirect + PKCE flow, asks only for `calendar.readonly`, and keeps the refresh token in your Keychain.
+About five minutes in [Google Cloud Console](https://console.cloud.google.com/):
+
+1. **Create a project** (project picker → *New project*, e.g. `Cadence`) and select it.
+2. **Enable the API:** *APIs & Services → Library →* **Google Calendar API** *→ Enable*.
+3. **Consent screen:** *Google Auth Platform → Get started* (older consoles: *APIs & Services → OAuth consent screen*). App name `Cadence`, your email as support contact, then pick an **Audience**:
+   - **Internal**: Google Workspace accounts only, signing in within your own domain. Simplest option: no test users, and sign-ins don't expire.
+   - **External**: personal `@gmail.com` accounts, or more than one domain. See the note below.
+4. *(Optional)* **Data Access → Add or remove scopes →** `.../auth/calendar.readonly`. Cadence requests this scope anyway; adding it here makes the consent screen accurate.
+5. **Create the client:** *Clients → Create client →* Application type **Desktop app**. Copy the **Client ID** and **Client secret**. You don't need a redirect URI: Desktop clients accept Cadence's `http://127.0.0.1:<port>` loopback automatically.
+6. Either **build it in** for everyone who uses your build (next section), or paste both values into **Cadence → Settings → Accounts → Use my own OAuth client…**. Then click **Sign in with Google**, choose your account and **Allow**. The browser tab says *"Cadence is connected"* when it's done.
+
+> [!IMPORTANT]
+> **External apps start in "Testing" mode, and Google expires their refresh tokens after 7 days.** Cadence then shows *Not signed in* and you have to sign in again. You also have to add every account you'll use under *Audience → Test users*, or sign-in fails with *"Access blocked"*.
+>
+> To stop the weekly re-sign-in, click **Publish app** under *Audience* so its status becomes *In production*. You don't need Google's verification for personal use. Sign-in then shows *"Google hasn't verified this app"*: choose **Advanced → Go to Cadence (unsafe)**. That's expected, because the OAuth client is your own.
+
+Cadence uses the loopback redirect + PKCE flow and asks only for `calendar.readonly`. It keeps the client secret and refresh token in your Keychain; after an ad-hoc-signed rebuild, macOS may ask to allow Keychain access, so choose **Always Allow**. It connects one direct Google account at a time. If that account is also in macOS Calendar, duplicate meetings are merged automatically.
 </details>
 
 ## 🛠️ Build & run
@@ -114,6 +127,23 @@ No Xcode project, no SwiftPM, no dependencies — just the Xcode Command Line To
 scripts/test.sh            # 53 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
 ```
+
+### Building in a Google OAuth client
+
+Save the client as `Support/Secrets.env` (git-ignored; `Support/Secrets.env.example` shows the format), or export the same two variables:
+
+```bash
+GOOGLE_CLIENT_ID=1234-abc.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-…
+```
+
+`scripts/build.sh` writes them into the app's `Info.plist`, so users only see **Sign in with Google**. A client someone enters in Settings still takes priority.
+
+> [!NOTE]
+> Google treats Desktop-app client secrets as non-confidential: PKCE protects the sign-in itself, and anyone with the `.app` can read the secret. Keep it out of git anyway, so nobody else's builds use your project's quota.
+> To let people outside your test-user list sign in, **publish** the consent screen. Unverified apps are capped at 100 users and show a warning. Above that, Google requires verification for the `calendar.readonly` scope: a privacy policy, a homepage, and a demo video.
+
+### More build options
 
 ```bash
 CONFIG=debug scripts/build.sh                                     # debug build

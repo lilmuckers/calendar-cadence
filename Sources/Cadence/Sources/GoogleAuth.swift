@@ -32,15 +32,36 @@ final class GoogleAuth {
     private var accessToken: String?
     private var expiry = Date.distantPast
 
-    var credentials: Credentials? {
+    /// The client in use: one the user entered in Settings wins over the one built into the app.
+    var credentials: Credentials? { customCredentials ?? Self.bundledCredentials }
+
+    /// A client the user entered themselves (Settings → Accounts → "Use my own OAuth client").
+    var customCredentials: Credentials? {
         let id = UserDefaults.standard.string(forKey: "Cadence.google.clientID") ?? ""
         let secret = Keychain.get(Self.secretKey) ?? ""
         return id.isEmpty || secret.isEmpty ? nil : Credentials(clientID: id, clientSecret: secret)
     }
 
+    /// Injected by scripts/build.sh from GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, if set at build time.
+    static let bundledCredentials: Credentials? = {
+        let info = Bundle.main.infoDictionary
+        guard let id = info?["CadenceGoogleClientID"] as? String, !id.isEmpty,
+              let secret = info?["CadenceGoogleClientSecret"] as? String, !secret.isEmpty else { return nil }
+        return Credentials(clientID: id, clientSecret: secret)
+    }()
+
+    var hasBundledClient: Bool { Self.bundledCredentials != nil }
+
     func saveCredentials(clientID: String, clientSecret: String) {
         UserDefaults.standard.set(clientID.trimmingCharacters(in: .whitespaces), forKey: "Cadence.google.clientID")
         Keychain.set(clientSecret.trimmingCharacters(in: .whitespaces), for: Self.secretKey)
+    }
+
+    /// Go back to the built-in client. Signs out, since refresh tokens belong to the client that issued them.
+    func clearCustomCredentials() {
+        signOut()
+        UserDefaults.standard.removeObject(forKey: "Cadence.google.clientID")
+        Keychain.set(nil, for: Self.secretKey)
     }
 
     var isSignedIn: Bool { Keychain.get(Self.refreshKey) != nil }
