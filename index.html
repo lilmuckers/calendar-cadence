@@ -6,8 +6,10 @@
   <title>Cadence — your calendar, gently panicking on your behalf</title>
   <meta name="description" content="Cadence is a tiny native macOS menu-bar app that counts down to your next meeting, finds the join link, and takes over your screen 30 seconds before you're due.">
   <link rel="canonical" href="https://cadence.patrick-mckinley.com/">
-  <link rel="icon" type="image/png" href="assets/AppIcon.png">
-  <link rel="apple-touch-icon" href="assets/AppIcon.png">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
   <meta property="og:title" content="Cadence">
   <meta property="og:description" content="Your calendar, gently panicking on your behalf.">
   <meta property="og:image" content="https://cadence.patrick-mckinley.com/assets/takeover.jpg">
@@ -17,7 +19,7 @@
 <body>
   <header class="site-header">
     <div class="wrap">
-      <a class="brand" href="./"><img src="assets/AppIcon.png" alt="">Cadence</a>
+      <a class="brand" href="./"><img src="assets/icon-192.png" alt="">Cadence</a>
       <nav>
         <a href="#features">Features</a>
         <a href="privacy.html">Privacy</a>
@@ -28,7 +30,7 @@
 
   <main>
     <div class="wrap hero">
-      <img class="icon" src="assets/AppIcon.png" alt="Cadence app icon: a panicking calendar page with googly eyes shouting LATE!">
+      <img class="icon" src="assets/icon-512.png" alt="Cadence app icon: a panicking calendar page with googly eyes shouting LATE!">
       <h1>Cadence</h1>
       <p class="tagline">Your calendar, gently panicking on your behalf. A tiny native macOS menu-bar app that makes sure you're never late for a meeting again.</p>
       <div class="badges">
@@ -102,13 +104,27 @@
     </section>
 
     <section>
+      <div class="wrap feature flip">
+        <div class="media"><img src="assets/invites.jpg" alt="Good morning! RSVP time: three invites with Accept, Maybe and Decline buttons and a colour picker" style="max-width:400px"></div>
+        <div>
+          <h2>RSVP without opening your calendar</h2>
+          <p>Each morning Cadence gathers every invite still waiting for a reply into one card: <strong>Accept</strong>, <strong>Maybe</strong> or <strong>Decline</strong>, and pick a colour while you're there. New invites get the same card, or a notification with reply buttons, as soon as they arrive.</p>
+          <p>Replies go straight to your Google and Microsoft 365 accounts, and the organiser hears back as usual.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
       <div class="wrap">
         <h2 class="section-title">Everything else</h2>
         <div class="grid">
           <div class="card"><h3>🔗 Join links from anywhere</h3><p>Zoom, Meet, Teams, Webex, Slack huddles, FaceTime and more — even buried in HTML invites or wrapped in SafeLinks.</p></div>
           <div class="card"><h3>⌨️ Global join shortcut</h3><p><kbd>⌃⌥⌘J</kbd> joins whatever's starting in the next 10 minutes, or the one you're late for.</p></div>
-          <div class="card"><h3>🗂️ Every calendar</h3><p>macOS Calendar (iCloud, Google, Exchange, CalDAV), ICS/webcal feeds, and Google Calendar directly, with as many Google accounts as you like. Duplicates are merged.</p></div>
-          <div class="card"><h3>🎨 Event colours</h3><p>Colour an event in Google Calendar, or give it a colour in an ICS feed, and Cadence uses it instead of the calendar's colour.</p></div>          <div class="card"><h3>🧹 Filters</h3><p>Hide all-day, declined, tentative or link-less events; include or exclude by keyword.</p></div>
+          <div class="card"><h3>🗂️ Every calendar</h3><p>macOS Calendar, ICS/webcal feeds, and Google Calendar and Microsoft 365 directly, with as many accounts as you like. Duplicates are merged.</p></div>
+          <div class="card"><h3>🗣️ Wrap-up nudge</h3><p>Five minutes before a meeting ends, a reminder to wrap up, and a warning if the next one starts straight after.</p></div>
+          <div class="card"><h3>☀️ Morning summary</h3><p>How many meetings you have, when the first starts, when you're done and which invites need a reply. Tomorrow shows up in the evening.</p></div>
+          <div class="card"><h3>🎨 Event colours</h3><p>Uses the colours you set in Google Calendar, Outlook categories or ICS feeds, and lets you recolour Google events from the menu.</p></div>
+          <div class="card"><h3>🔔 Heads-up notifications</h3><p>An optional nudge a few minutes before each meeting, on top of the full-screen alert.</p></div>          <div class="card"><h3>🧹 Filters</h3><p>Hide all-day, declined, tentative or link-less events; include or exclude by keyword.</p></div>
           <div class="card"><h3>😰 An icon with feelings</h3><p>Calm, nervous at 15 minutes, sweating at 5.</p></div>
         </div>
       </div>
@@ -118,7 +134,7 @@
       <div class="wrap">
         <div class="privacy-callout">
           <h2>🔒 Your calendar stays on your Mac</h2>
-          <p>No accounts, no analytics, no servers. Cadence only talks to the calendar services you connect and Apple Maps for travel times.</p>
+          <p>No Cadence accounts, no analytics, no servers. Cadence only talks to the calendar services you connect (like Google and Microsoft 365) and Apple Maps for travel times.</p>
           <a href="privacy.html">Read the privacy policy →</a>
         </div>
       </div>

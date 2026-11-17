@@ -6,13 +6,16 @@
   <title>Privacy Policy — Cadence</title>
   <meta name="description" content="How Cadence handles your calendar data: everything stays on your Mac.">
   <link rel="canonical" href="https://cadence.patrick-mckinley.com/privacy.html">
-  <link rel="icon" type="image/png" href="assets/AppIcon.png">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="site-header">
     <div class="wrap">
-      <a class="brand" href="./"><img src="assets/AppIcon.png" alt="">Cadence</a>
+      <a class="brand" href="./"><img src="assets/icon-192.png" alt="">Cadence</a>
       <nav>
         <a href="./">Home</a>
         <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
@@ -36,11 +39,12 @@
     <table>
       <thead><tr><th>What</th><th>Why</th><th>Where it's kept</th></tr></thead>
       <tbody>
-        <tr><td>Calendar events (title, time, location, attendees, notes, join links)</td><td>Show your agenda, countdowns, join buttons, reminders and clash prompts</td><td>In memory on your Mac; read from macOS Calendar, your ICS feeds or Google Calendar</td></tr>
+        <tr><td>Calendar events and invites (title, time, location, attendees, notes, join links, your RSVP status, colours and categories)</td><td>Show your agenda, countdowns, join buttons, reminders, clash prompts and invites waiting for a reply</td><td>In memory on your Mac; read from macOS Calendar, your ICS feeds, Google Calendar or Microsoft 365</td></tr>
         <tr><td>Your approximate location (only if you allow it)</td><td>Estimate travel time to in-person meetings</td><td>In memory on your Mac</td></tr>
         <tr><td>Settings and preferences, including ICS feed URLs</td><td>Remember how you've configured the app</td><td>macOS user defaults on your Mac</td></tr>
-        <tr><td>For each Google account you connect: its email address and a refresh token</td><td>Fetch that account's calendars, and label the account in Settings</td><td>Email in macOS user defaults; refresh token in your macOS Keychain</td></tr>
-        <tr><td>Your own Google OAuth client ID and secret (only if you enter one)</td><td>Sign in with your own client instead of the one built into the app</td><td>Client ID in macOS user defaults; secret in your macOS Keychain</td></tr>
+        <tr><td>For each Google or Microsoft account you connect: its email address and a refresh token</td><td>Fetch that account's calendars, send your invite replies, and label the account in Settings</td><td>Email in macOS user defaults; refresh token in your macOS Keychain</td></tr>
+        <tr><td>Each connected account's profile photo, if it has one</td><td>Show which account is which in Settings and on calendar badges</td><td>Cached in Cadence's Application Support folder on your Mac; refreshed at most once a day and deleted when you disconnect the account</td></tr>
+        <tr><td>Your own Google OAuth client or Microsoft app registration (only if you enter one)</td><td>Sign in with your own client instead of the one built into the app</td><td>Client IDs in macOS user defaults; Google client secret in your macOS Keychain</td></tr>
         <tr><td>Events you've hidden from the countdown panel</td><td>Keep them off the panel</td><td>macOS user defaults on your Mac</td></tr>
         <tr><td>Which apps have windows on screen and whether the microphone is in use</td><td>Avoid covering your screen while you present or are on a call</td><td>Checked in the moment; never stored</td></tr>
       </tbody>
@@ -51,6 +55,7 @@
     <p>Cadence connects only to services you choose to use, directly from your Mac:</p>
     <ul>
       <li><strong>Google</strong>: only if you sign in with Google. Cadence talks to Google's sign-in service and the Google Calendar API directly from your Mac. Google's handling of your data is covered by the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</li>
+      <li><strong>Microsoft</strong>: only if you sign in with Microsoft. Cadence talks to Microsoft's sign-in service and Microsoft Graph directly from your Mac. Microsoft's handling of your data is covered by the <a href="https://privacy.microsoft.com/privacystatement">Microsoft Privacy Statement</a>.</li>
       <li><strong>ICS / webcal feed hosts</strong> — whatever calendar subscription URLs you add.</li>
       <li><strong>Apple Maps</strong> — when estimating travel time, Cadence sends the meeting location and your approximate position to Apple's MapKit service. See <a href="https://www.apple.com/legal/privacy/">Apple's Privacy Policy</a>.</li>
       <li><strong>Meeting services</strong> — when you click Join, the meeting link opens in your browser or the relevant app (Zoom, Teams, etc.).</li>
@@ -60,12 +65,23 @@
     <h2>Google user data</h2>
     <p>When you choose <strong>Sign in with Google</strong>, Cadence asks for these permissions and nothing else:</p>
     <ul>
-      <li><code>openid</code> and <code>email</code>: your Google account's email address, used only to label the account in Settings so you can tell your accounts apart.</li>
-      <li><code>calendar.readonly</code>: read-only access to your calendars and events, used only to show your meetings, countdowns, join links, reminders and clash prompts inside the app. Cadence can't create, change or delete anything in your calendar.</li>
+      <li><code>openid</code>, <code>email</code> and <code>profile</code>: your Google account's email address and profile photo, used only to label the account in Settings so you can tell your accounts apart.</li>
+      <li><code>calendar.readonly</code>: read access to your calendars and events, used only to show your meetings, countdowns, join links, reminders, clash prompts and pending invites inside the app.</li>
+      <li><code>calendar.events</code>: used only for two things you trigger yourself: sending your Accept, Maybe or Decline reply to an invite, and changing an event's colour. Cadence never creates or deletes events and never changes anything else about them.</li>
     </ul>
     <p>This data goes straight from Google to the app on your Mac. It never passes through or is stored on any server we run, and it isn't shared with anyone. It isn't used for advertising or to train AI or machine-learning models, and no person reads it.</p>
     <p>Cadence's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
-    <p>You can disconnect an account at any time in <em>Cadence → Settings → Accounts</em>. Disconnecting revokes the token with Google and removes it from your Keychain.</p>
+    <p>You can disconnect an account at any time in <em>Cadence → Settings → Accounts</em>. Disconnecting revokes the token with Google and removes it and the cached photo from your Mac.</p>
+
+    <h2>Microsoft user data</h2>
+    <p>When you choose <strong>Sign in with Microsoft</strong>, Cadence asks for these Microsoft Graph permissions:</p>
+    <ul>
+      <li><code>openid</code>, <code>email</code>, <code>profile</code> and <code>User.Read</code>: your account's email address and profile photo, used only to label the account in Settings.</li>
+      <li><code>offline_access</code>: keeps you signed in between launches.</li>
+      <li><code>Calendars.ReadWrite</code>: read your calendars and events to show them in the app, and send your Accept, Maybe or Decline reply to an invite. Cadence never creates, edits or deletes events.</li>
+      <li><code>MailboxSettings.Read</code>: read your Outlook category colours so events show in the same colours as in Outlook. Cadence doesn't read your email.</li>
+    </ul>
+    <p>As with Google, this data goes straight from Microsoft to the app on your Mac, is never sent to us or shared with anyone, and isn't used for advertising or to train AI models. Disconnecting an account in <em>Settings → Accounts</em> deletes its token and cached photo from your Mac.</p>
 
     <h2>What we don't do</h2>
     <ul>
@@ -77,8 +93,8 @@
     <h2>Your choices</h2>
     <ul>
       <li>Calendar and location access can be granted or revoked any time in <em>System Settings → Privacy &amp; Security</em>.</li>
-      <li>Disconnect Google accounts or remove ICS feeds in <em>Cadence → Settings → Accounts</em>. You can also revoke Google access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
-      <li>Deleting the app and its preferences removes everything Cadence stores. Its Keychain items can be removed in Keychain Access (search for <code>com.cadence.calendarmonitor</code>).</li>
+      <li>Disconnect Google or Microsoft accounts, or remove ICS feeds, in <em>Cadence → Settings → Accounts</em>. You can also revoke access from your account: Google at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>, Microsoft at <a href="https://account.live.com/consent/Manage">account.live.com/consent/Manage</a> (personal accounts) or <a href="https://myapps.microsoft.com/">myapps.microsoft.com</a> (work or school accounts).</li>
+      <li>Deleting the app, its preferences and its Application Support folder removes everything Cadence stores. Its Keychain items can be removed in Keychain Access (search for <code>com.cadence.calendarmonitor</code>).</li>
     </ul>
 
     <h2>Children</h2>
