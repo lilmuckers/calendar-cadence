@@ -303,6 +303,8 @@ private struct AlertsTab: View {
                     Button("Preview Alert") { state.previewAlert() }
                     Button("Preview Late Alert") { state.previewLateAlert() }
                         .help("A demo meeting that started a minute ago: watch it get redder, faster and angrier")
+                    Button("Preview Meltdown") { state.previewLateAlert(lateBy: 172) }
+                        .help("A demo meeting that's nearly three minutes late: watch it start falling apart")
                     Button("Preview Banner") { state.previewAlert(style: .banner) }
                     Button("Preview Notification") { state.previewAlert(style: .notification) }
                 }

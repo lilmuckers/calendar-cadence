@@ -93,3 +93,40 @@ struct TakeoverUrgencyTests {
         #expect(TakeoverUrgency.headline(remaining: -400) == "SERIOUSLY. JOIN. NOW.")
     }
 }
+
+@Suite("Takeover meltdown")
+struct MeltdownTests {
+    @Test func startsAtFullPanicAndRamps() {
+        #expect(!Meltdown.isActive(secondsLate: 179))
+        #expect(Meltdown.isActive(secondsLate: 180))
+        #expect(Meltdown.progress(secondsLate: 100) == 0)
+        #expect(Meltdown.progress(secondsLate: 240) == 0.5)
+        #expect(Meltdown.progress(secondsLate: 900) == 1)
+        #expect(Meltdown.letterDelay(progress: 1, jitter: 0.5) < Meltdown.letterDelay(progress: 0, jitter: 0.5))
+        #expect(Meltdown.digitDelay(progress: 1, jitter: 0.5) < Meltdown.digitDelay(progress: 0, jitter: 0.5))
+    }
+
+    @Test func fallingLetterLandsAndRests() {
+        var p = FallingPiece.launch(id: "t-0", from: Vec2(500, 300), r: (0.9, 0.5, 0.5))
+        #expect(p.velocity.y < 0) // pings upward first
+        for _ in 0..<600 { p.step(dt: 1.0 / 60, floor: 900, width: 1000) }
+        #expect(p.resting)
+        #expect(p.position.y == 900 - 14)
+        #expect(p.position.x >= 14 && p.position.x <= 1000 - 14)
+        let rested = p
+        p.step(dt: 1, floor: 900, width: 1000)
+        #expect(p == rested)
+    }
+
+    @Test func bottlePieceStaysInsideTheRing() {
+        var p = BottlePiece(slot: 0, position: .zero, velocity: Vec2(900, -700), spin: 2)
+        var maxDistance = 0.0
+        for i in 0..<2000 {
+            let shake = Vec2(sin(Double(i) * 0.7) * 9000, cos(Double(i) * 1.3) * 9000)
+            p.step(dt: 1.0 / 120, radius: 130, shake: shake)
+            maxDistance = max(maxDistance, (p.position * p.position).sum().squareRoot())
+        }
+        #expect(maxDistance <= 130 - 26 + 1e-9)
+        #expect(p.position.x.isFinite && p.position.y.isFinite && p.angle.isFinite)
+    }
+}

@@ -128,6 +128,7 @@ struct TakeoverView: View {
     let actions: TakeoverActions
     @State private var appeared = false
     @State private var clock = PulseClock()
+    @State private var meltdown = MeltdownModel()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var remaining: TimeInterval { meeting.start.timeIntervalSince(state.now) }
@@ -141,14 +142,21 @@ struct TakeoverView: View {
             let u = urgency
             let phase = clock.advance(to: context.date, period: reduceMotion ? 2 : u.period)
             let pulse = (1 - cos(phase * 2 * .pi)) / 2
-            content(urgency: u, phase: phase, pulse: reduceMotion ? 0.5 : pulse)
+            content(urgency: u, phase: phase, pulse: reduceMotion ? 0.5 : pulse, date: context.date)
         }
         .ignoresSafeArea()
         .onAppear { withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { appeared = true } }
     }
 
-    @ViewBuilder private func content(urgency u: TakeoverUrgency, phase: Double, pulse: Double) -> some View {
+    private var clockText: String {
+        remaining > 0 ? CountdownFormatter.clock(remaining) : "-" + CountdownFormatter.clock(-remaining)
+    }
+
+    @ViewBuilder private func content(urgency u: TakeoverUrgency, phase: Double, pulse: Double, date: Date) -> some View {
         let shake = reduceMotion ? 0 : u.shake
+        // Three minutes late and still ignored: things start falling off.
+        let melting = !reduceMotion && Meltdown.isActive(secondsLate: -remaining)
+        let headline = TakeoverUrgency.headline(remaining: remaining)
         ZStack {
             VisualEffect(material: .fullScreenUI)
             Color.black.opacity(0.45)
@@ -177,12 +185,19 @@ struct TakeoverView: View {
                 .allowsHitTesting(false)
 
             VStack(spacing: 28) {
-                Text(TakeoverUrgency.headline(remaining: remaining))
-                    .font(.system(size: 15 + 5 * u.level, weight: .heavy))
-                    .tracking(4)
-                    .foregroundStyle(u.level > 0 ? AnyShapeStyle(mood) : AnyShapeStyle(.white.opacity(0.6)))
-                    .contentTransition(.opacity)
-                    .animation(.easeInOut, value: TakeoverUrgency.headline(remaining: remaining))
+                if melting {
+                    BreakableText(text: headline, idPrefix: "h", style: .heading, broken: meltdown.brokenLetters,
+                                  tracking: 4, wordSpacing: 14)
+                        .font(GlyphStyle.heading.font(level: u.level))
+                        .foregroundStyle(mood)
+                } else {
+                    Text(headline)
+                        .font(GlyphStyle.heading.font(level: u.level))
+                        .tracking(4)
+                        .foregroundStyle(u.level > 0 ? AnyShapeStyle(mood) : AnyShapeStyle(.white.opacity(0.6)))
+                        .contentTransition(.opacity)
+                        .animation(.easeInOut, value: headline)
+                }
 
                 ZStack {
                     Circle().stroke(.white.opacity(0.1), lineWidth: 6)
@@ -191,21 +206,44 @@ struct TakeoverView: View {
                         .stroke(mood.gradient, style: StrokeStyle(lineWidth: 6 + 4 * u.level, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                         .animation(.linear(duration: 1), value: state.now)
-                    Text(remaining > 0 ? CountdownFormatter.clock(remaining) : "-" + CountdownFormatter.clock(-remaining))
-                        .font(.system(size: 88, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
-                        .contentTransition(.numericText(countsDown: true))
-                        .animation(.snappy, value: Int(remaining))
+                    if melting {
+                        BreakableCountdown(text: clockText, broken: meltdown.brokenSlots)
+                            .font(GlyphStyle.countdown.font(level: u.level))
+                            .foregroundStyle(.white)
+                        // Broken-off characters keep counting while they rattle around the ring.
+                        ForEach(meltdown.bottle, id: \.slot) { piece in
+                            if let ch = BreakableCountdown.character(in: clockText, slot: piece.slot) {
+                                Text(String(ch))
+                                    .font(GlyphStyle.countdown.font(level: u.level))
+                                    .foregroundStyle(.white)
+                                    .rotationEffect(.radians(piece.angle))
+                                    .offset(x: piece.position.x, y: piece.position.y)
+                            }
+                        }
+                    } else {
+                        Text(clockText)
+                            .font(GlyphStyle.countdown.font(level: u.level))
+                            .foregroundStyle(.white)
+                            .contentTransition(.numericText(countsDown: true))
+                            .animation(.snappy, value: Int(remaining))
+                    }
                 }
                 .frame(width: 260, height: 260)
+                .transformAnchorPreference(key: GlyphAnchorKey.self, value: .bounds) { $0["ring"] = $1 }
 
                 VStack(spacing: 10) {
-                    Text(meeting.title)
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
+                    if melting {
+                        BreakableText(text: meeting.title, idPrefix: "t", style: .title, broken: meltdown.brokenLetters,
+                                      wordSpacing: 11)
+                            .font(GlyphStyle.title.font(level: u.level))
+                            .foregroundStyle(.white)
+                    } else {
+                        Text(meeting.title)
+                            .font(GlyphStyle.title.font(level: u.level))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                    }
                     HStack(spacing: 10) {
                         Circle().fill(meeting.tint).frame(width: 8, height: 8)
                         Text(meeting.calendar.title)
@@ -247,6 +285,44 @@ struct TakeoverView: View {
             .opacity(appeared ? 1 : 0)
             .offset(x: shake * sin(phase * 2 * .pi * 2.3), y: shake * 0.4 * cos(phase * 2 * .pi * 3.1))
         }
+        .overlayPreferenceValue(GlyphAnchorKey.self) { anchors in
+            if melting {
+                GeometryReader { geo in
+                    let _ = tickMeltdown(anchors: anchors, geo: geo, date: date, headline: headline)
+                    ForEach(meltdown.falling, id: \.id) { piece in
+                        if let glyph = meltdown.fallingGlyph[piece.id] {
+                            Text(String(glyph.0))
+                                .font(glyph.1.font(level: u.level))
+                                .foregroundStyle(glyph.1 == .heading ? mood : .white)
+                                .rotationEffect(.radians(piece.angle))
+                                .position(x: piece.position.x, y: piece.position.y)
+                        }
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    /// Feeds the meltdown where every breakable character is right now, then advances it a frame.
+    private func tickMeltdown(anchors: [String: Anchor<CGRect>], geo: GeometryProxy, date: Date, headline: String) -> Bool {
+        let heading = Array(headline), title = Array(meeting.title), clock = clockText
+        var glyphs: [String: (CGRect, Character, GlyphStyle)] = [:]
+        for (id, anchor) in anchors where id != "ring" {
+            let parts = id.split(separator: "-", maxSplits: 1)
+            guard parts.count == 2, let n = Int(parts[1]) else { continue }
+            switch parts[0] {
+            case "h" where n < heading.count: glyphs[id] = (geo[anchor], heading[n], .heading)
+            case "t" where n < title.count: glyphs[id] = (geo[anchor], title[n], .title)
+            case "d": if let ch = BreakableCountdown.character(in: clock, slot: n) { glyphs[id] = (geo[anchor], ch, .countdown) }
+            default: break
+            }
+        }
+        let ring = anchors["ring"].map { geo[$0] }
+        meltdown.tick(date: date, secondsLate: -remaining, glyphs: glyphs,
+                      ringCenter: ring.map { CGPoint(x: $0.midX, y: $0.midY) }, screen: geo.size,
+                      sound: state.prefs.takeoverSound)
+        return true
     }
 
     private var ringProgress: CGFloat {
