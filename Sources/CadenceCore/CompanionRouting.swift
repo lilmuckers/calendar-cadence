@@ -17,6 +17,33 @@ public enum CompanionTakeoverMode: String, Codable, CaseIterable, Sendable {
 
 /// Where alerts go when a paired iPhone may be displaying. Only while the phone is connected *and*
 /// displaying does the Mac go quiet; otherwise everything is unchanged.
+/// While the phone has the alert: show it on the Mac after all once the meeting is this late and
+/// still not joined, snoozed or dismissed.
+public enum CompanionEscalation: Int, Codable, CaseIterable, Sendable {
+    case off = 0
+    case tenSeconds = 10
+    case thirtySeconds = 30
+    case oneMinute = 60
+    case twoMinutes = 120
+
+    public var label: String {
+        switch self {
+        case .off: "Never"
+        case .tenSeconds: "After 10 seconds"
+        case .thirtySeconds: "After 30 seconds"
+        case .oneMinute: "After 1 minute"
+        case .twoMinutes: "After 2 minutes"
+        }
+    }
+
+    /// When to escalate an alert for a meeting starting at `start`, given it was sent at `now`.
+    /// Nil = never. An alert that only went out after that point escalates straight away.
+    public func date(start: Date, now: Date) -> Date? {
+        guard self != .off else { return nil }
+        return max(now, start.addingTimeInterval(TimeInterval(rawValue)))
+    }
+}
+
 public enum CompanionRouting {
     /// Whether the floating countdown panel may show on the Mac.
     public static func macShowsPanel(phoneDisplaying: Bool) -> Bool { !phoneDisplaying }

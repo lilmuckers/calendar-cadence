@@ -34,6 +34,10 @@ final class PhoneState {
     var alerting: Meeting?
     /// A reminder from the Mac, shown as an in-app banner.
     var banner: CompanionReminder?
+    /// Pop-ups from the Mac waiting for a decision, oldest first. Only while connected: the Mac
+    /// shows whatever's left itself once the link drops.
+    private(set) var invitePrompts: [CompanionInvite] = []
+    private(set) var clashPrompts: [CompanionClash] = []
 
     let link = CompanionClient()
     let desk = DeskMode()
@@ -100,8 +104,17 @@ final class PhoneState {
     func start() {
         guard !started else { return }
         started = true
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-previewPrompts") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.loadPreviewPrompts() }
+        }
+        #endif
         eventKit.onChange = { [weak self] in self?.refresh() }
         link.onMessage = { [weak self] in self?.handle($0) }
+        link.onDisconnected = { [weak self] in
+            self?.invitePrompts = []
+            self?.clashPrompts = []
+        }
         desk.onChange = { [weak self] in self?.displayChanged() }
         notifier.onJoin = { [weak self] id in self?.join(id: id) }
         notifier.isForegroundSuppressed = { [weak self] in
@@ -204,6 +217,19 @@ final class PhoneState {
             present(meeting)
         case .dismissAlert(let id):
             if alerting?.id == id { alerting = nil }
+        case .invitePrompt(let invites):
+            let fresh = invites.filter { i in !invitePrompts.contains { $0.meeting.id == i.meeting.id } }
+            guard !fresh.isEmpty else { break }
+            invitePrompts += fresh
+            haptic(.success)
+        case .inviteHandled(let id):
+            invitePrompts.removeAll { $0.meeting.id == id }
+        case .clashPrompt(let clash):
+            guard !clashPrompts.contains(where: { $0.key == clash.key }) else { break }
+            clashPrompts.append(clash)
+            haptic(.warning)
+        case .clashHandled(let key):
+            clashPrompts.removeAll { $0.key == key }
         case .reminder(let reminder):
             banner = reminder
             haptic(.warning)
@@ -307,6 +333,46 @@ final class PhoneState {
         alerting = nil
     }
 
+    /// Answer an invite pop-up. nil reply = open it in Calendar on the Mac.
+    func answer(_ invite: CompanionInvite, _ reply: RSVP?) {
+        link.send(.rsvp(meetingID: invite.meeting.id, reply: reply))
+        invitePrompts.removeAll { $0.meeting.id == invite.meeting.id }
+    }
+
+    /// Close an invite pop-up without answering.
+    func later(_ invite: CompanionInvite) {
+        link.send(.inviteLater(meetingID: invite.meeting.id))
+        invitePrompts.removeAll { $0.meeting.id == invite.meeting.id }
+    }
+
+    /// Settle a clash pop-up: a meeting id, "all", or nil for "decide later".
+    func resolve(_ clash: CompanionClash, choice: String?) {
+        link.send(.resolveClash(key: clash.key, choice: choice))
+        clashPrompts.removeAll { $0.key == clash.key }
+    }
+
+    #if DEBUG
+    /// `-previewPrompts`: sample pop-ups (clash, invite, reminder) in desk mode, for checking the layout.
+    func loadPreviewPrompts() {
+        func m(_ id: String, _ title: String, _ inMin: Double, _ len: Double, _ c: RGBAColor) -> Meeting {
+            let cal = CalendarInfo(id: "preview-\(id)", title: "Work", sourceTitle: "Preview", color: c)
+            return Meeting(id: id, title: title, start: Date().addingTimeInterval(inMin * 60),
+                           end: Date().addingTimeInterval((inMin + len) * 60), calendar: cal,
+                           organizer: "Alex Organiser", attendeeCount: 4, participation: .pending)
+        }
+        let purple = RGBAColor(red: 0.5, green: 0.47, blue: 0.87)
+        let invite = m("p-invite", "Budget review", 85, 30, purple)
+        invitePrompts = [CompanionInvite(meeting: invite, canRespond: true)]
+        if ProcessInfo.processInfo.arguments.contains("-previewClash") {
+            clashPrompts = [CompanionClash(key: "p", meetings: [
+                m("p-a", "1:1 with Sam", 40, 30, RGBAColor(red: 0.22, green: 0.54, blue: 0.87)),
+                m("p-b", "Vendor call", 55, 30, RGBAColor(red: 0.85, green: 0.35, blue: 0.19)),
+            ])]
+        }
+        desk.set(true)
+    }
+    #endif
+
     func dismissAlert() {
         if let alerting, link.isConnected { link.send(.dismiss(meetingID: alerting.id)) }
         alerting = nil
@@ -356,8 +422,10 @@ final class PhoneState {
             && f.meeting.start.timeIntervalSince(now) < Self.earlyStartLimit
         if f.live || now >= countdownFrom || early {
             let after = laterToday.first { $0.start >= f.meeting.start && $0.id != f.meeting.id }
+            // Same as the Mac's menu bar: the mood follows the next meeting to start.
+            let moodStart = f.live ? after?.start : f.meeting.start
             liveActivity.show(f.meeting, live: f.live, next: after, onMac: link.isConnected ? link.mac?.name : nil,
-                              countdownFrom: f.live ? now : countdownFrom)
+                              countdownFrom: f.live ? now : countdownFrom, moodStart: moodStart)
         } else if isActive {
             // Back in the app with nothing close: drop an early one; it'll come back when it's due.
             liveActivity.end()

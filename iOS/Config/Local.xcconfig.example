@@ -4,3 +4,5 @@ CADENCE_BUNDLE_ID = com.yourname.cadence
 // From a Google Cloud "iOS" OAuth client, e.g. 1234-abcd for 1234-abcd.apps.googleusercontent.com
 GOOGLE_IOS_CLIENT_PREFIX = 1234-abcd
 MICROSOFT_CLIENT_ID = 00000000-0000-0000-0000-000000000000
+// Free Personal Team (no paid developer account)? Uncomment:
+// CADENCE_ENTITLEMENTS = Config/Cadence-PersonalTeam.entitlements

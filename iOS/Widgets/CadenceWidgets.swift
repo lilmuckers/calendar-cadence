@@ -21,9 +21,12 @@ struct MeetingLiveActivity: Widget {
             let stale = context.isStale
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Label(s.live ? "Now" : "Next", systemImage: s.serviceSymbol ?? "calendar")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(s.tint)
+                    HStack(spacing: 6) {
+                        GooglyIcon(mood: s.mood(), height: 20).foregroundStyle(.white)
+                        Text(s.live ? "Now" : "Next")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(s.tint)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Countdown(state: s, stale: stale).font(.title3.weight(.semibold)).monospacedDigit()
@@ -35,7 +38,8 @@ struct MeetingLiveActivity: Widget {
                     if s.hasLink { JoinLink(state: s) }
                 }
             } compactLeading: {
-                Image(systemName: s.serviceSymbol ?? "calendar").foregroundStyle(s.tint)
+                // The Mac's menu bar icon: calm, then nervous at 15 min, panicking at 5.
+                GooglyIcon(mood: s.mood(), height: 16).foregroundStyle(.white)
             } compactTrailing: {
                 Countdown(state: s, stale: stale).monospacedDigit().frame(maxWidth: 56)
                     .foregroundStyle(s.counting(stale: stale) ? s.tint : .secondary)
@@ -46,7 +50,7 @@ struct MeetingLiveActivity: Widget {
                         .monospacedDigit().font(.caption2.weight(.semibold)).foregroundStyle(s.tint)
                         .frame(maxWidth: 36)
                 } else {
-                    Image(systemName: "calendar.badge.clock").foregroundStyle(s.tint)
+                    GooglyIcon(mood: s.mood(), height: 15).foregroundStyle(.white)
                 }
             }
             .widgetURL(s.joinURL)

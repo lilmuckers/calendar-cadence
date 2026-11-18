@@ -28,6 +28,11 @@ struct PhoneTab: View {
                     Picker("Full-screen alert", selection: $state.prefs.companionTakeover) {
                         ForEach(CompanionTakeoverMode.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
+                    Picker("If you're still late", selection: $state.prefs.companionEscalation) {
+                        ForEach(CompanionEscalation.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    Text("Brings the alert up on this Mac too once the meeting has started and you haven't joined, snoozed or dismissed it on the phone.")
+                        .font(.caption).foregroundStyle(.secondary)
                     Text("Join on the phone joins on this Mac while they're connected.")
                         .font(.caption).foregroundStyle(.secondary)
                 }

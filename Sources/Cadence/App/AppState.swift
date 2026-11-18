@@ -41,6 +41,8 @@ final class AppState {
     /// Set by the AppDelegate to show/hide windows when state changes.
     /// Fired when a meeting's alert is due. The optional style forces a presentation (used by Preview).
     @ObservationIgnored var onAlert: ((Meeting, BusyAlertStyle?) -> Void)?
+    /// The user joined or snoozed a meeting here on the Mac (an alert escalation can stand down).
+    @ObservationIgnored var onHandled: ((String) -> Void)?
     @ObservationIgnored var onPrefsChanged: (() -> Void)?
     /// Off while rendering screenshots so demo tweaks never touch the user's saved settings.
     @ObservationIgnored var persistPrefs = true
@@ -55,6 +57,9 @@ final class AppState {
     @ObservationIgnored private let launchedAt = Date()
     /// A newly found clash the user hasn't decided on yet.
     @ObservationIgnored var onClash: ((Clash) -> Void)?
+    /// A clash was settled or an invite answered here on the Mac (so the phone can close its pop-up).
+    @ObservationIgnored var onClashResolved: ((String) -> Void)?
+    @ObservationIgnored var onInviteAnswered: ((String) -> Void)?
 
     /// Clash key → chosen meeting id (or "all"). Persisted so a decision sticks across refreshes.
     private(set) var clashChoices: [String: String] = UserDefaults.standard.dictionary(forKey: "Cadence.clashChoices") as? [String: String] ?? [:]
@@ -303,6 +308,7 @@ final class AppState {
             return
         }
         try await provider.respond(target, reply)
+        onInviteAnswered?(meeting.id)
         answered.insert(meeting.seriesID)
         allMeetings = allMeetings.map { m in
             guard m.seriesID == meeting.seriesID || MeetingDeduplicator.isSameMeeting(m, meeting) else { return m }
@@ -343,6 +349,7 @@ final class AppState {
         guard let choice else { return }
         clashChoices[clash.key] = choice
         UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
+        onClashResolved?(clash.key)
     }
 
     /// Clashes `meeting` is part of.
@@ -713,6 +720,7 @@ final class AppState {
 
     func snooze(_ meeting: Meeting, seconds: TimeInterval = 60) {
         planner.snooze(meeting, until: Date().addingTimeInterval(seconds))
+        onHandled?(meeting.id)
     }
 
     /// Fire an alert now for the next meeting (Settings → Alerts → Preview).
@@ -765,6 +773,7 @@ final class AppState {
     }
 
     func join(_ meeting: Meeting) {
+        onHandled?(meeting.id)
         browsers.refresh()
         guard let route = joinRoute(for: meeting) else { return }
         switch route {
@@ -779,6 +788,7 @@ final class AppState {
     /// A nil profile means the default browser without a profile.
     func join(_ meeting: Meeting, in profile: BrowserProfile?, remember: ProfileMemory?) {
         guard let link = meeting.joinLink else { return }
+        onHandled?(meeting.id)
         if let remember, let profile {
             switch remember {
             case .once: prefs.profileRules.meetings[meeting.id] = profile.id

@@ -21,9 +21,19 @@ struct CompanionProtocolTests {
         .snooze(meetingID: "a", seconds: 60),
         .dismiss(meetingID: "a"),
         .welcome(macID: "m", macName: "Mac"),
+        .address(hosts: ["192.168.0.21"], port: 62166),
+        .rsvp(meetingID: "m1", reply: .accept),
+        .rsvp(meetingID: "m1", reply: nil),
+        .inviteLater(meetingID: "m1"),
+        .resolveClash(key: "a|b", choice: "all"),
+        .resolveClash(key: "a|b", choice: nil),
+        .inviteHandled(meetingID: "m1"),
+        .clashHandled(key: "a|b"),
         .snapshot(CompanionSnapshot(macName: "Mac", generatedAt: now, meetings: [meeting(), meeting("b", link: false)],
                                     suppressedIDs: ["b"], takeoverEnabled: false, takeoverLeadSeconds: 45)),
         .alert(meeting()),
+        .invitePrompt([CompanionInvite(meeting: meeting(), canRespond: true), CompanionInvite(meeting: meeting("b"), canRespond: false)]),
+        .clashPrompt(CompanionClash(key: "a|b", meetings: [meeting(), meeting("b")])),
         .dismissAlert(meetingID: "a"),
         .reminder(CompanionReminder(key: "k", title: "t", body: "b", joinMeetingID: "a")),
         .ping,
@@ -55,6 +65,16 @@ struct CompanionProtocolTests {
         var decoder = CompanionFrameDecoder()
         let out = try decoder.append(bad + CompanionFraming.encode(.ping))
         #expect(out == [.ping])
+    }
+
+    /// A message from a newer peer (a case this build doesn't know) is skipped, not fatal.
+    @Test func unknownMessageSkipped() throws {
+        let future = Data(#"{"somethingNew":{"x":1}}"#.utf8)
+        var length = UInt32(future.count).bigEndian
+        var frame = Data(bytes: &length, count: 4)
+        frame.append(future)
+        var decoder = CompanionFrameDecoder()
+        #expect(try decoder.append(frame + CompanionFraming.encode(.ping)) == [.ping])
     }
 
     @Test func oversizedFrameRejected() {
@@ -116,12 +136,36 @@ struct CompanionRoutingTests {
     }
 }
 
+@Suite("Escalation to the Mac")
+struct EscalationTests {
+    @Test func countsFromTheStart() {
+        let start = now.addingTimeInterval(30)
+        #expect(CompanionEscalation.thirtySeconds.date(start: start, now: now) == start.addingTimeInterval(30))
+        #expect(CompanionEscalation.twoMinutes.date(start: start, now: now) == start.addingTimeInterval(120))
+    }
+
+    @Test func lateAlertEscalatesNow() {
+        let start = now.addingTimeInterval(-300)
+        #expect(CompanionEscalation.oneMinute.date(start: start, now: now) == now)
+    }
+
+    @Test func offNeverEscalates() {
+        #expect(CompanionEscalation.off.date(start: now, now: now) == nil)
+    }
+}
+
 @Suite("Pairing")
 struct PairingTests {
     @Test func roundTrip() {
         let invite = PairingInvite(macID: "mac-1", macName: "Pat's MacBook Pro", key: PairingInvite.newKey())
         #expect(PairingInvite(url: invite.url) == invite)
         #expect(PairingInvite(string: "  \(invite.url.absoluteString)\n") == invite)
+    }
+
+    @Test func carriesDirectAddress() {
+        let direct = PairingInvite(macID: "mac-1", macName: "Mac", key: PairingInvite.newKey(),
+                                   hosts: ["192.168.0.21", "10.0.0.4"], port: 58168)
+        #expect(PairingInvite(url: direct.url) == direct)
     }
 
     @Test func keysAreRandom() {

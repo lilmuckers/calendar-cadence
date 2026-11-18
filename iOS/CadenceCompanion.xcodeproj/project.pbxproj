@@ -50,33 +50,64 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		CA0000000000000000000F01 /* Config */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Config; sourceTree = "<group>"; };
+		CA0000000000000000000F02 /* Config/Cadence.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Cadence.xcconfig; sourceTree = "<group>"; };
 		CA0000000000000000000P01 /* libCadenceCore.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libCadenceCore.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		CA0000000000000000000P02 /* Cadence.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cadence.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CA0000000000000000000P03 /* CadenceWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CadenceWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		CA0000000000000000000P04 /* CadenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CadenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		CA0000000000000000000F01 /* Config */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Config; sourceTree = "<group>"; };
-		CA0000000000000000000F02 /* Cadence.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Cadence.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		CA0000000000000000000S01 /* CadenceCore */ = {isa = PBXFileSystemSynchronizedRootGroup; name = CadenceCore; path = ../Sources/CadenceCore; sourceTree = "<group>"; };
-		CA0000000000000000000S02 /* CadenceShared */ = {isa = PBXFileSystemSynchronizedRootGroup; name = CadenceShared; path = ../Sources/CadenceShared; sourceTree = "<group>"; };
-		CA0000000000000000000S03 /* Cadence */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Cadence; sourceTree = "<group>"; };
-		CA0000000000000000000S04 /* Shared */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Shared; sourceTree = "<group>"; };
-		CA0000000000000000000S05 /* Widgets */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Widgets; sourceTree = "<group>"; };
-		CA0000000000000000000S06 /* CadenceCoreTests */ = {isa = PBXFileSystemSynchronizedRootGroup; name = CadenceCoreTests; path = ../Tests/CadenceCoreTests; sourceTree = "<group>"; };
-		CA0000000000000000000S07 /* Tests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Tests; sourceTree = "<group>"; };
+		CA0000000000000000000S01 /* CadenceCore */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = CadenceCore;
+			path = ../Sources/CadenceCore;
+			sourceTree = "<group>";
+		};
+		CA0000000000000000000S02 /* CadenceShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = CadenceShared;
+			path = ../Sources/CadenceShared;
+			sourceTree = "<group>";
+		};
+		CA0000000000000000000S03 /* Cadence */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Cadence;
+			sourceTree = "<group>";
+		};
+		CA0000000000000000000S04 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		CA0000000000000000000S05 /* Widgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Widgets;
+			sourceTree = "<group>";
+		};
+		CA0000000000000000000S06 /* CadenceCoreTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = CadenceCoreTests;
+			path = ../Tests/CadenceCoreTests;
+			sourceTree = "<group>";
+		};
+		CA0000000000000000000S07 /* Tests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Tests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		CA0000000000000000000H01 /* Frameworks (core) */ = {
+		CA0000000000000000000H01 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		CA0000000000000000000H02 /* Frameworks (app) */ = {
+		CA0000000000000000000H02 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -84,14 +115,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		CA0000000000000000000H03 /* Frameworks (widgets) */ = {
+		CA0000000000000000000H03 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		CA0000000000000000000H04 /* Frameworks (tests) */ = {
+		CA0000000000000000000H04 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -101,6 +132,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		52E208A530ADFEE4004E738D /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				CA0000000000000000000F02 /* Config/Cadence.xcconfig */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		CA0000000000000000000G01 = {
 			isa = PBXGroup;
 			children = (
@@ -113,6 +152,7 @@
 				CA0000000000000000000S06 /* CadenceCoreTests */,
 				CA0000000000000000000F01 /* Config */,
 				CA0000000000000000000G02 /* Products */,
+				52E208A530ADFEE4004E738D /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -135,7 +175,7 @@
 			buildConfigurationList = CA0000000000000000000L02 /* Build configuration list for PBXNativeTarget "CadenceCore" */;
 			buildPhases = (
 				CA0000000000000000000E01 /* Sources */,
-				CA0000000000000000000H01 /* Frameworks (core) */,
+				CA0000000000000000000H01 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -154,7 +194,7 @@
 			buildConfigurationList = CA0000000000000000000L03 /* Build configuration list for PBXNativeTarget "Cadence" */;
 			buildPhases = (
 				CA0000000000000000000E02 /* Sources */,
-				CA0000000000000000000H02 /* Frameworks (app) */,
+				CA0000000000000000000H02 /* Frameworks */,
 				CA0000000000000000000A01 /* Resources */,
 				CA0000000000000000000C01 /* Embed Foundation Extensions */,
 			);
@@ -165,9 +205,9 @@
 				CA0000000000000000000D02 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				CA0000000000000000000S02 /* CadenceShared */,
 				CA0000000000000000000S03 /* Cadence */,
 				CA0000000000000000000S04 /* Shared */,
-				CA0000000000000000000S02 /* CadenceShared */,
 			);
 			name = Cadence;
 			productName = Cadence;
@@ -179,7 +219,7 @@
 			buildConfigurationList = CA0000000000000000000L04 /* Build configuration list for PBXNativeTarget "CadenceWidgets" */;
 			buildPhases = (
 				CA0000000000000000000E03 /* Sources */,
-				CA0000000000000000000H03 /* Frameworks (widgets) */,
+				CA0000000000000000000H03 /* Frameworks */,
 				CA0000000000000000000A02 /* Resources */,
 			);
 			buildRules = (
@@ -187,8 +227,8 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				CA0000000000000000000S05 /* Widgets */,
 				CA0000000000000000000S04 /* Shared */,
+				CA0000000000000000000S05 /* Widgets */,
 			);
 			name = CadenceWidgets;
 			productName = CadenceWidgets;
@@ -200,7 +240,7 @@
 			buildConfigurationList = CA0000000000000000000L05 /* Build configuration list for PBXNativeTarget "CadenceTests" */;
 			buildPhases = (
 				CA0000000000000000000E04 /* Sources */,
-				CA0000000000000000000H04 /* Frameworks (tests) */,
+				CA0000000000000000000H04 /* Frameworks */,
 				CA0000000000000000000A03 /* Resources */,
 			);
 			buildRules = (
@@ -225,7 +265,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2700;
-				LastUpgradeCheck = 2700;
+				LastUpgradeCheck = 2720;
 				TargetAttributes = {
 					CA0000000000000000000T04 = {
 						TestTargetID = CA0000000000000000000T02;
@@ -328,10 +368,219 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		CA0000000000000000000K01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CA0000000000000000000F02 /* Config/Cadence.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		CA0000000000000000000K02 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CA0000000000000000000F02 /* Config/Cadence.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		CA0000000000000000000K03 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				PRODUCT_NAME = CadenceCore;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CA0000000000000000000K04 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				PRODUCT_NAME = CadenceCore;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		CA0000000000000000000K05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = "$(CADENCE_ENTITLEMENTS)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/Cadence-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Cadence reads your calendars to show upcoming meetings, countdowns and join links.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Cadence uses the camera to scan the pairing code shown on your Mac.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cadence connects to Cadence on your Mac to show your meetings and join them on the Mac.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-force_load",
+					"$(BUILT_PRODUCTS_DIR)/libCadenceCore.a",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID)";
+				PRODUCT_NAME = Cadence;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CA0000000000000000000K06 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = "$(CADENCE_ENTITLEMENTS)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/Cadence-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Cadence reads your calendars to show upcoming meetings, countdowns and join links.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Cadence uses the camera to scan the pairing code shown on your Mac.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cadence connects to Cadence on your Mac to show your meetings and join them on the Mac.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID)";
+				PRODUCT_NAME = Cadence;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		CA0000000000000000000K07 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/Widgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID).widgets";
+				PRODUCT_NAME = CadenceWidgets;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CA0000000000000000000K08 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/Widgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID).widgets";
+				PRODUCT_NAME = CadenceWidgets;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		CA0000000000000000000K09 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID).tests";
@@ -345,147 +594,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID).tests";
 				PRODUCT_NAME = CadenceTests;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Cadence.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Cadence";
-			};
-			name = Release;
-		};
-		CA0000000000000000000K01 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = CA0000000000000000000F02 /* Cadence.xcconfig */;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ENABLE_MODULES = YES;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-			};
-			name = Debug;
-		};
-		CA0000000000000000000K02 /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = CA0000000000000000000F02 /* Cadence.xcconfig */;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ENABLE_MODULES = YES;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				SDKROOT = iphoneos;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
-		CA0000000000000000000K03 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				PRODUCT_NAME = CadenceCore;
-				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		CA0000000000000000000K04 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				PRODUCT_NAME = CadenceCore;
-				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		CA0000000000000000000K05 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Config/Cadence.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				DEAD_CODE_STRIPPING = NO;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-force_load",
-					"$(BUILT_PRODUCTS_DIR)/libCadenceCore.a",
-				);
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Config/Cadence-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Cadence reads your calendars to show upcoming meetings, countdowns and join links.";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Cadence uses the camera to scan the pairing code shown on your Mac.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cadence connects to Cadence on your Mac to show your meetings and join them on the Mac.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID)";
-				PRODUCT_NAME = Cadence;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		CA0000000000000000000K06 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Config/Cadence.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Config/Cadence-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Cadence reads your calendars to show upcoming meetings, countdowns and join links.";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Cadence uses the camera to scan the pairing code shown on your Mac.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cadence connects to Cadence on your Mac to show your meetings and join them on the Mac.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID)";
-				PRODUCT_NAME = Cadence;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		CA0000000000000000000K07 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Config/Widgets-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID).widgets";
-				PRODUCT_NAME = CadenceWidgets;
-				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		CA0000000000000000000K08 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Config/Widgets-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID).widgets";
-				PRODUCT_NAME = CadenceWidgets;
-				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};

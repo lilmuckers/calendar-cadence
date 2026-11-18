@@ -23,6 +23,7 @@ struct ConnectedPhone: Identifiable, Equatable {
 @Observable
 final class CompanionHub {
     private static let pairedKey = "Cadence.companion.paired"
+    private static let portKey = "Cadence.companion.port"
 
     private(set) var phones: [ConnectedPhone] = []
     private(set) var paired: [PairedPhone] =
@@ -41,6 +42,13 @@ final class CompanionHub {
     @ObservationIgnored var onJoin: ((String) -> Void)?
     @ObservationIgnored var onSnooze: ((String, TimeInterval) -> Void)?
     @ObservationIgnored var onDismiss: ((String) -> Void)?
+    @ObservationIgnored var onRSVP: ((String, RSVP?) -> Void)?
+    @ObservationIgnored var onInviteLater: ((String) -> Void)?
+    @ObservationIgnored var onResolveClash: ((String, String?) -> Void)?
+    /// A phone said hello (so it's ready for prompts).
+    @ObservationIgnored var onPhoneConnected: (() -> Void)?
+    /// The last connected phone went away.
+    @ObservationIgnored var onPhonesGone: (() -> Void)?
 
     @ObservationIgnored private var listener: NWListener?
     @ObservationIgnored private var channels: [ObjectIdentifier: (channel: CompanionChannel, phoneID: String?)] = [:]
@@ -53,7 +61,14 @@ final class CompanionHub {
     func start() {
         guard listener == nil, let key = CompanionIdentity.storedKey() else { return }
         do {
-            let listener = try NWListener(using: CompanionNetwork.parameters(key: key))
+            // A fixed port, so the address in the pairing code keeps working across launches.
+            let port = NWEndpoint.Port(rawValue: Self.port) ?? .any
+            let listener: NWListener
+            if let fixed = try? NWListener(using: CompanionNetwork.parameters(key: key), on: port) {
+                listener = fixed
+            } else {
+                listener = try NWListener(using: CompanionNetwork.parameters(key: key))
+            }
             var txt = NWTXTRecord()
             txt[CompanionService.macIDKey] = macID
             listener.service = NWListener.Service(name: macName, type: CompanionService.type, domain: nil, txtRecord: txt)
@@ -90,9 +105,14 @@ final class CompanionHub {
         case .ready:
             listening = true
             lastError = nil
+            if let port = listener?.port?.rawValue, port != Self.port {
+                UserDefaults.standard.set(Int(port), forKey: Self.portKey)
+            }
         case .failed(let error):
             listening = false
             lastError = error.localizedDescription
+            // The saved port may be taken; let the next attempt pick a free one.
+            if case .posix(.EADDRINUSE) = error { UserDefaults.standard.removeObject(forKey: Self.portKey) }
             listener?.cancel()
             listener = nil
             // Network changes can kill the listener; try again shortly.
@@ -117,7 +137,34 @@ final class CompanionHub {
             return k
         }()
         start()
-        return PairingInvite(macID: macID, macName: macName, key: key)
+        return PairingInvite(macID: macID, macName: macName, key: key, hosts: Self.lanAddresses(), port: Self.port)
+    }
+
+    /// The port the listener binds to: the one it used last time, else a random one from the dynamic range.
+    private static var port: UInt16 {
+        if let saved = UserDefaults.standard.object(forKey: portKey) as? Int, let p = UInt16(exactly: saved), p > 0 { return p }
+        let p = UInt16.random(in: 49152...65000)
+        UserDefaults.standard.set(Int(p), forKey: portKey)
+        return p
+    }
+
+    /// This Mac's IPv4 addresses on Wi-Fi/Ethernet (en*), for the phone to dial when Bonjour can't find us.
+    static func lanAddresses() -> [String] {
+        var list: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&list) == 0, let first = list else { return [] }
+        defer { freeifaddrs(list) }
+        var out: [String] = []
+        for ifa in sequence(first: first, next: { $0.pointee.ifa_next }) {
+            let flags = Int32(ifa.pointee.ifa_flags)
+            guard let addr = ifa.pointee.ifa_addr, addr.pointee.sa_family == UInt8(AF_INET),
+                  flags & IFF_UP != 0, flags & IFF_RUNNING != 0, flags & IFF_LOOPBACK == 0,
+                  String(cString: ifa.pointee.ifa_name).hasPrefix("en") else { continue }
+            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            guard getnameinfo(addr, socklen_t(addr.pointee.sa_len), &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 else { continue }
+            let ip = String(cString: host)
+            if !ip.hasPrefix("169.254."), !out.contains(ip) { out.append(ip) }
+        }
+        return out
     }
 
     /// Unpairs every phone by rotating the link key (phones keep nothing that still works).
@@ -145,6 +192,7 @@ final class CompanionHub {
             self.channels[id] = nil
             if let phoneID, !self.channels.values.contains(where: { $0.phoneID == phoneID }) {
                 self.phones.removeAll { $0.id == phoneID }
+                if self.phones.isEmpty { self.onPhonesGone?() }
             }
         }
         channel.start()
@@ -169,7 +217,11 @@ final class CompanionHub {
             }
             savePaired()
             entry.channel.send(.welcome(macID: macID, macName: macName))
+            if let port = listener?.port?.rawValue {
+                entry.channel.send(.address(hosts: Self.lanAddresses(), port: port))
+            }
             if let snapshot = snapshot?() { entry.channel.send(.snapshot(snapshot)) }
+            onPhoneConnected?()
         case .displayState(let displaying):
             guard let phoneID = entry.phoneID, let i = phones.firstIndex(where: { $0.id == phoneID }) else { return }
             phones[i].displaying = displaying
@@ -182,6 +234,12 @@ final class CompanionHub {
         case .dismiss(let meetingID):
             onDismiss?(meetingID)
             broadcast(.dismissAlert(meetingID: meetingID))
+        case .rsvp(let meetingID, let reply):
+            onRSVP?(meetingID, reply)
+        case .inviteLater(let meetingID):
+            onInviteLater?(meetingID)
+        case .resolveClash(let key, let choice):
+            onResolveClash?(key, choice)
         case .bye:
             entry.channel.close()
         default:

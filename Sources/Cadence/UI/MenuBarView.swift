@@ -24,11 +24,11 @@ struct MenuBarLabel: View {
 
     /// Gets more anxious as the next meeting approaches.
     private var mood: MenuBarIcon.Mood {
-        guard let next = state.next else { return .calm }
-        let remaining = next.start.timeIntervalSince(state.now)
-        if remaining <= 300 { return .panicking }
-        if remaining <= 900 { return .nervous }
-        return .calm
+        switch IconMood.forNext(start: state.next?.start, now: state.now) {
+        case .calm: .calm
+        case .nervous: .nervous
+        case .panicking: .panicking
+        }
     }
 
     private var text: String? {

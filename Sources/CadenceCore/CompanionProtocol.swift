@@ -73,6 +73,29 @@ public struct CompanionReminder: Codable, Equatable, Sendable {
     }
 }
 
+/// A double-booking the Mac wants the user to settle: alert for one meeting, or all of them.
+public struct CompanionClash: Codable, Equatable, Sendable {
+    public var key: String
+    public var meetings: [Meeting]
+
+    public init(key: String, meetings: [Meeting]) {
+        self.key = key
+        self.meetings = meetings
+    }
+}
+
+/// A new invitation for the phone to pop up. `canRespond` false = the source can't send an RSVP
+/// (macOS Calendar), so the phone offers to open it on the Mac instead.
+public struct CompanionInvite: Codable, Equatable, Sendable {
+    public var meeting: Meeting
+    public var canRespond: Bool
+
+    public init(meeting: Meeting, canRespond: Bool) {
+        self.meeting = meeting
+        self.canRespond = canRespond
+    }
+}
+
 public enum CompanionMessage: Codable, Equatable, Sendable {
     // Phone → Mac
     case hello(CompanionHello)
@@ -80,14 +103,31 @@ public enum CompanionMessage: Codable, Equatable, Sendable {
     case join(meetingID: String)
     case snooze(meetingID: String, seconds: Double)
     case dismiss(meetingID: String)
+    /// Answer an invite from its pop-up. nil = open it in Calendar on the Mac (sources that can't RSVP).
+    case rsvp(meetingID: String, reply: RSVP?)
+    /// Close an invite pop-up without answering (it stays in the invite list).
+    case inviteLater(meetingID: String)
+    /// Settle a clash: a meeting id, "all", or nil for "decide later".
+    case resolveClash(key: String, choice: String?)
     // Mac → Phone
     case welcome(macID: String, macName: String)
+    /// Where the phone can dial the Mac directly right now, sent after `welcome` so a phone whose
+    /// network blocks Bonjour keeps up with a Mac that changed address. Older phones skip it.
+    case address(hosts: [String], port: UInt16)
     case snapshot(CompanionSnapshot)
     /// The full-screen alert for this meeting is due now.
     case alert(Meeting)
     /// The alert was handled (joined, dismissed or snoozed) on the other side.
     case dismissAlert(meetingID: String)
     case reminder(CompanionReminder)
+    /// New invites to pop up while the phone is connected (the Mac holds its own card back).
+    case invitePrompt([CompanionInvite])
+    /// The invite was answered (on either side): close its pop-up.
+    case inviteHandled(meetingID: String)
+    /// A clash to settle on the phone (the Mac holds its own prompt back).
+    case clashPrompt(CompanionClash)
+    /// The clash was settled (on either side): close its pop-up.
+    case clashHandled(key: String)
     // Both
     case ping
     case bye(reason: String)

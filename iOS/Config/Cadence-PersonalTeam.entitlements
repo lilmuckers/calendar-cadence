@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- For free Personal Team signing, which can't use Time Sensitive Notifications.
+     Alerts still arrive, they just don't break through Focus. -->
+<plist version="1.0">
+<dict/>
+</plist>
