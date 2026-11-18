@@ -8,6 +8,7 @@ struct SettingsScreen: View {
     @State private var confirmUnpair = false
     @State private var authError: String?
     @State private var newFeedURL = ""
+    @State private var macNickname = ""
 
     var body: some View {
         @Bindable var state = state
@@ -93,7 +94,7 @@ struct SettingsScreen: View {
             .alert("Sign-in failed", isPresented: Binding(get: { authError != nil }, set: { if !$0 { authError = nil } })) {
                 Button("OK") {}
             } message: { Text(authError ?? "") }
-            .confirmationDialog("Unpair from \(state.link.mac?.name ?? "Mac")?", isPresented: $confirmUnpair) {
+            .confirmationDialog("Unpair from \(state.link.mac?.displayName ?? "Mac")?", isPresented: $confirmUnpair) {
                 Button("Unpair", role: .destructive) { state.link.unpair() }
             }
         }
@@ -102,18 +103,28 @@ struct SettingsScreen: View {
     @ViewBuilder private var macSection: some View {
         Section {
             if let mac = state.link.mac {
-                LabeledContent(mac.name) { ConnectionPill() }
+                LabeledContent(mac.displayName) { ConnectionPill() }
+                LabeledContent("Name") {
+                    TextField(mac.name, text: $macNickname)
+                        .multilineTextAlignment(.trailing)
+                        .submitLabel(.done)
+                        .onSubmit { state.link.rename(macNickname) }
+                }
+                .onAppear { macNickname = mac.nickname ?? "" }
+                .onChange(of: macNickname) { state.link.rename(macNickname) }
                 Button("Unpair", role: .destructive) { confirmUnpair = true }
             } else {
                 Button("Pair with Cadence on your Mac") { showPairing = true }
             }
         } header: { Text("Mac") } footer: {
-            Text("Paired and on the same Wi-Fi (or nearby), the phone shows the Mac's meetings and Join opens the meeting on the Mac.")
+            Text(state.link.mac == nil
+                 ? "Paired and on the same Wi-Fi (or nearby), the phone shows the Mac's meetings and Join opens the meeting on the Mac."
+                 : "Shown on Join buttons and in the Dynamic Island, e.g. \"Join on Work laptop\". Leave blank to use the Mac's own name. The phone keeps a copy of the Mac's agenda, so it carries on without the Mac.")
         }
     }
 
     @ViewBuilder private var accountsSection: some View {
-        Section("Calendars on this iPhone") {
+        Section {
             if state.calendarAccess {
                 Label("iPhone Calendar", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
             } else {
@@ -139,6 +150,10 @@ struct SettingsScreen: View {
                 .disabled(state.googleAuth.credentials == nil)
             Button("Sign in with Microsoft") { signIn { try await state.microsoftSignIn() } }
                 .disabled(state.microsoftAuth.clientID == nil)
+        } header: { Text("Calendars on this iPhone") } footer: {
+            if state.link.mac != nil {
+                Text("Optional while paired: the phone gets everything from the Mac and keeps today's and tomorrow's agenda when it can't reach it.")
+            }
         }
     }
 

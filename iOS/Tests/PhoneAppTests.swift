@@ -62,3 +62,20 @@ struct ThemeTests {
         #expect(Theme.range(m) == "All day")
     }
 }
+
+@Suite("Paired Mac nickname")
+struct PairedMacTests {
+    @Test func oldSavedMacStillDecodes() throws {
+        let json = #"{"id":"m1","name":"C02XK1ABCDEF","hosts":["192.168.0.21"],"port":62166}"#
+        let mac = try JSONDecoder().decode(PairedMac.self, from: Data(json.utf8))
+        #expect(mac.nickname == nil)
+        #expect(mac.displayName == "C02XK1ABCDEF")
+    }
+
+    @Test func nicknameWinsAndRoundTrips() throws {
+        let mac = PairedMac(id: "m1", name: "C02XK1ABCDEF", nickname: "Work laptop")
+        #expect(mac.displayName == "Work laptop")
+        let back = try JSONDecoder().decode(PairedMac.self, from: JSONEncoder().encode(mac))
+        #expect(back == mac)
+    }
+}

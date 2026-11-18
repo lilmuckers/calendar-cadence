@@ -14,9 +14,12 @@ final class LiveActivityController {
     }
 
     /// `countdownFrom`: when to swap the start time for a countdown (now, or later for an early start).
-    /// `moodStart`: the upcoming start that drives the icon's mood (the Mac's menu bar stages).
-    func show(_ meeting: Meeting, live: Bool, next: Meeting?, onMac: String?, countdownFrom: Date, moodStart: Date?) {
+    /// `moodMeeting`: the upcoming meeting that drives the icon's mood (the Mac's menu bar stages)
+    /// and colour.
+    func show(_ meeting: Meeting, live: Bool, next: Meeting?, onMac: String?, countdownFrom: Date, moodMeeting: Meeting?) {
         let c = meeting.displayColor
+        let ic = (moodMeeting ?? meeting).displayColor
+        let moodStart = moodMeeting?.start
         let now = Date()
         let state = MeetingActivityAttributes.ContentState(
             meetingID: meeting.id, title: meeting.title, start: meeting.start, end: meeting.end, live: live,
@@ -28,7 +31,8 @@ final class LiveActivityController {
             countdownFrom: countdownFrom,
             nervousFrom: moodStart.map { $0.addingTimeInterval(-IconMood.nervousLead) },
             panicFrom: moodStart.map { $0.addingTimeInterval(-IconMood.panicLead) },
-            mood: ActivityMood(rawValue: IconMood.forNext(start: moodStart, now: now).rawValue) ?? .calm)
+            mood: ActivityMood(rawValue: IconMood.forNext(start: moodStart, now: now).rawValue) ?? .calm,
+            iconRed: ic.red, iconGreen: ic.green, iconBlue: ic.blue)
         guard state != lastState else { return }
         lastState = state
         // Go stale at the next visual switch so the system redraws even while the app is suspended:

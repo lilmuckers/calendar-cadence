@@ -22,7 +22,7 @@ struct MeetingLiveActivity: Widget {
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
-                        GooglyIcon(mood: s.mood(), height: 20).foregroundStyle(.white)
+                        GooglyIcon(mood: s.mood(), height: 20).foregroundStyle(s.iconTint)
                         Text(s.live ? "Now" : "Next")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(s.tint)
@@ -39,7 +39,7 @@ struct MeetingLiveActivity: Widget {
                 }
             } compactLeading: {
                 // The Mac's menu bar icon: calm, then nervous at 15 min, panicking at 5.
-                GooglyIcon(mood: s.mood(), height: 16).foregroundStyle(.white)
+                GooglyIcon(mood: s.mood(), height: 16).foregroundStyle(s.iconTint)
             } compactTrailing: {
                 Countdown(state: s, stale: stale).monospacedDigit().frame(maxWidth: 56)
                     .foregroundStyle(s.counting(stale: stale) ? s.tint : .secondary)
@@ -50,7 +50,7 @@ struct MeetingLiveActivity: Widget {
                         .monospacedDigit().font(.caption2.weight(.semibold)).foregroundStyle(s.tint)
                         .frame(maxWidth: 36)
                 } else {
-                    GooglyIcon(mood: s.mood(), height: 15).foregroundStyle(.white)
+                    GooglyIcon(mood: s.mood(), height: 15).foregroundStyle(s.iconTint)
                 }
             }
             .widgetURL(s.joinURL)
@@ -111,7 +111,7 @@ private struct JoinLink: View {
         Link(destination: state.joinURL) {
             VStack(spacing: 2) {
                 Image(systemName: state.serviceSymbol ?? "video.fill").font(.title3)
-                Text(state.joinsOn == nil ? "Join" : "Join on Mac").font(.caption.weight(.semibold))
+                Text(state.joinsOn.map { "Join on \($0)" } ?? "Join").lineLimit(1).font(.caption.weight(.semibold))
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 14).padding(.vertical, 10)
@@ -122,4 +122,16 @@ private struct JoinLink: View {
 
 extension MeetingActivityAttributes.ContentState {
     var tint: Color { Color(red: red, green: green, blue: blue) }
+
+    /// The googly icon's colour: the approaching meeting's calendar, lifted towards white when it's
+    /// too dark to see against the black Dynamic Island.
+    var iconTint: Color {
+        var (r, g, b) = (iconRed ?? red, iconGreen ?? green, iconBlue ?? blue)
+        let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        if luminance < 0.4 {
+            let lift = (0.4 - luminance) / 0.4 * 0.5
+            (r, g, b) = (r + (1 - r) * lift, g + (1 - g) * lift, b + (1 - b) * lift)
+        }
+        return Color(red: r, green: g, blue: b)
+    }
 }
