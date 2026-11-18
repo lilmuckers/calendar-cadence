@@ -60,3 +60,36 @@ struct PanelPlannerTests {
         #expect(meeting.seriesID == expected)
     }
 }
+
+@Suite("Takeover urgency")
+struct TakeoverUrgencyTests {
+    @Test func rampsWithLateness() {
+        let calm = TakeoverUrgency(secondsLate: -20)
+        #expect(calm.level == 0)
+        #expect(calm.period == 2.0)
+        #expect(calm.scaleRange == 0.6...1.0)
+        #expect(calm.shake == 0)
+        #expect(calm.color(from: RGBAColor(red: 0.2, green: 0.4, blue: 1)) == RGBAColor(red: 0.2, green: 0.4, blue: 1))
+
+        let half = TakeoverUrgency(secondsLate: 90)
+        #expect(half.level == 0.5)
+        #expect(half.period < 2.0 && half.period > 0.35)
+        #expect(half.shake == 0)
+
+        let panic = TakeoverUrgency(secondsLate: 600)
+        #expect(panic.level == 1)
+        #expect(abs(panic.period - 0.35) < 1e-9)
+        #expect(panic.shake == 7)
+        #expect(panic.alarm == 1)
+        let red = panic.color(from: RGBAColor(red: 0.2, green: 0.4, blue: 1))
+        #expect(red.red == 1 && red.green < 0.15 && red.blue < 0.15)
+    }
+
+    @Test func headlines() {
+        #expect(TakeoverUrgency.headline(remaining: 12) == "STARTING IN")
+        #expect(TakeoverUrgency.headline(remaining: -5) == "STARTED")
+        #expect(TakeoverUrgency.headline(remaining: -45) == "YOU'RE LATE")
+        #expect(TakeoverUrgency.headline(remaining: -120) == "THEY'RE WAITING FOR YOU")
+        #expect(TakeoverUrgency.headline(remaining: -400) == "SERIOUSLY. JOIN. NOW.")
+    }
+}

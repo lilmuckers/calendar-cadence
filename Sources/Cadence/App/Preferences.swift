@@ -34,6 +34,8 @@ struct Preferences: Codable, Equatable {
     var takeoverAllScreens = true
     var takeoverOnlyWithLink = false
     var takeoverSound = true
+    /// Minutes after the start time an ignored full-screen alert closes itself; 0 = stays until you act.
+    var takeoverAutoDismissMinutes = 5
     var whilePresenting: BusyAlertStyle = .banner
     var whileOnCall: BusyAlertStyle = .banner
     var showPanel = true
@@ -113,6 +115,7 @@ extension Preferences {
         takeoverAllScreens = try c.decodeIfPresent(Bool.self, forKey: .takeoverAllScreens) ?? d.takeoverAllScreens
         takeoverOnlyWithLink = try c.decodeIfPresent(Bool.self, forKey: .takeoverOnlyWithLink) ?? d.takeoverOnlyWithLink
         takeoverSound = try c.decodeIfPresent(Bool.self, forKey: .takeoverSound) ?? d.takeoverSound
+        takeoverAutoDismissMinutes = try c.decodeIfPresent(Int.self, forKey: .takeoverAutoDismissMinutes) ?? d.takeoverAutoDismissMinutes
         whilePresenting = try c.decodeIfPresent(BusyAlertStyle.self, forKey: .whilePresenting) ?? d.whilePresenting
         whileOnCall = try c.decodeIfPresent(BusyAlertStyle.self, forKey: .whileOnCall) ?? d.whileOnCall
         showPanel = try c.decodeIfPresent(Bool.self, forKey: .showPanel) ?? d.showPanel

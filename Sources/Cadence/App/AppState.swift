@@ -637,6 +637,23 @@ final class AppState {
         onAlert?(sample, style)
     }
 
+    /// A full-screen alert for a made-up meeting that started `lateBy` seconds ago, to show the panic ramp.
+    /// Always uses demo data, so Join can never open a real meeting.
+    func previewLateAlert(lateBy: TimeInterval = 60) {
+        let start = Date().addingTimeInterval(-lateBy)
+        let sample = Meeting(
+            id: "preview-late",
+            title: "Design Review",
+            start: start,
+            end: start.addingTimeInterval(1800),
+            calendar: CalendarInfo(id: "preview", title: "Work", sourceTitle: "Preview",
+                                   color: RGBAColor(red: 0.35, green: 0.45, blue: 1)),
+            attendeeCount: 6,
+            joinLink: MeetingLink(service: .zoom, url: URL(string: "https://example.com/cadence-preview")!)
+        )
+        onAlert?(sample, .fullScreen)
+    }
+
     // MARK: - Actions
 
     /// The profile `meeting` would open in, if any rule applies to the default browser's profiles.

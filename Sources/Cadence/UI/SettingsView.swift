@@ -208,6 +208,17 @@ private struct AlertsTab: View {
                 Toggle("Cover all displays", isOn: $state.prefs.takeoverAllScreens)
                 Toggle("Only for meetings with a join link", isOn: $state.prefs.takeoverOnlyWithLink)
                 Toggle("Play sound", isOn: $state.prefs.takeoverSound)
+                Picker(selection: $state.prefs.takeoverAutoDismissMinutes) {
+                    Text("1 minute").tag(1)
+                    Text("2 minutes").tag(2)
+                    Text("5 minutes").tag(5)
+                    Text("10 minutes").tag(10)
+                    Text("Never — stay until I act").tag(0)
+                } label: {
+                    Text("If ignored, close after the start by")
+                    Text("It gets redder and more frantic for the first 3 minutes you're late.")
+                }
+                .disabled(!state.prefs.takeoverEnabled)
             }
             Section {
                 Picker("While presenting or sharing", selection: $state.prefs.whilePresenting) {
@@ -290,6 +301,8 @@ private struct AlertsTab: View {
             Section {
                 HStack {
                     Button("Preview Alert") { state.previewAlert() }
+                    Button("Preview Late Alert") { state.previewLateAlert() }
+                        .help("A demo meeting that started a minute ago: watch it get redder, faster and angrier")
                     Button("Preview Banner") { state.previewAlert(style: .banner) }
                     Button("Preview Notification") { state.previewAlert(style: .notification) }
                 }
