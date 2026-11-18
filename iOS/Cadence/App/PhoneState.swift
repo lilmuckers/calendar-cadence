@@ -87,8 +87,13 @@ final class PhoneState {
     /// When the saved agenda was last brought up to date.
     var macCopyDate: Date? { snapshot?.generatedAt }
     var hasOwnSources: Bool { calendarAccess || !googleProviders.isEmpty || !microsoftProviders.isEmpty || !icsProviders.isEmpty }
-    /// Meetings muted by a clash choice on the Mac; still honoured from the saved copy.
-    private var suppressed: Set<String> { link.mac == nil ? [] : snapshot?.suppressedIDs ?? [] }
+    /// Meetings muted by a clash choice or an agenda-only calendar on the Mac (still honoured from the
+    /// saved copy), plus this phone's own agenda-only calendars.
+    private var suppressed: Set<String> {
+        (link.mac == nil ? [] : snapshot?.suppressedIDs ?? []).union(ownAgendaOnlyIDs)
+    }
+    /// Ids in `ownMeetings` that come only from this phone's agenda-only calendars.
+    private var ownAgendaOnlyIDs: Set<String> = []
 
     var todayMeetings: [Meeting] {
         let cal = Calendar.current
@@ -97,8 +102,13 @@ final class PhoneState {
         return meetings.filter { !$0.isAllDay && $0.end > start && $0.start < end }
     }
 
-    var current: [Meeting] { meetings.filter { !$0.isAllDay && $0.isInProgress(at: now) } }
-    var next: Meeting? { meetings.first { !$0.isAllDay && $0.start > now } }
+    var current: [Meeting] { meetings.filter { !$0.isAllDay && $0.isInProgress(at: now) && !isAgendaOnly($0) } }
+    var next: Meeting? { meetings.first { !$0.isAllDay && $0.start > now && !isAgendaOnly($0) } }
+
+    /// On an agenda-only calendar (here or on the Mac): shown, but never alerts.
+    func isAgendaOnly(_ m: Meeting) -> Bool {
+        ownAgendaOnlyIDs.contains(m.id) || (link.mac != nil && snapshot?.agendaOnlyIDs?.contains(m.id) == true)
+    }
 
     /// What the desk display focuses on: the next meeting, or the live one when nothing's close.
     var focus: PanelFocus? {
@@ -198,7 +208,10 @@ final class PhoneState {
     @ObservationIgnored private var rawMeetings: [Meeting] = []
 
     private func recompute() {
-        ownMeetings = MeetingDeduplicator.dedupe(rawMeetings.filter { prefs.filters.allows($0) })
+        let shown = rawMeetings.filter { prefs.filters.allows($0) }
+        let merged = MeetingDeduplicator.dedupe(shown)
+        ownAgendaOnlyIDs = prefs.filters.agendaOnlyIDs(in: merged, sources: shown)
+        ownMeetings = merged
         planner.prune(keeping: meetings)
         updateLiveActivity()
     }
@@ -213,6 +226,12 @@ final class PhoneState {
     }
 
     func isCalendarEnabled(_ id: String) -> Bool { !prefs.filters.disabledCalendarIDs.contains(id) }
+
+    func isCalendarAgendaOnly(_ id: String) -> Bool { prefs.filters.agendaOnlyCalendarIDs.contains(id) }
+
+    func setCalendar(_ id: String, agendaOnly: Bool) {
+        if agendaOnly { prefs.filters.agendaOnlyCalendarIDs.insert(id) } else { prefs.filters.agendaOnlyCalendarIDs.remove(id) }
+    }
 
     func setCalendar(_ id: String, enabled: Bool) {
         if enabled { prefs.filters.disabledCalendarIDs.remove(id) } else { prefs.filters.disabledCalendarIDs.insert(id) }

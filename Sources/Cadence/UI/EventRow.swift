@@ -53,6 +53,12 @@ struct EventRow: View {
                                       ? "Clash — you chose not to be alerted for this one. Right-click → Clash Alerts to change."
                                       : "Overlaps another meeting. Right-click → Clash Alerts to choose which one alerts.")
                         }
+                        if state.isAgendaOnly(meeting) {
+                            Image(systemName: "bell.slash")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                                .help("Agenda only — this calendar never alerts or clashes")
+                        }
                         if state.isHiddenFromPanel(meeting) {
                             Image(systemName: "eye.slash")
                                 .font(.system(size: 10))
@@ -235,6 +241,10 @@ struct PanelVisibilityMenu: View {
             }
         } else {
             Button("Hide from Countdown Panel") { state.hideFromPanel(meeting, series: false) }
+        }
+        let quiet = state.isCalendarAgendaOnly(meeting.calendar.id)
+        Button(quiet ? "Alert for “\(meeting.calendar.title)” Again" : "Make “\(meeting.calendar.title)” Agenda Only") {
+            state.setCalendar(meeting.calendar.id, agendaOnly: !quiet)
         }
     }
 }

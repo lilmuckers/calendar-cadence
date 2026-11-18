@@ -37,6 +37,11 @@ final class AppState {
     private(set) var lastRemoteRefresh: Date?
     /// Filtered and de-duplicated events across every source.
     private(set) var meetings: [Meeting] = []
+    /// Ids in `meetings` that come only from "agenda only" calendars.
+    private(set) var agendaOnlyIDs: Set<String> = []
+    /// `meetings` without agenda-only ones: what alerts, reminders, clashes, current/next and
+    /// assistant timeline events run on.
+    private(set) var activeMeetings: [Meeting] = []
 
     /// Set by the AppDelegate to show/hide windows when state changes.
     /// Fired when a meeting's alert is due. The optional style forces a presentation (used by Preview).
@@ -168,11 +173,12 @@ final class AppState {
     }
 
     private func recompute() {
-        let previous = meetings
-        meetings = visibleMeetings()
+        let previous = activeMeetings
+        let previousAll = meetings
+        applyVisible()
         companion.pushSnapshot()
-        clashes = ClashDetector.clashes(in: meetings, after: Date())
-        emitChanges(from: previous)
+        clashes = ClashDetector.clashes(in: activeMeetings, after: Date())
+        emitChanges(from: previous, all: previousAll)
         let live = Set(clashes.map(\.key))
         clashChoices = clashChoices.filter { live.contains($0.key) }
         UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
@@ -186,14 +192,14 @@ final class AppState {
     static let agendaURIs = ["cadence://agenda/today", "cadence://agenda/tomorrow", "cadence://next", "cadence://clashes"]
 
     /// Tell assistants about moved/cancelled meetings and new clashes, and refresh their resources.
-    private func emitChanges(from previous: [Meeting]) {
+    private func emitChanges(from previous: [Meeting], all previousAll: [Meeting]) {
         guard let onEvent else { return }
         let now = Date()
-        if previous != meetings {
+        if previousAll != meetings {
             onEvent(MCPEvent(type: "agenda.updated", message: "Agenda updated", uris: Self.agendaURIs, log: false))
         }
         if !previous.isEmpty {
-            for change in MeetingChangeDetector.changes(old: previous, new: meetings, now: now) {
+            for change in MeetingChangeDetector.changes(old: previous, new: activeMeetings, now: now) {
                 switch change {
                 case .moved(let from, let to):
                     onEvent(MCPEvent(type: "meeting.changed", message: "\(to.title) moved to \(Theme.dayTime(to.start))",
@@ -220,13 +226,13 @@ final class AppState {
     func dto(_ m: Meeting) -> JSONValue {
         let inClash = clashes.contains { $0.meetings.contains { $0.id == m.id } }
         let value = MeetingDTO(m, now: Date(), inClash: inClash, mutedByClash: suppressedByClash.contains(m.id),
-                               hiddenFromPanel: isHiddenFromPanel(m))
+                               hiddenFromPanel: isHiddenFromPanel(m), agendaOnly: isAgendaOnly(m))
         return (try? JSONValue(encoding: value)) ?? .null
     }
 
     private func checkTimelineEvents() {
         guard let onEvent else { return }
-        let due = MCPEventPlanner.due(meetings, now: now, sent: sentEvents,
+        let due = MCPEventPlanner.due(activeMeetings, now: now, sent: sentEvents,
                                       leadMinutes: max(1, prefs.headsUpMinutes), wrapMinutes: prefs.wrapUpMinutes)
         for d in due {
             sentEvents.insert(d.key)
@@ -235,11 +241,21 @@ final class AppState {
         }
     }
 
-    private func visibleMeetings() -> [Meeting] {
+    private func applyVisible() {
         var shown = allMeetings.filter { prefs.filters.allows($0) }
         if !prefs.useEventColors { shown = shown.map { var m = $0; m.eventColor = nil; return m } }
         shown = shown.map(applyLocalColor)
-        return MeetingDeduplicator.dedupe(shown)
+        meetings = MeetingDeduplicator.dedupe(shown)
+        agendaOnlyIDs = prefs.filters.agendaOnlyIDs(in: meetings, sources: shown)
+        activeMeetings = agendaOnlyIDs.isEmpty ? meetings : meetings.filter { !agendaOnlyIDs.contains($0.id) }
+    }
+
+    func isAgendaOnly(_ m: Meeting) -> Bool { agendaOnlyIDs.contains(m.id) }
+
+    func isCalendarAgendaOnly(_ id: String) -> Bool { prefs.filters.agendaOnlyCalendarIDs.contains(id) }
+
+    func setCalendar(_ id: String, agendaOnly: Bool) {
+        if agendaOnly { prefs.filters.agendaOnlyCalendarIDs.insert(id) } else { prefs.filters.agendaOnlyCalendarIDs.remove(id) }
     }
 
     private func applyLocalColor(_ m: Meeting) -> Meeting {
@@ -386,8 +402,8 @@ final class AppState {
         self.calendars = calendars
         access = .granted
         allMeetings = demo.sorted { $0.start < $1.start }
-        meetings = visibleMeetings()
-        clashes = ClashDetector.clashes(in: meetings, after: now)
+        applyVisible()
+        clashes = ClashDetector.clashes(in: activeMeetings, after: now)
     }
 
     // MARK: - Hotkey
@@ -395,7 +411,7 @@ final class AppState {
     /// What the global "join" shortcut opens: a meeting starting within 10 minutes beats one that's
     /// already running; otherwise the live meeting; otherwise the next one today with a link.
     var joinTarget: Meeting? {
-        let linked = meetings.filter { !$0.isAllDay && $0.joinLink != nil && $0.end > now && !suppressedByClash.contains($0.id) }
+        let linked = activeMeetings.filter { !$0.isAllDay && $0.joinLink != nil && $0.end > now && !suppressedByClash.contains($0.id) }
         if let soon = linked.first(where: { $0.start > now && $0.start.timeIntervalSince(now) <= 600 }) { return soon }
         if let live = linked.last(where: { $0.isInProgress(at: now) }) { return live }
         return linked.first { Calendar.current.isDate($0.start, inSameDayAs: now) }
@@ -410,7 +426,7 @@ final class AppState {
 
     private func checkReminders() {
         var reminders: [Reminder] = []
-        let upcoming = meetings.filter { !$0.isAllDay && $0.start > now && !suppressedByClash.contains($0.id) }
+        let upcoming = activeMeetings.filter { !$0.isAllDay && $0.start > now && !suppressedByClash.contains($0.id) }
         if prefs.headsUpEnabled {
             reminders += ReminderPlanner.headsUps(for: upcoming, minutes: prefs.headsUpMinutes)
         }
@@ -426,11 +442,11 @@ final class AppState {
         }
         if prefs.wrapUpEnabled {
             let live = current.filter { $0.participation != .declined && !suppressedByClash.contains($0.id) }
-            reminders += ReminderPlanner.wrapUps(live: live, all: meetings, minutes: prefs.wrapUpMinutes,
+            reminders += ReminderPlanner.wrapUps(live: live, all: activeMeetings, minutes: prefs.wrapUpMinutes,
                                                  onlyBackToBack: prefs.wrapUpOnlyBackToBack)
         }
         if prefs.summaryEnabled, canShowAgenda, lastRefresh != nil,
-           let summary = ReminderPlanner.morningSummary(meetings: meetings, now: now,
+           let summary = ReminderPlanner.morningSummary(meetings: activeMeetings, now: now,
                                                         hour: prefs.summaryTime / 60, minute: prefs.summaryTime % 60),
            UserDefaults.standard.string(forKey: "Cadence.lastSummary") != summary.key {
             reminders.append(summary)
@@ -610,15 +626,15 @@ final class AppState {
 
     var showsTomorrow: Bool {
         guard prefs.tomorrowPreview, !tomorrowMeetings.isEmpty else { return false }
-        let doneToday = !todayMeetings.contains { !$0.isAllDay && $0.end > now }
+        let doneToday = !todayMeetings.contains { !$0.isAllDay && $0.end > now && !isAgendaOnly($0) }
         return doneToday || Calendar.current.component(.hour, from: now) >= prefs.tomorrowFromHour
     }
 
     /// Timed meetings happening right now.
-    var current: [Meeting] { meetings.filter { !$0.isAllDay && $0.isInProgress(at: now) } }
+    var current: [Meeting] { activeMeetings.filter { !$0.isAllDay && $0.isInProgress(at: now) } }
 
     /// The next timed meeting that has not started yet.
-    var next: Meeting? { meetings.first { !$0.isAllDay && $0.start > now } }
+    var next: Meeting? { activeMeetings.first { !$0.isAllDay && $0.start > now } }
 
     var isNextToday: Bool {
         guard let next else { return false }
@@ -630,7 +646,7 @@ final class AppState {
     private func checkAlert() {
         guard prefs.takeoverEnabled else { return }
         let suppressed = suppressedByClash
-        let candidates = meetings.filter {
+        let candidates = activeMeetings.filter {
             (!prefs.takeoverOnlyWithLink || $0.joinLink != nil) && !suppressed.contains($0.id)
         }
         guard let due = planner.due(in: candidates, now: now, leadTime: prefs.takeoverLeadSeconds) else { return }
@@ -658,7 +674,7 @@ final class AppState {
 
     /// The suggested messages for `meeting` (suggestion first) and where they could go (best guess first).
     func lateDraft(for meeting: Meeting, minutes: Int) -> LateDraft {
-        let previous = RunningLate.previous(to: meeting, in: meetings)
+        let previous = RunningLate.previous(to: meeting, in: activeMeetings)
         let situation = RunningLate.situation(previous: previous, now: Date(), onCall: SystemContext.microphoneApp() != nil)
         let mine = lateMessenger.myEmails
         return LateDraft(
@@ -837,7 +853,8 @@ final class AppState {
             return m
         }
         return CompanionSnapshot(macName: companion.macName, generatedAt: Date(), meetings: mirrored,
-                                 suppressedIDs: suppressedByClash, takeoverEnabled: prefs.takeoverEnabled,
+                                 suppressedIDs: suppressedByClash.union(agendaOnlyIDs),
+                                 agendaOnlyIDs: agendaOnlyIDs, takeoverEnabled: prefs.takeoverEnabled,
                                  takeoverLeadSeconds: prefs.takeoverLeadSeconds,
                                  takeoverAutoDismissMinutes: prefs.takeoverAutoDismissMinutes)
     }
@@ -849,7 +866,7 @@ final class AppState {
 
     /// What the floating panel shows, after hidden events and the "only within" window.
     var panelFocus: PanelFocus? {
-        PanelPlanner.focus(meetings: meetings, now: now, isHidden: isHiddenFromPanel,
+        PanelPlanner.focus(meetings: activeMeetings, now: now, isHidden: isHiddenFromPanel,
                            withinMinutes: prefs.panelWithinMinutes, showDuringMeetings: prefs.panelShowDuringMeetings)
     }
 
