@@ -56,6 +56,22 @@ Pick **Standard**, **Compact** or an ultra-small **Mini**, and let it **grow** a
 30 seconds before a meeting (configurable), Cadence covers every display with a countdown and a big **Join** button.
 <kbd>Return</kbd> joins · <kbd>Esc</kbd> dismisses · **Snooze** nags you again a minute later.
 
+### Running late? It tells them.
+
+Once the meeting has started, the alert offers to send a message **as you**:
+- **Send via:** its best guess at where to send, with every other option listed and checked in the background (✓ ready, ⚠ won't work and why, 🔒 needs permission).
+  - Teams meetings go to the meeting chat.
+  - Google Meet goes to Google Chat: a group chat for small same-org meetings, otherwise the organiser.
+  - Slack huddles go to their channel.
+  - Anything else follows your **domain rules** (e.g. *@client.com → Slack*), then email.
+
+  It sends from the account the meeting is for: the one matching its browser profile, then the one its calendar belongs to.
+- **Message:** a suggestion based on the meeting before. It might be *"Just wrapping up my previous meeting — there in 2 mins!"*, *"Grabbing a quick breather between back-to-backs"*, or *"Running a few minutes late, sorry!"*. You can also pick one of your saved messages or write your own.
+- **2 / 5 / 10 mins:** after sending, the alert backs off until then, and only gets cross again if you miss that too.
+
+Set it up in *Settings → Accounts → Allow running-late messages* and *Settings → Messages*.
+Right-click a meeting → **Send Running Late** sends one straight away.
+
 ### …but not while you're presenting
 
 Cadence checks what you're doing before it shouts:
@@ -203,7 +219,7 @@ If your build has a Microsoft app built in, skip this and click **Sign in with M
 No Xcode project, no SwiftPM, no dependencies — just the Xcode Command Line Tools on macOS 14+.
 
 ```bash
-scripts/test.sh            # 120 unit tests (Swift Testing)
+scripts/test.sh            # 131 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
 scripts/ios-build.sh       # build the iPhone app for the Simulator
 scripts/ios-test.sh        # iPhone unit tests in the Simulator (needs Xcode)
@@ -217,7 +233,16 @@ Save the client as `Support/Secrets.env` (git-ignored; `Support/Secrets.env.exam
 GOOGLE_CLIENT_ID=1234-abc.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-…
 MICROSOFT_CLIENT_ID=00000000-0000-0000-0000-000000000000   # optional
+SLACK_CLIENT_ID=1234567890.1234567890                      # optional, for running-late messages
 ```
+
+**Running-late messages** need a one-time setup:
+- **Slack:** create a Slack app with **PKCE turned on**, the *user* scopes `chat:write`, `users:read`, `users:read.email` and `im:write`, and the redirect URL `https://cadence.patrick-mckinley.com/slack`. That page forwards the sign-in to Cadence on `localhost:53682`; Slack needs HTTPS redirects to distribute an app.
+  There's no client secret.
+- **Google Chat:** enable the Google Chat API in the Cloud project and configure a Chat app (name, icon, description).
+  This only works for Workspace accounts.
+  Without it, Meet meetings fall back to Gmail, which needs the Gmail API enabled.
+- **Microsoft:** the Teams chat and mail scopes (`ChatMessage.Send`, `OnlineMeetings.Read`, `Mail.Send`) are requested at sign-in, so the app registration doesn't change.
 
 `scripts/build.sh` writes them into the app's `Info.plist`, so users only see **Sign in with Google** / **Sign in with Microsoft**. A client someone enters in Settings still takes priority.
 

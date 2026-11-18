@@ -136,8 +136,17 @@ struct TakeoverView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var remaining: TimeInterval { meeting.start.timeIntervalSince(state.now) }
+    /// How late you are, counted from when you said you'd be there once you've sent a running-late message.
+    private var secondsLate: TimeInterval { state.now.timeIntervalSince(state.lateClockStart(for: meeting)) }
     /// Grows from calm to full panic over the first few minutes the user is late.
-    private var urgency: TakeoverUrgency { TakeoverUrgency(secondsLate: -remaining) }
+    private var urgency: TakeoverUrgency { TakeoverUrgency(secondsLate: secondsLate) }
+
+    private var headline: String {
+        guard let notice = state.lateNotices[meeting.id] else { return TakeoverUrgency.headline(remaining: remaining) }
+        if state.now < notice.promised { return "THEY KNOW YOU'RE ON YOUR WAY" }
+        // You said you'd be there by now: straight back to "late".
+        return TakeoverUrgency.headline(remaining: -max(30, secondsLate))
+    }
     /// The meeting's colour, turning red as panic sets in.
     private var mood: Color { Color(urgency.color(from: meeting.displayColor)) }
 
@@ -159,8 +168,8 @@ struct TakeoverView: View {
     @ViewBuilder private func content(urgency u: TakeoverUrgency, phase: Double, pulse: Double, date: Date) -> some View {
         let shake = reduceMotion ? 0 : u.shake
         // Three minutes late and still ignored: things start falling off.
-        let melting = !reduceMotion && Meltdown.isActive(secondsLate: -remaining)
-        let headline = TakeoverUrgency.headline(remaining: remaining)
+        let melting = !reduceMotion && Meltdown.isActive(secondsLate: secondsLate)
+        let headline = self.headline
         ZStack {
             VisualEffect(material: .fullScreenUI)
             Color.black.opacity(0.45)
@@ -278,6 +287,11 @@ struct TakeoverView: View {
                 }
                 .padding(.top, 8)
 
+                if isPrimary, remaining <= 0, state.prefs.lateMessages.enabled {
+                    RunningLateCard(meeting: meeting, afterSend: actions.dismiss)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+
                 if isPrimary {
                     Text(meeting.joinLink != nil ? "Return to join  ·  Esc to dismiss" : "Esc to dismiss")
                         .font(.system(size: 12, weight: .medium))
@@ -323,7 +337,7 @@ struct TakeoverView: View {
             }
         }
         let ring = anchors["ring"].map { geo[$0] }
-        meltdown.tick(date: date, secondsLate: -remaining, glyphs: glyphs,
+        meltdown.tick(date: date, secondsLate: secondsLate, glyphs: glyphs,
                       ringCenter: ring.map { CGPoint(x: $0.midX, y: $0.midY) }, screen: geo.size) { piece in
             guard state.prefs.takeoverSound else { return }
             NSSound(named: piece == .letter ? "Pop" : "Tink")?.play()

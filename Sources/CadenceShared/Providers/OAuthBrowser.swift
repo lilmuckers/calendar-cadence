@@ -47,12 +47,14 @@ final class LoopbackServer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "cadence.oauth.loopback")
     private var listener: NWListener?
 
-    func start() async throws -> UInt16 {
+    /// `port` nil picks a free one; Slack needs a fixed port its redirect page forwards to.
+    func start(port fixed: UInt16? = nil) async throws -> UInt16 {
         // Listen on every loopback address (IPv4 and IPv6) so both http://127.0.0.1 and
         // http://localhost redirects reach us; nothing off this Mac can connect.
         let params = NWParameters.tcp
         params.acceptLocalOnly = true
-        let listener = try NWListener(using: params, on: .any)
+        params.allowLocalEndpointReuse = true
+        let listener = try NWListener(using: params, on: fixed.flatMap { NWEndpoint.Port(rawValue: $0) } ?? .any)
         self.listener = listener
         return try await withCheckedThrowingContinuation { cont in
             let once = Once()

@@ -36,6 +36,8 @@ struct Preferences: Codable, Equatable {
     var takeoverSound = true
     /// Minutes after the start time an ignored full-screen alert closes itself; 0 = stays until you act.
     var takeoverAutoDismissMinutes = 5
+    /// "Running late" messages: the built-in wording, your own extras, and whether it's on.
+    var lateMessages = LateMessageSettings()
     var whilePresenting: BusyAlertStyle = .banner
     var whileOnCall: BusyAlertStyle = .banner
     var showPanel = true
@@ -120,6 +122,7 @@ extension Preferences {
         takeoverOnlyWithLink = try c.decodeIfPresent(Bool.self, forKey: .takeoverOnlyWithLink) ?? d.takeoverOnlyWithLink
         takeoverSound = try c.decodeIfPresent(Bool.self, forKey: .takeoverSound) ?? d.takeoverSound
         takeoverAutoDismissMinutes = try c.decodeIfPresent(Int.self, forKey: .takeoverAutoDismissMinutes) ?? d.takeoverAutoDismissMinutes
+        lateMessages = (try? c.decodeIfPresent(LateMessageSettings.self, forKey: .lateMessages)) ?? d.lateMessages
         whilePresenting = try c.decodeIfPresent(BusyAlertStyle.self, forKey: .whilePresenting) ?? d.whilePresenting
         whileOnCall = try c.decodeIfPresent(BusyAlertStyle.self, forKey: .whileOnCall) ?? d.whileOnCall
         showPanel = try c.decodeIfPresent(Bool.self, forKey: .showPanel) ?? d.showPanel

@@ -13,6 +13,11 @@ struct GoogleAccount: Codable, Identifiable, Equatable {
     var canWrite: Bool?
     /// Profile photo URL from the ID token's `picture` claim.
     var pictureURL: String?
+    /// The user turned on "Running late" messages for this account.
+    var messagingEnabled: Bool?
+    /// Granted: send Gmail as you / post in Google Chat as you.
+    var canSendMail: Bool?
+    var canChat: Bool?
 
     var refreshKey: String { "google.refreshToken.\(id)" }
     var avatarKey: String { "google-\(id)" }
@@ -53,6 +58,11 @@ final class GoogleAuth {
 
     static let writeScope = "https://www.googleapis.com/auth/calendar.events"
     static let scope = "openid email profile https://www.googleapis.com/auth/calendar.readonly \(writeScope)"
+    /// Asked for only when "Running late" messages are turned on for an account.
+    static let mailScope = "https://www.googleapis.com/auth/gmail.send"
+    /// Find or start a DM/group chat, then post in it.
+    static let chatScopes = "https://www.googleapis.com/auth/chat.spaces.readonly https://www.googleapis.com/auth/chat.spaces.create https://www.googleapis.com/auth/chat.messages.create"
+    static let messagingScope = "\(scope) \(mailScope) \(chatScopes)"
     private static let accountsKey = "Cadence.google.accounts"
     private static let legacyRefreshKey = "google.refreshToken"
     private static let secretKey = "google.clientSecret"
@@ -194,8 +204,19 @@ final class GoogleAuth {
     // MARK: Sign in
 
     /// Opens Google's account chooser and adds (or reconnects) whichever account the user picks.
+    /// Turn "Running late" messages on for an account: signs in again asking for Gmail and Chat.
+    func enableMessaging(_ account: GoogleAccount) async throws {
+        _ = try await signIn(messaging: true, loginHint: account.email)
+    }
+
+    func disableMessaging(_ account: GoogleAccount) {
+        guard let i = accounts.firstIndex(where: { $0.id == account.id }) else { return }
+        accounts[i].messagingEnabled = false
+        saveAccounts()
+    }
+
     @discardableResult
-    func signIn() async throws -> GoogleAccount {
+    func signIn(messaging: Bool = false, loginHint: String? = nil) async throws -> GoogleAccount {
         guard let creds = credentials else { throw AuthError.missingCredentials }
         let verifier = Self.randomURLSafe(64)
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64URL
@@ -209,14 +230,16 @@ final class GoogleAuth {
             .init(name: "client_id", value: creds.clientID),
             .init(name: "redirect_uri", value: redirect),
             .init(name: "response_type", value: "code"),
-            .init(name: "scope", value: Self.scope),
+            .init(name: "scope", value: messaging ? Self.messagingScope : Self.scope),
+            // Keep anything granted earlier (e.g. Gmail send) when signing in again.
+            .init(name: "include_granted_scopes", value: "true"),
             .init(name: "code_challenge", value: challenge),
             .init(name: "code_challenge_method", value: "S256"),
             .init(name: "state", value: state),
             .init(name: "access_type", value: "offline"),
             // Always show the account chooser so a second account can be added.
             .init(name: "prompt", value: "select_account consent"),
-        ]
+        ] + (loginHint.map { [.init(name: "login_hint", value: $0)] } ?? [])
         let callback = try await session.authorize(comps.url!)
         let items = callback.queryItems ?? []
         if let error = items.first(where: { $0.name == "error" })?.value { throw AuthError.denied(error) }
@@ -240,6 +263,11 @@ final class GoogleAuth {
         account.clientID = creds.clientID
         account.canWrite = response.scope.map { $0.contains(Self.writeScope) }
         account.pictureURL = response.id_token.flatMap { JWT.payload($0)?["picture"] as? String } ?? account.pictureURL
+        if messaging { account.messagingEnabled = true }
+        if let scope = response.scope {
+            account.canSendMail = scope.contains(Self.mailScope)
+            account.canChat = scope.contains("chat.messages.create")
+        }
         Keychain.set(refresh, for: account.refreshKey)
         if let i = accounts.firstIndex(where: { $0.id == account.id }) { accounts[i] = account } else { accounts.append(account) }
         needsReconnect.remove(account.id)
@@ -263,7 +291,17 @@ final class GoogleAuth {
             ]))
             tokens[account.id] = (response.access_token, Date().addingTimeInterval(response.expires_in ?? 3600))
             needsReconnect.remove(account.id)
-            if let scope = response.scope { setCanWrite(scope.contains(Self.writeScope), for: account.id) }
+            if let scope = response.scope {
+                setCanWrite(scope.contains(Self.writeScope), for: account.id)
+                if let i = accounts.firstIndex(where: { $0.id == account.id }) {
+                    let mail = scope.contains(Self.mailScope), chat = scope.contains("chat.messages.create")
+                    if accounts[i].canSendMail != mail || accounts[i].canChat != chat {
+                        accounts[i].canSendMail = mail
+                        accounts[i].canChat = chat
+                        saveAccounts()
+                    }
+                }
+            }
             if let picture = response.id_token.flatMap({ JWT.payload($0)?["picture"] as? String }) { setPicture(picture, for: account.id) }
             return response.access_token
         } catch TokenError.invalidGrant {

@@ -91,6 +91,39 @@ public struct CalendarInfo: Identifiable, Hashable, Codable, Sendable {
     }
 }
 
+/// Someone invited to a meeting.
+public struct Attendee: Codable, Hashable, Sendable {
+    public var name: String?
+    public var email: String?
+    /// The signed-in user.
+    public var isSelf: Bool
+    /// A room or piece of equipment, not a person.
+    public var isResource: Bool
+
+    public init(name: String? = nil, email: String? = nil, isSelf: Bool = false, isResource: Bool = false) {
+        self.name = name?.trimmingCharacters(in: .whitespaces).nilIfEmpty
+        self.email = email?.trimmingCharacters(in: .whitespaces).lowercased().nilIfEmpty
+        self.isSelf = isSelf
+        self.isResource = isResource
+    }
+
+    /// The name to show, falling back to the email address.
+    public var label: String { name ?? email ?? "Someone" }
+    /// First name only ("Roy Smith" → "Roy"; "roy.smith@x.com" → "Roy").
+    public var firstName: String {
+        // A real name ("Roy Smith"); a bare "roy.smith" or address is handled like an email below.
+        if let name, name.contains(" ") || !(name.contains("@") || name.contains(".")),
+           let first = name.split(separator: " ").first { return String(first) }
+        let local = (name ?? email)?.split(separator: "@").first ?? ""
+        guard let first = local.split(whereSeparator: { $0 == "." || $0 == "_" || $0 == "-" }).first else { return "them" }
+        return first.prefix(1).uppercased() + first.dropFirst()
+    }
+}
+
+extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
 /// A provider-agnostic calendar event.
 public struct Meeting: Identifiable, Hashable, Codable, Sendable {
     /// Unique per occurrence (recurring events share an EventKit identifier, so the start time is folded in).
@@ -108,6 +141,8 @@ public struct Meeting: Identifiable, Hashable, Codable, Sendable {
     /// The organizer's email address, when the source gives one (used for browser-profile rules).
     public var organizerEmail: String?
     public var attendeeCount: Int
+    /// Who's invited, when the source gives names or addresses (may be empty even when attendeeCount > 0).
+    public var attendees: [Attendee]
     public var participation: Participation
     public var availability: Availability
     public var joinLink: MeetingLink?
@@ -132,6 +167,7 @@ public struct Meeting: Identifiable, Hashable, Codable, Sendable {
         organizer: String? = nil,
         organizerEmail: String? = nil,
         attendeeCount: Int = 0,
+        attendees: [Attendee] = [],
         participation: Participation = .unknown,
         availability: Availability = .busy,
         joinLink: MeetingLink? = nil,
@@ -152,6 +188,7 @@ public struct Meeting: Identifiable, Hashable, Codable, Sendable {
         self.organizer = organizer
         self.organizerEmail = organizerEmail
         self.attendeeCount = attendeeCount
+        self.attendees = attendees
         self.participation = participation
         self.availability = availability
         self.joinLink = joinLink

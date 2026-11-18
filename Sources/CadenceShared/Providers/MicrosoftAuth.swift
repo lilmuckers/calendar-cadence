@@ -10,6 +10,11 @@ struct MicrosoftAccount: Codable, Identifiable, Equatable {
     var clientID: String
     /// Whether the token allows replying to invites (nil = not known yet).
     var canWrite: Bool?
+    /// The user turned on "Running late" messages for this account, so sign-in and refresh ask for more.
+    var messagingEnabled: Bool?
+    /// Granted: send mail as you / post in Teams chats as you.
+    var canSendMail: Bool?
+    var canTeamsChat: Bool?
 
     var refreshKey: String { "microsoft.refreshToken.\(id)" }
     var avatarKey: String { "microsoft-\(id)" }
@@ -38,6 +43,24 @@ final class MicrosoftAuth {
     static let writeScope = "Calendars.ReadWrite"
     /// MailboxSettings.Read gives category colours; offline_access gives a refresh token.
     static let scope = "openid email profile offline_access User.Read \(writeScope) MailboxSettings.Read"
+    /// Asked for only when "Running late" messages are turned on for an account.
+    static let mailScope = "Mail.Send"
+    static let chatScopes = "ChatMessage.Send OnlineMeetings.Read"
+
+    /// Personal Microsoft accounts can't use Teams chat scopes.
+    static func isPersonal(_ email: String?) -> Bool {
+        guard let domain = email?.split(separator: "@").last?.lowercased() else { return false }
+        return ["outlook.com", "hotmail.com", "live.com", "msn.com", "hotmail.co.uk", "live.co.uk", "outlook.co.uk"].contains(domain)
+    }
+
+    static func scope(messaging: Bool, email: String?) -> String {
+        guard messaging else { return scope }
+        return "\(scope) \(mailScope)" + (isPersonal(email) ? "" : " \(chatScopes)")
+    }
+
+    private func scope(for account: MicrosoftAccount) -> String {
+        Self.scope(messaging: account.messagingEnabled == true, email: account.email)
+    }
     private static let authority = "https://login.microsoftonline.com/common/oauth2/v2.0"
     private static let accountsKey = "Cadence.microsoft.accounts"
     private static let customClientKey = "Cadence.microsoft.clientID"
@@ -128,9 +151,24 @@ final class MicrosoftAuth {
     }
     #endif
 
+    /// Turn "Running late" messages on for an account: signs in again asking for the extra scopes.
+    func enableMessaging(_ account: MicrosoftAccount) async throws {
+        _ = try await signIn(messaging: true, loginHint: account.email)
+    }
+
+    func disableMessaging(_ account: MicrosoftAccount) {
+        guard let i = accounts.firstIndex(where: { $0.id == account.id }) else { return }
+        accounts[i].messagingEnabled = false
+        tokens[account.id] = nil // the next refresh asks for the base scopes only
+        saveAccounts()
+    }
+
     @discardableResult
-    func signIn() async throws -> MicrosoftAccount {
+    func signIn(messaging: Bool = false, loginHint: String? = nil) async throws -> MicrosoftAccount {
         guard let clientID else { throw AuthError.missingClient }
+        let existing = accounts.first { $0.email != nil && $0.email?.lowercased() == loginHint?.lowercased() }
+        let wantsMessaging = messaging || existing?.messagingEnabled == true
+        let scope = Self.scope(messaging: wantsMessaging, email: loginHint)
         let verifier = GoogleAuth.randomURLSafe(64)
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64URL
         let state = GoogleAuth.randomURLSafe(24)
@@ -144,12 +182,12 @@ final class MicrosoftAuth {
             .init(name: "redirect_uri", value: redirect),
             .init(name: "response_type", value: "code"),
             .init(name: "response_mode", value: "query"),
-            .init(name: "scope", value: Self.scope),
+            .init(name: "scope", value: scope),
             .init(name: "code_challenge", value: challenge),
             .init(name: "code_challenge_method", value: "S256"),
             .init(name: "state", value: state),
-            .init(name: "prompt", value: "select_account"),
-        ]
+            .init(name: "prompt", value: loginHint == nil ? "select_account" : "consent"),
+        ] + (loginHint.map { [.init(name: "login_hint", value: $0)] } ?? [])
         let callback = try await session.authorize(comps.url!)
         let items = callback.queryItems ?? []
         if let error = items.first(where: { $0.name == "error" })?.value {
@@ -162,7 +200,7 @@ final class MicrosoftAuth {
 
         let response = try await tokenRequest([
             "client_id": clientID,
-            "scope": Self.scope,
+            "scope": scope,
             "code": code,
             "redirect_uri": redirect,
             "grant_type": "authorization_code",
@@ -175,6 +213,16 @@ final class MicrosoftAuth {
             ?? MicrosoftAccount(email: email, clientID: clientID)
         account.clientID = clientID
         account.canWrite = response.scope.map { $0.contains(Self.writeScope) }
+        if wantsMessaging {
+            account.messagingEnabled = true
+            account.canSendMail = response.scope.map { $0.contains(Self.mailScope) }
+            account.canTeamsChat = response.scope.map { $0.contains("ChatMessage.Send") }
+        } else if account.messagingEnabled == true {
+            // Signed in again without the extra scopes (plain Reconnect): refreshes must not ask for them.
+            account.messagingEnabled = false
+            account.canSendMail = nil
+            account.canTeamsChat = nil
+        }
         Keychain.set(refresh, for: account.refreshKey)
         if let i = accounts.firstIndex(where: { $0.id == account.id }) { accounts[i] = account } else { accounts.append(account) }
         needsReconnect.remove(account.id)
@@ -193,7 +241,7 @@ final class MicrosoftAuth {
         do {
             let response = try await tokenRequest([
                 "client_id": clientID,
-                "scope": Self.scope,
+                "scope": scope(for: account),
                 "refresh_token": refresh,
                 "grant_type": "refresh_token",
             ])
@@ -201,7 +249,17 @@ final class MicrosoftAuth {
             if let rotated = response.refresh_token { Keychain.set(rotated, for: account.refreshKey) }
             tokens[account.id] = (response.access_token, Date().addingTimeInterval(response.expires_in ?? 3600))
             needsReconnect.remove(account.id)
-            if let scope = response.scope { setCanWrite(scope.contains(Self.writeScope), for: account.id) }
+            if let scope = response.scope {
+                setCanWrite(scope.contains(Self.writeScope), for: account.id)
+                if account.messagingEnabled == true, let i = accounts.firstIndex(where: { $0.id == account.id }) {
+                    let mail = scope.contains(Self.mailScope), chat = scope.contains("ChatMessage.Send")
+                    if accounts[i].canSendMail != mail || accounts[i].canTeamsChat != chat {
+                        accounts[i].canSendMail = mail
+                        accounts[i].canTeamsChat = chat
+                        saveAccounts()
+                    }
+                }
+            }
             return response.access_token
         } catch TokenError.invalidGrant {
             needsReconnect.insert(account.id)

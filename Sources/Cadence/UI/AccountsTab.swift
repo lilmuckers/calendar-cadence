@@ -35,6 +35,7 @@ struct AccountsTab: View {
             }
             GoogleSection()
             MicrosoftSection()
+            SlackSection()
             FeedsSection()
         }
         .formStyle(.grouped)
@@ -178,6 +179,12 @@ private struct AccountRow: View {
                         .font(.caption2)
                         .foregroundStyle(.orange)
                 }
+                MessagingLine(
+                    enabled: account.messagingEnabled == true,
+                    channels: [account.canSendMail == true ? "Gmail" : nil, account.canChat == true ? "Google Chat" : nil].compactMap { $0 },
+                    enable: { try await state.googleAuth.enableMessaging(account) },
+                    disable: { state.googleAuth.disableMessaging(account) }
+                )
             }
             Spacer()
             if needsReconnect || account.canWrite == false {
@@ -219,6 +226,12 @@ private struct MicrosoftSection: View {
                             .font(.caption)
                             .foregroundStyle(reconnect || (provider?.status.hasPrefix("Error") ?? false) ? Color.orange : Color.secondary)
                             .lineLimit(1)
+                        MessagingLine(
+                            enabled: account.messagingEnabled == true,
+                            channels: [account.canSendMail == true ? "Outlook mail" : nil, account.canTeamsChat == true ? "Teams chat" : nil].compactMap { $0 },
+                            enable: { try await auth.enableMessaging(account) },
+                            disable: { auth.disableMessaging(account) }
+                        )
                     }
                     Spacer()
                     if reconnect { Button("Reconnect") { signIn() }.disabled(busy) }
@@ -277,6 +290,102 @@ private struct MicrosoftSection: View {
         error = nil
         Task {
             do { try await state.microsoftSignIn() } catch { self.error = error.localizedDescription }
+            busy = false
+        }
+    }
+}
+
+/// "Running-late messages" under an account: turn it on (signs in again for the extra permission) or off.
+private struct MessagingLine: View {
+    let enabled: Bool
+    let channels: [String]
+    let enable: () async throws -> Void
+    let disable: () -> Void
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Image(systemName: "paperplane").font(.caption2)
+                if enabled {
+                    Text(channels.isEmpty ? "Running-late messages: permission not granted" : "Running-late messages via \(channels.joined(separator: " · "))")
+                    Button("Turn Off", action: disable).buttonStyle(.link)
+                } else {
+                    Button(busy ? "Waiting for browser…" : "Allow running-late messages…") {
+                        busy = true
+                        error = nil
+                        Task {
+                            do { try await enable() } catch { self.error = error.localizedDescription }
+                            busy = false
+                        }
+                    }
+                    .buttonStyle(.link)
+                    .disabled(busy)
+                    .help("Sign in again to let Cadence send \"running late\" messages as you, only when you click Send")
+                }
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            if let error { Text(error).font(.caption2).foregroundStyle(.red).lineLimit(3).textSelection(.enabled) }
+        }
+    }
+}
+
+private struct SlackSection: View {
+    @Environment(AppState.self) private var state
+    @State private var clientID = UserDefaults.standard.string(forKey: "Cadence.slack.clientID") ?? ""
+    @State private var busy = false
+    @State private var error: String?
+
+    private var auth: SlackAuth { state.slackAuth }
+
+    var body: some View {
+        Section {
+            ForEach(auth.accounts) { account in
+                HStack(spacing: 10) {
+                    Image(systemName: "number.square.fill").font(.system(size: 18)).foregroundStyle(.purple)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(account.label)
+                        Text(auth.needsReconnect.contains(account.id) ? "Needs signing in again" : "Can post running-late messages as you")
+                            .font(.caption)
+                            .foregroundStyle(auth.needsReconnect.contains(account.id) ? Color.orange : Color.secondary)
+                    }
+                    Spacer()
+                    if auth.needsReconnect.contains(account.id) { Button("Reconnect", action: signIn).disabled(busy) }
+                    Button("Sign Out") { auth.signOut(account) }
+                }
+            }
+            if !auth.hasBundledClient {
+                TextField("Slack app client ID", text: $clientID, prompt: Text("1234567890.1234567890"))
+            }
+            HStack {
+                Button(action: signIn) {
+                    Label(busy ? "Waiting for browser…" : (auth.accounts.isEmpty ? "Sign in with Slack" : "Add Another Workspace"),
+                          systemImage: "person.crop.circle.badge.plus")
+                }
+                .disabled(busy || (!auth.hasBundledClient && clientID.trimmingCharacters(in: .whitespaces).isEmpty))
+                if busy { ProgressView().controlSize(.small) }
+            }
+            if let error { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "number.square.fill").foregroundStyle(.purple)
+                Text("Slack")
+            }
+        } footer: {
+            Text("Optional — lets running-late messages for Slack huddles go to the huddle's channel, as you."
+                 + (auth.hasBundledClient ? "" : " Needs a Slack app with PKCE turned on, the user scopes chat:write, users:read, users:read.email and im:write, and the redirect URL \(SlackAuth.redirect) — see the README."))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func signIn() {
+        if !auth.hasBundledClient { auth.saveClientID(clientID) }
+        busy = true
+        error = nil
+        Task {
+            do { try await auth.signIn() } catch { self.error = error.localizedDescription }
             busy = false
         }
     }

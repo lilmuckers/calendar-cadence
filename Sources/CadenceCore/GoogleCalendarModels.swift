@@ -33,9 +33,10 @@ public struct GoogleEvent: Decodable, Sendable {
         public var displayName: String?
         public var isSelf: Bool?
         public var responseStatus: String?
+        public var resource: Bool?
 
         enum CodingKeys: String, CodingKey {
-            case email, displayName, responseStatus
+            case email, displayName, responseStatus, resource
             case isSelf = "self"
         }
     }
@@ -147,6 +148,7 @@ public enum GoogleMapper {
             organizer: e.organizer?.displayName ?? e.organizer?.email,
             organizerEmail: e.organizer?.email,
             attendeeCount: e.attendees?.count ?? 0,
+            attendees: (e.attendees ?? []).map { Attendee(name: $0.displayName, email: $0.email, isSelf: $0.isSelf == true, isResource: $0.resource == true) },
             participation: participation,
             availability: e.transparency == "transparent" ? .free : (participation == .tentative ? .tentative : .busy),
             joinLink: link,

@@ -1,6 +1,7 @@
 import AppKit
 import CadenceCore
 import Observation
+import UserNotifications
 
 enum AccessState { case unknown, granted, denied }
 
@@ -77,6 +78,10 @@ final class AppState {
     @ObservationIgnored private let eventKit = EventKitProvider()
     @ObservationIgnored let googleAuth = GoogleAuth()
     @ObservationIgnored let microsoftAuth = MicrosoftAuth()
+    @ObservationIgnored let slackAuth = SlackAuth()
+    @ObservationIgnored lazy var lateMessenger = LateMessenger(google: googleAuth, microsoft: microsoftAuth, slack: slackAuth)
+    /// "Running late" messages sent, by meeting id: when you said you'd be there.
+    private(set) var lateNotices: [String: LateNotice] = [:]
     /// One provider per signed-in Microsoft account.
     private(set) var microsoftProviders: [MicrosoftCalendarProvider] = []
     /// One provider per signed-in Google account.
@@ -624,6 +629,86 @@ final class AppState {
         guard let due = planner.due(in: candidates, now: now, leadTime: prefs.takeoverLeadSeconds) else { return }
         planner.markFired(due)
         onAlert?(due, nil)
+    }
+
+    // MARK: - Running late
+
+    struct LateNotice: Equatable {
+        var text: String
+        var via: String
+        var sentAt: Date
+        /// When you said you'd be there.
+        var promised: Date
+    }
+
+    struct LateDraft {
+        var situation: LateSituation
+        /// Messages on offer, the suggestion first.
+        var messages: [String]
+        /// Where it could go, best guess first.
+        var channels: [LateOption]
+    }
+
+    /// The suggested messages for `meeting` (suggestion first) and where they could go (best guess first).
+    func lateDraft(for meeting: Meeting, minutes: Int) -> LateDraft {
+        let previous = RunningLate.previous(to: meeting, in: meetings)
+        let situation = RunningLate.situation(previous: previous, now: Date(), onCall: SystemContext.microphoneApp() != nil)
+        let mine = lateMessenger.myEmails
+        return LateDraft(
+            situation: situation,
+            messages: RunningLate.options(situation, previous: previous, minutes: minutes, settings: prefs.lateMessages, myEmails: mine),
+            channels: lateMessenger.options(for: meeting, rules: prefs.lateMessages.domainRules,
+                                            preferredAccountIDs: messagingAccountIDs(for: meeting))
+        )
+    }
+
+    /// The accounts a meeting is "for", best first: the one matching its browser profile (so a client's
+    /// meetings are answered from that client's account), then the account its calendar belongs to.
+    func messagingAccountIDs(for meeting: Meeting) -> [String] {
+        var ids: [String] = []
+        func add(email: String?) {
+            guard let email = email?.lowercased(), !email.isEmpty else { return }
+            ids += googleAuth.accounts.filter { $0.email?.lowercased() == email }.map(\.id)
+            ids += microsoftAuth.accounts.filter { $0.email?.lowercased() == email }.map(\.id)
+        }
+        add(email: profileChoice(for: meeting)?.profile.email)
+        let cal = meeting.calendar.id
+        ids += googleAuth.accounts.filter { cal.hasPrefix("gcal:\($0.id):") }.map(\.id)
+        ids += microsoftAuth.accounts.filter { cal.hasPrefix("msft:\($0.id):") }.map(\.id)
+        // macOS Calendar accounts are usually named after their address.
+        let source = meeting.calendar.sourceTitle.lowercased()
+        for a in googleAuth.accounts where a.email.map({ source.contains($0.lowercased()) }) == true { ids.append(a.id) }
+        for a in microsoftAuth.accounts where a.email.map({ source.contains($0.lowercased()) }) == true { ids.append(a.id) }
+        var seen = Set<String>()
+        return ids.filter { seen.insert($0).inserted }
+    }
+
+    var canSendLateMessages: Bool { prefs.lateMessages.enabled && lateMessenger.isSetUp }
+
+    /// Sends the message as you, exactly where chosen, then holds the alert off until you said you'd be there.
+    func sendLateMessage(_ text: String, minutes: Int, via option: LateOption, for meeting: Meeting) async throws {
+        try await lateMessenger.send(text, via: option, meeting: meeting)
+        let promised = max(Date(), meeting.start).addingTimeInterval(TimeInterval(minutes * 60))
+        lateNotices[meeting.id] = LateNotice(text: text, via: "\(option.label) (\(option.accountLabel))", sentAt: Date(), promised: promised)
+        snooze(meeting, seconds: promised.timeIntervalSinceNow)
+    }
+
+    /// A notification saying whether a running-late message sent from a menu went out.
+    func notifyLateOutcome(_ error: Error?, option: LateOption, meeting: Meeting) {
+        let content = UNMutableNotificationContent()
+        content.title = error == nil ? "Told \(meeting.title) you're running late" : "Couldn't send your running-late message"
+        content.body = error.map(LateMessenger.short) ?? "Sent via \(option.label) from \(option.accountLabel)."
+        Task {
+            let center = UNUserNotificationCenter.current()
+            guard (try? await center.requestAuthorization(options: [.alert])) == true else { return }
+            try? await center.add(UNNotificationRequest(identifier: "late:\(meeting.id)", content: content, trigger: nil))
+        }
+    }
+
+    /// How late you are for the alert's purposes: counted from when you said you'd be there, once you've
+    /// sent a running-late message, so it calms down and only gets cross again if you miss that too.
+    func lateClockStart(for meeting: Meeting) -> Date {
+        max(meeting.start, lateNotices[meeting.id]?.promised ?? meeting.start)
     }
 
     func snooze(_ meeting: Meeting, seconds: TimeInterval = 60) {

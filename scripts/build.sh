@@ -39,6 +39,10 @@ if [[ -n "${MICROSOFT_CLIENT_ID:-}" ]]; then
 else
   echo "No Microsoft app registration bundled; users enter their own in Settings → Accounts"
 fi
+if [[ -n "${SLACK_CLIENT_ID:-}" ]]; then
+  /usr/libexec/PlistBuddy -c "Add :CadenceSlackClientID string $SLACK_CLIENT_ID" "$APP/Contents/Info.plist"
+  echo "Bundled Slack app (${SLACK_CLIENT_ID:0:8}…)"
+fi
 
 # Notarization needs a secure timestamp; ad-hoc signatures can't have one.
 SIGN_FLAGS=(--force --options runtime)

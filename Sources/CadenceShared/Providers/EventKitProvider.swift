@@ -141,6 +141,8 @@ final class EventKitProvider: CalendarProvider {
             organizer: event.organizer?.name,
             organizerEmail: Self.email(event.organizer?.url),
             attendeeCount: event.attendees?.count ?? 0,
+            attendees: (event.attendees ?? []).map { Attendee(name: $0.name, email: Self.email($0.url), isSelf: $0.isCurrentUser,
+                                                         isResource: $0.participantType == .room || $0.participantType == .resource) },
             participation: participation,
             availability: availability,
             joinLink: MeetingLinkDetector.detect(url: event.url, location: event.location, notes: event.notes),

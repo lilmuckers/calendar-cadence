@@ -10,6 +10,7 @@ struct SettingsView: View {
             FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }
             AlertsTab().tabItem { Label("Alerts", systemImage: "bell.badge") }
             PhoneTab().tabItem { Label("iPhone", systemImage: "iphone") }
+            MessagesTab().tabItem { Label("Messages", systemImage: "paperplane") }
             BrowserTab().tabItem { Label("Browser", systemImage: "globe") }
             AssistantsTab().tabItem { Label("Assistants", systemImage: "sparkles") }
             GeneralTab().tabItem { Label("General", systemImage: "gearshape") }

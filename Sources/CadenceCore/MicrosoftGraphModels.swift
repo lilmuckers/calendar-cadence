@@ -31,7 +31,11 @@ public struct GraphEvent: Decodable, Sendable {
     public struct Online: Decodable, Sendable { public var joinUrl: String? }
     public struct Response: Decodable, Sendable { public var response: String? }
     public struct Email: Decodable, Sendable { public var name: String?; public var address: String? }
-    public struct Recipient: Decodable, Sendable { public var emailAddress: Email? }
+    public struct Recipient: Decodable, Sendable {
+        public var emailAddress: Email?
+        /// "required", "optional" or "resource" (rooms, equipment).
+        public var type: String?
+    }
 
     public var id: String
     public var subject: String?
@@ -127,6 +131,7 @@ public enum GraphMapper {
             organizer: e.organizer?.emailAddress?.name ?? e.organizer?.emailAddress?.address,
             organizerEmail: e.organizer?.emailAddress?.address,
             attendeeCount: e.attendees?.count ?? 0,
+            attendees: (e.attendees ?? []).map { Attendee(name: $0.emailAddress?.name, email: $0.emailAddress?.address, isResource: $0.type == "resource") },
             participation: participation,
             availability: availability,
             joinLink: link,

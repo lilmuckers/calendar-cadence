@@ -46,6 +46,7 @@ public enum MeetingDeduplicator {
         if m.organizerEmail == nil { m.organizerEmail = other.organizerEmail }
         if m.participation == .unknown { m.participation = other.participation }
         m.attendeeCount = max(m.attendeeCount, other.attendeeCount)
+        if m.attendees.isEmpty { m.attendees = other.attendees }
         return m
     }
 }

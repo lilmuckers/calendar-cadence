@@ -16,6 +16,7 @@ public struct ICSEvent: Equatable, Sendable {
     public var organizer: String?
     public var organizerEmail: String? = nil
     public var attendeeCount: Int
+    public var attendees: [Attendee] = []
     public var rrule: RecurrenceRule?
     public var exdates: [Date]
     /// Set on an override of one occurrence of a recurring event.
@@ -213,6 +214,7 @@ public enum ICSParser {
             organizer: e.organizer,
             organizerEmail: e.organizerEmail,
             attendeeCount: e.attendeeCount,
+            attendees: e.attendees,
             participation: .unknown,
             availability: e.transparent ? .free : (e.status?.uppercased() == "TENTATIVE" ? .tentative : .busy),
             joinLink: MeetingLinkDetector.detect(url: e.url, location: e.location, notes: e.description),
@@ -378,6 +380,12 @@ public enum ICSParser {
             organizer: organizer,
             organizerEmail: organizerEmail,
             attendeeCount: props.filter { $0.name == "ATTENDEE" }.count,
+            attendees: props.filter { $0.name == "ATTENDEE" }.map { p in
+                let email = p.value.replacingOccurrences(of: "mailto:", with: "", options: .caseInsensitive)
+                let cutype = p.params["CUTYPE"]?.uppercased()
+                return Attendee(name: p.params["CN"], email: email.contains("@") ? email : nil,
+                                isResource: cutype == "ROOM" || cutype == "RESOURCE")
+            },
             rrule: prop("RRULE").flatMap { RecurrenceRule($0.value, timeZone: start.tz) },
             exdates: exdates,
             recurrenceID: date("RECURRENCE-ID")?.date,

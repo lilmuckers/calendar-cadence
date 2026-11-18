@@ -126,6 +126,7 @@ struct EventRow: View {
             Button("Show in Calendar") { state.openInCalendar(meeting) }
             if !meeting.isAllDay {
                 Divider()
+                RunningLateMenu(meeting: meeting)
                 ClashAlertsMenu(meeting: meeting)
                 PanelVisibilityMenu(meeting: meeting)
             }

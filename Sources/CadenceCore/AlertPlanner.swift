@@ -5,7 +5,7 @@ public struct AlertPlanner: Sendable {
     /// How late (after start) a missed alert may still fire, e.g. when the Mac wakes from sleep.
     public var lateGrace: TimeInterval = 60
     /// How long after start a snoozed alert may still fire.
-    public var snoozeGrace: TimeInterval = 10 * 60
+    public var snoozeGrace: TimeInterval = 20 * 60
 
     public private(set) var fired: Set<String> = []
     public private(set) var snoozedUntil: [String: Date] = [:]
