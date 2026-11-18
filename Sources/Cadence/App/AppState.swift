@@ -423,7 +423,14 @@ final class AppState {
            UserDefaults.standard.string(forKey: "Cadence.lastSummary") != summary.key {
             reminders.append(summary)
         }
+        // Checked only when a call-dependent reminder is due. Not marked sent when skipped, so if the
+        // call starts again within the reminder's grace period it still goes out.
+        var onCall: Bool?
         for r in ReminderPlanner.due(reminders, now: now, sent: sentReminders) {
+            if r.needsActiveCall {
+                if onCall == nil { onCall = SystemContext.microphoneApp() != nil }
+                if onCall == false { continue }
+            }
             sentReminders.insert(r.key)
             if r.isSummary { UserDefaults.standard.set(r.key, forKey: "Cadence.lastSummary") }
             onReminder?(r)

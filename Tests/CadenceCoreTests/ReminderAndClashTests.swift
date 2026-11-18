@@ -79,7 +79,8 @@ struct WrapUpTests {
         #expect(r.count == 1)
         #expect(r[0].fireAt == live.end.addingTimeInterval(-300))
         #expect(r[0].joinTarget.id == "next")
-        #expect(ReminderPlanner.message(for: r[0]).title == "Dude, you have 5 minutes to the next meeting and you're still talking")
+        #expect(ReminderPlanner.message(for: r[0]).title == "Wrap up: next in 5 min")
+        #expect(ReminderPlanner.message(for: r[0]).body.hasPrefix("live ends at "))
         // Due during the meeting, not after it ends.
         #expect(ReminderPlanner.due(r, now: base.addingTimeInterval(25 * 60 + 10), sent: []).count == 1)
         #expect(ReminderPlanner.due(r, now: base.addingTimeInterval(31 * 60), sent: []).isEmpty)
@@ -91,6 +92,16 @@ struct WrapUpTests {
         #expect(r.first?.joinTarget.id == "live")
         #expect(ReminderPlanner.message(for: r[0]).title == "live ends in 5 min")
         #expect(ReminderPlanner.wrapUps(live: [live], all: [live, gap], minutes: 5, onlyBackToBack: true).isEmpty)
+    }
+
+    @Test func onlineWrapUpsNeedACall() {
+        var online = mt("online", 0, 30)
+        online.joinLink = MeetingLink(service: .zoom, url: URL(string: "https://zoom.us/j/1")!)
+        let inPerson = mt("room", 0, 30)
+        let r = ReminderPlanner.wrapUps(live: [online, inPerson], all: [online, inPerson], minutes: 5, onlyBackToBack: false)
+        #expect(r.first { $0.meeting.id == "online" }?.needsActiveCall == true)
+        #expect(r.first { $0.meeting.id == "room" }?.needsActiveCall == false)
+        #expect(ReminderPlanner.headsUps(for: [online], minutes: 5).first?.needsActiveCall == false)
     }
 
     @Test func summaryFiresLateButOnce() {

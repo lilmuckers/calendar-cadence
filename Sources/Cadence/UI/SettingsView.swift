@@ -259,7 +259,7 @@ private struct AlertsTab: View {
                 }
                 Toggle(isOn: $state.prefs.wrapUpEnabled) {
                     Text("Wrap-up nudge before meetings end")
-                    Text("Names the next meeting when one starts straight after.")
+                    Text("Names the next meeting when one starts straight after. For online meetings, only while your mic is still in use.")
                 }
                 Stepper(value: $state.prefs.wrapUpMinutes, in: 1...30) {
                     Text("\(state.prefs.wrapUpMinutes) min before the end")

@@ -140,7 +140,7 @@ claude mcp add --scope user cadence -- "/Applications/Cadence.app/Contents/MacOS
 - **⌨️ Global join shortcut.** <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>J</kbd> (re-bindable) joins whatever's starting in the next 10 minutes — or the meeting you're already late for.
 - **🚗 "Leave now" reminders.** For in-person meetings, Cadence watches live traffic and pings you at configurable offsets before you need to leave (default: 10 minutes before, and "time to leave").
 - **🔔 Heads-up notifications.** Optional nudge N minutes before each meeting (default 5).
-- **🗣️ Wrap-up nudge.** Five minutes before a meeting ends (configurable). If another one starts straight after, it says so: *"Dude, you have 5 minutes to the next meeting and you're still talking."* Its Join button opens the next meeting.
+- **🗣️ Wrap-up nudge.** Five minutes before a meeting ends (configurable). If another one starts straight after, it says so: *"Wrap up: Design Review in 5 min."* Its Join button opens the next meeting. For online meetings it only goes out while your mic is still in use, so it stays quiet if you've already left the call.
 - **☀️ Morning summary & tomorrow.** A good-morning notification with how many meetings you have, when the first starts, when you're done and how many invites need a reply. In the evening (or once today is over) the agenda shows tomorrow too.
 - **🎨 Event colours.** Colour an event in Google Calendar (or give it a `COLOR` in an ICS feed) and Cadence uses that colour instead of the calendar's. Toggle in *Settings → Calendars*.
 - **🧹 Filters.** Toggle calendars; hide all-day, declined, tentative, free or link-less events; include/exclude by title keyword; minimum duration.

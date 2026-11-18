@@ -38,6 +38,14 @@ public struct Reminder: Equatable, Sendable {
         return false
     }
 
+    /// Only worth sending while you're actually on the call: a wrap-up for an online meeting (one with a
+    /// join link). If the mic isn't in use you've already left, so there's nothing to wrap up. In-person
+    /// meetings can't be detected, so their wrap-ups always go out.
+    public var needsActiveCall: Bool {
+        if case .wrapUp = kind { return meeting.joinLink != nil }
+        return false
+    }
+
     /// What a "Join" action on this reminder should open.
     public var joinTarget: Meeting {
         if case .wrapUp(_, let next?) = kind { return next }
@@ -107,8 +115,8 @@ public enum ReminderPlanner {
             }
             let toNext = max(1, Int((next.start.timeIntervalSince(r.fireAt) / 60).rounded()))
             let via = next.joinLink?.service.displayName ?? next.physicalLocation
-            return ("Dude, you have \(toNext) minutes to the next meeting and you're still talking",
-                    "Next: \(next.title) at \(timeString(next.start))" + (via.map { " · \($0)" } ?? ""))
+            return ("Wrap up: \(next.title) in \(toNext) min",
+                    "\(r.meeting.title) ends at \(timeString(r.meeting.end))" + (via.map { " · next on \($0)" } ?? ""))
         case .summary(_, let meetings):
             let timed = meetings.filter { !$0.isAllDay }
             guard let first = timed.first else {
