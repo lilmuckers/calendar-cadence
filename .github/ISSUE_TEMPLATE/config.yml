@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Setup help (Google / Microsoft sign-in)
+    url: https://github.com/lilmuckers/calendar-cadence#readme
+    about: The README walks through creating your own Google OAuth client and Microsoft app registration.
+  - name: 🔒 Report a security problem
+    url: https://github.com/lilmuckers/calendar-cadence/security/advisories/new
+    about: Please report vulnerabilities privately, not as a public issue.

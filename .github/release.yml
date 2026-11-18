@@ -1,0 +1,17 @@
+# Categories for GitHub's generated release notes (used by the Release workflow's changelog).
+# Each merged PR lands in the first category whose label it has.
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+    authors:
+      - dependabot
+  categories:
+    - title: 💥 Breaking changes
+      labels: [major]
+    - title: ✨ New features
+      labels: [minor]
+    - title: 🐛 Fixes and improvements
+      labels: [patch]
+    - title: 📦 Other changes
+      labels: ["*"]

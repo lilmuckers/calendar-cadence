@@ -1,0 +1,27 @@
+name: Sync labels
+
+# Creates (or updates) the release labels the PR check and the release workflow rely on.
+# Runs when this file changes on main, or by hand.
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/labels.yml]
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create release labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh label create major --force --color B60205 --description "Breaking change: bumps the major version"
+          gh label create minor --force --color 0E8A16 --description "New feature: bumps the minor version"
+          gh label create patch --force --color 1D76DB --description "Fix or small change: bumps the patch version"
+          gh label create skip-changelog --force --color EDEDED --description "Leave this PR out of the release notes"
