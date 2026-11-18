@@ -195,22 +195,39 @@ struct CenteredFlow: Layout {
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width ?? .infinity
         let rows = rows(subviews, width: width)
-        let widest = rows.map { r in r.map(\.1.width).reduce(0, +) + spacing * CGFloat(max(0, r.count - 1)) }.max() ?? 0
-        let height = rows.map { $0.map(\.1.height).max() ?? 0 }.reduce(0, +) + lineSpacing * CGFloat(max(0, rows.count - 1))
+        var widest: CGFloat = 0
+        var height: CGFloat = 0
+        for row in rows {
+            widest = max(widest, rowWidth(row))
+            height += rowHeight(row)
+        }
+        height += lineSpacing * CGFloat(max(0, rows.count - 1))
         return CGSize(width: min(widest, width), height: height)
+    }
+
+    // Spelled out with explicit types: the one-line map/reduce versions time out the type checker on slower machines (CI).
+    private func rowWidth(_ row: [(Int, CGSize)]) -> CGFloat {
+        var total: CGFloat = 0
+        for (_, size) in row { total += size.width }
+        return total + spacing * CGFloat(max(0, row.count - 1))
+    }
+
+    private func rowHeight(_ row: [(Int, CGSize)]) -> CGFloat {
+        var tallest: CGFloat = 0
+        for (_, size) in row { tallest = max(tallest, size.height) }
+        return tallest
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         var y = bounds.minY
         for row in rows(subviews, width: bounds.width) {
-            let rowWidth = row.map(\.1.width).reduce(0, +) + spacing * CGFloat(max(0, row.count - 1))
-            let rowHeight = row.map(\.1.height).max() ?? 0
-            var x = bounds.midX - rowWidth / 2
+            let w = rowWidth(row), h = rowHeight(row)
+            var x = bounds.midX - w / 2
             for (i, size) in row {
-                subviews[i].place(at: CGPoint(x: x, y: y + (rowHeight - size.height) / 2), proposal: ProposedViewSize(size))
+                subviews[i].place(at: CGPoint(x: x, y: y + (h - size.height) / 2), proposal: ProposedViewSize(size))
                 x += size.width + spacing
             }
-            y += rowHeight + lineSpacing
+            y += h + lineSpacing
         }
     }
 }
