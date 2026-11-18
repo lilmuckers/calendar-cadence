@@ -15,6 +15,8 @@ concurrency:
 
 permissions:
   contents: read
+  checks: write          # test results check run
+  pull-requests: write   # test results PR comment
 
 jobs:
   test:
@@ -32,4 +34,20 @@ jobs:
           swift --version
 
       - name: Run tests
-        run: scripts/test.sh
+        run: scripts/test.sh --xunit-output build/junit.xml
+
+      # Docker-free macOS variant of the action: adds a "Unit test results" check and a PR comment.
+      - name: Publish test results
+        if: ${{ !cancelled() }}
+        uses: EnricoMi/publish-unit-test-result-action/macos@v2
+        with:
+          files: build/junit.xml
+          check_name: Unit test results
+
+      - name: Upload JUnit report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit
+          path: build/junit.xml
+          if-no-files-found: warn
