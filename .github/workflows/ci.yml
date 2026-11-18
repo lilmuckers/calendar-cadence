@@ -1,0 +1,35 @@
+name: CI
+
+# Runs the CadenceCore unit tests on every push to main and every pull request.
+# Deliberately test-only: building, signing and packaging the app lives in release.yml.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit tests
+    # The app uses macOS 26 SDK APIs, so stay on the macOS 26 image (Xcode 26 / Swift 6.2+).
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+
+      - name: Run tests
+        run: scripts/test.sh

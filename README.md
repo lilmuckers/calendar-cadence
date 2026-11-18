@@ -215,6 +215,24 @@ scripts/icon.sh                                                   # regenerate t
 build/Cadence.app/Contents/MacOS/Cadence --screenshots docs/screenshots   # regenerate these images
 ```
 
+### CI and releases
+
+- **CI** ([`ci.yml`](.github/workflows/ci.yml)) runs `scripts/test.sh` on every pull request and push to `main`. It only runs the tests; it doesn't build the app.
+- **Release labels.** Every PR needs exactly one of `major`, `minor` or `patch` ([`pr-labels.yml`](.github/workflows/pr-labels.yml) fails the check otherwise). Add `skip-changelog` to leave a PR out of the release notes. Run *Actions → Sync labels* once to create the labels.
+- **Release** ([`release.yml`](.github/workflows/release.yml)): start it from *Actions → Release → Run workflow* on `main`. It:
+  1. Works out the next version from the highest label on PRs merged since the last `vX.Y.Z` tag (`scripts/next-version.sh`; the first release uses the version in `Info.plist`). You can force a bump instead.
+  2. Runs the tests, builds `Cadence.app`, and packages `Cadence-<version>.dmg`, `Cadence-<version>.zip` and `SHA256SUMS.txt`.
+  3. Tags the commit `v<version>` and publishes a GitHub release with those files attached. The notes come from [`RELEASE_NOTES_TEMPLATE.md`](.github/RELEASE_NOTES_TEMPLATE.md), with a changelog of the merged PRs grouped by label ([`.github/release.yml`](.github/release.yml)).
+  - `dry_run` builds everything without tagging or releasing; `draft` creates the release as a draft.
+- **Signing.** Signing and notarization turn on when the Developer ID and notary secrets listed at the top of `release.yml` are added. Until then builds are ad-hoc signed and published as **pre-releases**, and Gatekeeper blocks them on other Macs.
+
+Preview the next version or the release notes locally:
+
+```bash
+scripts/next-version.sh
+scripts/release-notes.sh v0.1.0 "" patch false /dev/null   # tag, previous tag, bump, notarized, checksums file
+```
+
 > [!TIP]
 > Builds are ad-hoc signed by default, so macOS may re-ask for calendar (and Keychain) access after each rebuild. Set `CODESIGN_IDENTITY` to a real signing identity to avoid that, and copy the app to `/Applications` to use **Launch at login**.
 

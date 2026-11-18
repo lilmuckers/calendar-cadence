@@ -1,0 +1,48 @@
+name: ✨ Feature request
+description: Suggest an idea or improvement for Cadence
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check [BACKLOG.md](https://github.com/lilmuckers/calendar-cadence/blob/main/BACKLOG.md) first — the idea might already be parked or skipped, with the reason why.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the situation, not the solution yet.
+      placeholder: I keep missing meetings that start straight after another one, because…
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Cadence to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds
+      description: Anything you've tried, or other apps that handle this well.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Cadence?
+      multiple: true
+      options:
+        - Menu bar / agenda
+        - Floating countdown panel
+        - Full-screen alert / banner
+        - Join links / browser profiles
+        - Clash detection
+        - Invites / RSVP
+        - Notifications and reminders
+        - Travel time / leave now
+        - Settings
+        - Assistants (MCP server)
+        - New area
