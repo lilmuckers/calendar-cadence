@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cadence — your calendar, gently panicking on your behalf</title>
-  <meta name="description" content="Cadence is a tiny native macOS menu-bar app that counts down to your next meeting, finds the join link, and takes over your screen 30 seconds before you're due.">
+  <meta name="description" content="Cadence is a tiny native macOS menu-bar app, with an iPhone desk companion, that counts down to your next meeting, finds the join link, and takes over your screen 30 seconds before you're due.">
   <link rel="canonical" href="https://cadence.patrick-mckinley.com/">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -14,7 +14,7 @@
   <meta property="og:description" content="Your calendar, gently panicking on your behalf.">
   <meta property="og:image" content="https://cadence.patrick-mckinley.com/assets/takeover.jpg">
   <meta property="og:url" content="https://cadence.patrick-mckinley.com/">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <header class="site-header">
@@ -22,6 +22,7 @@
       <a class="brand" href="./"><img src="assets/icon-192.png" alt="">Cadence</a>
       <nav>
         <a class="nav-features" href="#features">Features</a>
+        <a class="nav-features" href="#iphone">iPhone</a>
         <a href="privacy.html">Privacy</a>
         <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
       </nav>
@@ -32,9 +33,10 @@
     <div class="wrap hero">
       <img class="icon" src="assets/icon-512.png" alt="Cadence app icon: a panicking calendar page with googly eyes shouting LATE!">
       <h1>Cadence</h1>
-      <p class="tagline">Your calendar, gently panicking on your behalf. A tiny native macOS menu-bar app that makes sure you're never late for a meeting again.</p>
+      <p class="tagline">Your calendar, gently panicking on your behalf. A tiny native macOS menu-bar app, with an iPhone desk companion, that makes sure you're never late for a meeting again.</p>
       <div class="badges">
         <span class="badge">macOS 14+</span>
+        <span class="badge">iOS 17+</span>
         <span class="badge">Native Swift &amp; SwiftUI</span>
         <span class="badge">Zero dependencies</span>
         <span class="badge">Runs locally</span>
@@ -76,6 +78,25 @@
 
     <section>
       <div class="wrap feature">
+        <div class="media">
+          <div class="late-card" role="img" aria-label="Illustration: a Running late card offering to send a message via the Teams meeting chat, with a suggested message and 2, 5 and 10 minute buttons">
+            <div class="late-card-title">Running late? Let them know</div>
+            <div class="late-card-row"><span class="label">Send via</span><span class="pick">Teams meeting chat <em>from Work</em> <b>✓</b></span></div>
+            <div class="late-card-row"><span class="label">Message</span><span class="msg">Just wrapping up my previous meeting — there in 2 mins!</span></div>
+            <div class="late-card-buttons"><span class="primary">2 mins</span><span>5 mins</span><span>10 mins</span></div>
+          </div>
+        </div>
+        <div>
+          <h2>Running late? It tells them.</h2>
+          <p>Once a meeting has started, the alert offers to send a quick message <strong>as you</strong>. It picks the meeting's own channel first: the Teams meeting chat, Google Chat for Meet, the Slack huddle's channel. Then it tries your domain rules (like <em>@client.com → Slack</em>), then email. Every option is checked before you send.</p>
+          <p>The suggested message depends on what came before: wrapping up the previous meeting, a breather between back-to-backs, or just running a few minutes late. Pick <strong>2</strong>, <strong>5</strong> or <strong>10</strong> minutes and the alert backs off until then.</p>
+          <p>Off until you allow it per account in <em>Settings → Accounts</em>. Right-click any meeting → <strong>Send Running Late</strong> to send one straight away.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap feature flip">
         <div class="media"><img src="assets/banner.jpg" alt="Compact banner: Design Review, starts in 0:23, Join" class="w-420"></div>
         <div>
           <h2>…but never while you're presenting</h2>
@@ -86,7 +107,7 @@
     </section>
 
     <section>
-      <div class="wrap feature flip">
+      <div class="wrap feature">
         <div class="media"><img src="assets/menu.jpg" alt="Today's agenda dropdown with colour-coded meetings and Join buttons" class="w-440"></div>
         <div>
           <h2>Today, at a glance</h2>
@@ -97,7 +118,7 @@
     </section>
 
     <section>
-      <div class="wrap feature">
+      <div class="wrap feature flip">
         <div class="media panels">
           <img src="assets/panel.jpg" alt="Floating countdown panel: Up next, Design Review in 7:19">
           <div class="panel-row">
@@ -114,7 +135,7 @@
     </section>
 
     <section>
-      <div class="wrap feature flip">
+      <div class="wrap feature">
         <div class="media"><img src="assets/clash.jpg" alt="Double-booked! Which one should I alert you for?" class="w-380"></div>
         <div>
           <h2>Double-booked? It asks.</h2>
@@ -125,18 +146,43 @@
     </section>
 
     <section>
-      <div class="wrap feature">
+      <div class="wrap feature flip">
         <div class="media"><img src="assets/invites.jpg" alt="Good morning! RSVP time: three invites with Accept, Maybe and Decline buttons and a colour picker" class="w-400"></div>
         <div>
           <h2>RSVP without opening your calendar</h2>
-          <p>Each morning Cadence gathers every invite still waiting for a reply into one card: <strong>Accept</strong>, <strong>Maybe</strong> or <strong>Decline</strong>, and pick a colour while you're there. New invites get the same card, or a notification with reply buttons, as soon as they arrive.</p>
+          <p>Each morning Cadence gathers every invite still waiting for a reply into one card: <strong>Accept</strong>, <strong>Maybe</strong> or <strong>Decline</strong>, and pick a colour while you're there, under the names you gave your Google Calendar colour labels. The button you press lights up straight away and the row flashes once it's saved. New invites get the same card, or a notification with reply buttons, as soon as they arrive.</p>
           <p>Replies go straight to your Google and Microsoft 365 accounts, and the organiser hears back as usual.</p>
         </div>
       </div>
     </section>
 
+    <section id="iphone" class="iphone">
+      <div class="wrap">
+        <h2 class="section-title">Cadence for iPhone</h2>
+        <p class="section-lede">Put your iPhone on a MagSafe stand and it becomes a desk clock for your meetings. While it's showing, your Mac goes quiet.</p>
+        <div class="phones">
+          <figure><img src="assets/ios-desk.jpg" alt="iPhone desk mode: Up next, Standup in 6:13, Join Zoom, and 1:1 with Priya later today"><figcaption>Desk mode</figcaption></figure>
+          <figure><img src="assets/ios-prompts.jpg" alt="iPhone desk mode, Standup in 4:19, with a New invite card: Budget review, clashes with Pricing Workshop, Accept, Maybe or Decline"><figcaption>Invites and clashes, on the phone</figcaption></figure>
+          <figure><img src="assets/ios-meltdown.jpg" alt="iPhone full-screen alert, bright red, reading SERIOUSLY. JOIN. NOW., with letters fallen off Design Review and piled at the bottom"><figcaption>The same meltdown</figcaption></figure>
+        </div>
+        <div class="feature iphone-detail">
+          <div class="media"><img src="assets/ios-island.jpg" alt="Expanded Dynamic Island: googly calendar icon, Next, Standup, 4:54 and a Join button" class="w-440"></div>
+          <div>
+            <ul class="ticks">
+              <li><strong>Desk mode turns on by itself while charging.</strong> The time, a big countdown, a <strong>Join</strong> button and the rest of your day, in portrait or landscape. It dims when nothing's close.</li>
+              <li><strong>Your Mac goes quiet.</strong> While the phone is connected and on screen, banners, reminders, invites and clash prompts go to the phone. Pick it up and the Mac is back to normal.</li>
+              <li><strong>Join opens on the Mac</strong> while they're connected, or on the phone when they're not. Snooze or dismiss on either one closes the alert on both.</li>
+              <li><strong>Dynamic Island, Lock Screen and StandBy.</strong> A Live Activity counts down to your next meeting, with a Join button and a googly icon in the calendar's colour.</li>
+              <li><strong>Works on its own too.</strong> It reads its own calendars (iPhone Calendar, Google, Microsoft 365, ICS), keeps the Mac's last agenda for when you're away, and runs its own alerts.</li>
+            </ul>
+            <p class="fine">Pair by scanning a code from <em>Settings → iPhone</em> on the Mac. The two talk directly over an encrypted connection on your Wi-Fi or peer-to-peer. No servers involved.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="assistants">
-      <div class="wrap feature flip">
+      <div class="wrap feature">
         <div class="media">
           <div class="assistant-demo" role="img" aria-label="Illustration: you ask your assistant about your afternoon, it checks Cadence, then asks to accept an invite and Cadence shows an Allow, Deny or Always allow card">
             <div class="bubble you">What's my afternoon like? Can I fit in a 30-minute call?</div>
@@ -163,12 +209,12 @@
           <div class="card"><h3>🔗 Join links from anywhere</h3><p>Zoom, Meet, Teams, Webex, Slack huddles, FaceTime and more — even buried in HTML invites or wrapped in SafeLinks.</p></div>
           <div class="card"><h3>⌨️ Global join shortcut</h3><p><kbd>⌃⌥⌘J</kbd> joins whatever's starting in the next 10 minutes, or the one you're late for.</p></div>
           <div class="card"><h3>🗂️ Every calendar</h3><p>macOS Calendar, ICS/webcal feeds, and Google Calendar and Microsoft 365 directly, with as many accounts as you like. Duplicates are merged.</p></div>
-          <div class="card"><h3>🗣️ Wrap-up nudge</h3><p>Five minutes before a meeting ends, a reminder to wrap up, and a warning if the next one starts straight after.</p></div>
+          <div class="card"><h3>🗣️ Wrap-up nudge</h3><p>Five minutes before a meeting ends, a reminder to wrap up, and a warning if the next one starts straight after. Only while you're still on the call.</p></div>
           <div class="card"><h3>☀️ Morning summary</h3><p>How many meetings you have, when the first starts, when you're done and which invites need a reply. Tomorrow shows up in the evening.</p></div>
           <div class="card"><h3>🎨 Event colours</h3><p>Uses the colours you set in Google Calendar, Outlook categories or ICS feeds, and lets you recolour Google events from the menu.</p></div>
-          <div class="card"><h3>🧭 The right browser profile</h3><p>Opens each meeting in the right Chrome, Edge, Brave, Vivaldi or Firefox profile (or Firefox container): per account, per calendar, or by organiser, like <em>@client.com → Client</em>.</p></div>
-          <div class="card"><h3>🧹 Filters</h3><p>Hide all-day, declined, tentative or link-less events; include or exclude by keyword.</p></div>
-          <div class="card"><h3>😰 An icon with feelings</h3><p>Calm, nervous at 15 minutes, sweating at 5.</p></div>
+          <div class="card"><h3>🧭 The right browser profile</h3><p>Opens each meeting in the right Chrome, Edge, Brave, Vivaldi or Firefox profile (or Firefox container), and brings it to the front: per account, per calendar, or by organiser, like <em>@client.com → Client</em>.</p></div>
+          <div class="card"><h3>🧹 Filters</h3><p>Hide all-day, declined, tentative or link-less events; include or exclude by keyword. Make a calendar <em>agenda only</em> to keep it on screen but out of alerts.</p></div>
+          <div class="card"><h3>😰 An icon with feelings</h3><p>Calm, nervous at 15 minutes, sweating at 5. A little phone appears beside it while your iPhone is paired.</p></div>
         </div>
       </div>
     </section>
@@ -177,7 +223,7 @@
       <div class="wrap">
         <div class="privacy-callout">
           <h2>🔒 Your calendar stays on your Mac</h2>
-          <p>No Cadence accounts, no analytics, no servers. Cadence only talks to the calendar services you connect (like Google and Microsoft 365) and Apple Maps for travel times, and assistants reach it through a private local socket with no network port.</p>
+          <p>No Cadence accounts, no analytics, no servers. Cadence only talks to the services you connect (like Google, Microsoft 365 and Slack) and Apple Maps for travel times. Your iPhone and Mac talk to each other directly over an encrypted link, and assistants reach it through a private local socket with no network port.</p>
           <a href="privacy.html">Read the privacy policy →</a>
         </div>
       </div>

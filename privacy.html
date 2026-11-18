@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Privacy Policy — Cadence</title>
-  <meta name="description" content="How Cadence handles your calendar data: everything stays on your Mac.">
+  <meta name="description" content="How Cadence handles your calendar data: everything stays on your Mac and iPhone.">
   <link rel="canonical" href="https://cadence.patrick-mckinley.com/privacy.html">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <header class="site-header">
@@ -25,29 +25,33 @@
 
   <main class="wrap narrow prose">
     <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: 17 November 2026</p>
+    <p class="updated">Last updated: 18 November 2026</p>
 
     <div class="summary">
-      <strong>The short version:</strong> Cadence runs entirely on your Mac. It has no servers, no accounts, no analytics and no tracking. The developer never receives your calendar data or anything else about you.
+      <strong>The short version:</strong> Cadence runs entirely on your Mac (and your iPhone, if you use the companion app). It has no servers, no accounts, no analytics and no tracking. The developer never receives your calendar data or anything else about you.
     </div>
 
     <h2>Who we are</h2>
-    <p>Cadence is a macOS menu-bar app developed by Patrick McKinley ("we", "us"). This policy explains what information the app uses and where it goes.</p>
+    <p>Cadence is a macOS menu-bar app with an optional iPhone companion app, developed by Patrick McKinley ("we", "us"). This policy covers both apps and explains what information they use and where it goes.</p>
 
     <h2>Information Cadence uses</h2>
-    <p>To do its job, Cadence reads the following on your device. None of it is sent to us.</p>
+    <p>To do its job, Cadence reads the following on your devices. None of it is sent to us. Unless a row says otherwise, the iPhone app keeps the same things in the same way on the phone.</p>
     <table>
       <thead><tr><th>What</th><th>Why</th><th>Where it's kept</th></tr></thead>
       <tbody>
-        <tr><td data-label="What">Calendar events and invites (title, time, location, attendees, notes, join links, your RSVP status, colours and categories)</td><td data-label="Why">Show your agenda, countdowns, join buttons, reminders, clash prompts and invites waiting for a reply</td><td data-label="Where it's kept">In memory on your Mac; read from macOS Calendar, your ICS feeds, Google Calendar or Microsoft 365</td></tr>
+        <tr><td data-label="What">Calendar events and invites (title, time, location, attendees and their email addresses, notes, join links, your RSVP status, colours and categories)</td><td data-label="Why">Show your agenda, countdowns, join buttons, reminders, clash prompts and invites waiting for a reply</td><td data-label="Where it's kept">In memory on your Mac; read from macOS Calendar, your ICS feeds, Google Calendar or Microsoft 365</td></tr>
         <tr><td data-label="What">Your approximate location (only if you allow it)</td><td data-label="Why">Estimate travel time to in-person meetings</td><td data-label="Where it's kept">In memory on your Mac</td></tr>
         <tr><td data-label="What">Settings and preferences, including ICS feed URLs</td><td data-label="Why">Remember how you've configured the app</td><td data-label="Where it's kept">macOS user defaults on your Mac</td></tr>
         <tr><td data-label="What">For each Google or Microsoft account you connect: its email address and a refresh token</td><td data-label="Why">Fetch that account's calendars, send your invite replies, and label the account in Settings</td><td data-label="Where it's kept">Email in macOS user defaults; refresh token in your macOS Keychain</td></tr>
+        <tr><td data-label="What">For each Slack workspace you connect: its name, your Slack user ID and your user token</td><td data-label="Why">Send running-late messages as you</td><td data-label="Where it's kept">Workspace name and user ID in macOS user defaults; token in your macOS Keychain</td></tr>
+        <tr><td data-label="What">Your saved running-late messages and domain rules</td><td data-label="Why">Suggest a message and pick where to send it</td><td data-label="Where it's kept">macOS user defaults on your Mac</td></tr>
         <tr><td data-label="What">Each connected account's profile photo, if it has one</td><td data-label="Why">Show which account is which in Settings and on calendar badges</td><td data-label="Where it's kept">Cached in Cadence's Application Support folder on your Mac; refreshed at most once a day and deleted when you disconnect the account</td></tr>
         <tr><td data-label="What">Your own Google OAuth client or Microsoft app registration (only if you enter one)</td><td data-label="Why">Sign in with your own client instead of the one built into the app</td><td data-label="Where it's kept">Client IDs in macOS user defaults; Google client secret in your macOS Keychain</td></tr>
         <tr><td data-label="What">Events you've hidden from the countdown panel</td><td data-label="Why">Keep them off the panel</td><td data-label="Where it's kept">macOS user defaults on your Mac</td></tr>
         <tr><td data-label="What">Your default browser's profile list: profile names and, for Chromium browsers, the email each profile is signed in with</td><td data-label="Why">Let you choose which profile opens each meeting, and match profiles to your calendar accounts</td><td data-label="Where it's kept">Read from the browser's own files on your Mac (Chrome's <code>Local State</code>, Firefox's <code>profiles.ini</code>) and held in memory; the rules you set are saved in macOS user defaults</td></tr>
         <tr><td data-label="What">A log of what connected AI assistants asked Cadence for (assistant name, tool, time, outcome and a one-line summary)</td><td data-label="Why">Show you what each assistant did in <em>Settings → Assistants → Activity</em></td><td data-label="Where it's kept">A file only your user can read, in Cadence's Application Support folder; kept for 30 days and clearable any time</td></tr>
+        <tr><td data-label="What">The iPhone link key and the list of paired phones (or, on the iPhone, the paired Mac and the name you gave it)</td><td data-label="Why">Let your Mac and iPhone find and trust each other</td><td data-label="Where it's kept">Link key in the Keychain on each device; the rest in user defaults</td></tr>
+        <tr><td data-label="What">On the iPhone: the last copy of today's and tomorrow's agenda from your Mac</td><td data-label="Why">Keep the agenda and alerts going when the Mac is out of reach</td><td data-label="Where it's kept">The iPhone app's own storage; deleted when you unpair</td></tr>
         <tr><td data-label="What">Which apps have windows on screen and whether the microphone is in use</td><td data-label="Why">Avoid covering your screen while you present or are on a call</td><td data-label="Where it's kept">Checked in the moment; never stored</td></tr>
       </tbody>
     </table>
@@ -58,6 +62,8 @@
     <ul>
       <li><strong>Google</strong>: only if you sign in with Google. Cadence talks to Google's sign-in service and the Google Calendar API directly from your Mac. Google's handling of your data is covered by the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</li>
       <li><strong>Microsoft</strong>: only if you sign in with Microsoft. Cadence talks to Microsoft's sign-in service and Microsoft Graph directly from your Mac. Microsoft's handling of your data is covered by the <a href="https://privacy.microsoft.com/privacystatement">Microsoft Privacy Statement</a>.</li>
+      <li><strong>Slack</strong>: only if you connect a workspace for running-late messages. Cadence talks to Slack's sign-in service and the Slack API directly from your Mac. See <a href="https://slack.com/trust/privacy/privacy-policy">Slack's Privacy Policy</a>.</li>
+      <li><strong>Your iPhone and Mac</strong>: the two apps talk to each other directly, never through a server. See <a href="#iphone">Cadence for iPhone</a> below.</li>
       <li><strong>AI assistants you connect</strong>: only if you set one up in <em>Settings → Assistants</em>. See below.</li>
       <li><strong>ICS / webcal feed hosts</strong> — whatever calendar subscription URLs you add.</li>
       <li><strong>Apple Maps</strong> — when estimating travel time, Cadence sends the meeting location and your approximate position to Apple's MapKit service. See <a href="https://www.apple.com/legal/privacy/">Apple's Privacy Policy</a>.</li>
@@ -65,12 +71,25 @@
     </ul>
     <p>Calendars you've added in macOS Calendar are read locally through Apple's EventKit framework; Cadence doesn't contact those providers itself.</p>
 
+    <h2>Running-late messages</h2>
+    <p>Running-late messages are off until you allow them for an account in <em>Settings → Accounts</em>. That asks Google, Microsoft or Slack for the extra permissions listed below.</p>
+    <ul>
+      <li><strong>Only when you click.</strong> A message is sent only when you press Send (or choose <em>Send Running Late</em>). It goes from your own account, to the place shown on the button: a meeting chat, a direct or group message, a Slack channel or an email to the attendees.</li>
+      <li><strong>Checking where it can go.</strong> To show which options will work, Cadence asks that service about the meeting's attendees before you send, for example looking up their email addresses in Slack, finding the Teams meeting chat, or finding an existing Google Chat conversation. These lookups send nothing to anyone.</li>
+      <li><strong>Nothing kept.</strong> Cadence doesn't keep a copy of the messages it sends. They are stored by Google, Microsoft or Slack like any message you send yourself.</li>
+    </ul>
+
     <h2>Google user data</h2>
     <p>When you choose <strong>Sign in with Google</strong>, Cadence asks for these permissions and nothing else:</p>
     <ul>
       <li><code>openid</code>, <code>email</code> and <code>profile</code>: your Google account's email address and profile photo, used only to label the account in Settings so you can tell your accounts apart.</li>
       <li><code>calendar.readonly</code>: read access to your calendars and events, used only to show your meetings, countdowns, join links, reminders, clash prompts and pending invites inside the app.</li>
       <li><code>calendar.events</code>: used only for two things you trigger yourself: sending your Accept, Maybe or Decline reply to an invite, and changing an event's colour. Cadence never creates or deletes events and never changes anything else about them.</li>
+    </ul>
+    <p>If you allow running-late messages for a Google account, Cadence also asks for these. They are only used to send the messages you choose to send:</p>
+    <ul>
+      <li><code>gmail.send</code>: send a running-late email from your account. Cadence can't read your email.</li>
+      <li><code>chat.spaces.readonly</code>, <code>chat.spaces.create</code> and <code>chat.messages.create</code>: find or start a Google Chat conversation with the meeting's attendees and post your message in it.</li>
     </ul>
     <p>This data goes straight from Google to the app on your Mac. It never passes through or is stored on any server we run, and it isn't shared with anyone. It isn't used for advertising or to train AI or machine-learning models, and no person reads it.</p>
     <p>Cadence's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
@@ -84,7 +103,32 @@
       <li><code>Calendars.ReadWrite</code>: read your calendars and events to show them in the app, and send your Accept, Maybe or Decline reply to an invite. Cadence never creates, edits or deletes events.</li>
       <li><code>MailboxSettings.Read</code>: read your Outlook category colours so events show in the same colours as in Outlook. Cadence doesn't read your email.</li>
     </ul>
+    <p>If you allow running-late messages for a Microsoft account, Cadence also asks for these. They are only used to send the messages you choose to send:</p>
+    <ul>
+      <li><code>Mail.Send</code>: send a running-late email from your account.</li>
+      <li><code>ChatMessage.Send</code> and <code>OnlineMeetings.Read</code> (work and school accounts only): find a Teams meeting's chat and post your message in it.</li>
+    </ul>
     <p>As with Google, this data goes straight from Microsoft to the app on your Mac, is never sent to us or shared with anyone, and isn't used for advertising or to train AI models. Disconnecting an account in <em>Settings → Accounts</em> deletes its token and cached photo from your Mac.</p>
+
+    <h2>Slack user data</h2>
+    <p>When you connect a Slack workspace, Cadence asks only for these <em>user</em> permissions, so messages are posted as you:</p>
+    <ul>
+      <li><code>chat:write</code>: post your running-late message.</li>
+      <li><code>users:read</code> and <code>users:read.email</code>: find the meeting's attendees in Slack by their email address.</li>
+      <li><code>im:write</code>: open a direct message with them.</li>
+    </ul>
+    <p>Slack only lets apps redirect sign-ins to HTTPS addresses, so at the end of signing in Slack sends your browser to <a href="slack.html">cadence.patrick-mckinley.com/slack</a>. That page immediately hands the result to Cadence on your Mac. It doesn't store or send it anywhere else, and the one-time code it carries is useless without a secret that never leaves your Mac. Like any website, the page is served by GitHub Pages, which may keep standard request logs under <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">GitHub's Privacy Statement</a>.</p>
+    <p>Disconnecting a workspace in <em>Settings → Accounts</em> revokes the token with Slack and deletes it from your Mac.</p>
+
+    <h2 id="iphone">Cadence for iPhone</h2>
+    <p>The iPhone app works on its own or paired with Cadence on your Mac. On its own, it reads its own calendars (iPhone Calendar, Google, Microsoft 365 and ICS feeds) exactly as described above, using the same Google and Microsoft permissions, minus the running-late ones.</p>
+    <ul>
+      <li><strong>Permissions it asks for.</strong> Calendars, to show your meetings. Notifications, for alerts while the app is in the background. Local Network, to reach your Mac. The Camera, only to scan the pairing code on your Mac; nothing it sees is saved.</li>
+      <li><strong>Pairing.</strong> The pairing code holds a random 256-bit key that both devices keep in their Keychain and use to encrypt everything between them (TLS with a pre-shared key). The phone finds the Mac over Bonjour on your network, or directly between the two devices when they aren't on the same Wi-Fi. Nothing goes through the internet or any server of ours.</li>
+      <li><strong>What travels between them.</strong> Your meetings for today and tomorrow, alerts, reminders, invites and clash prompts from the Mac, and what you tap on the phone (Join, Snooze, Dismiss, invite replies) back to the Mac.</li>
+      <li><strong>Live Activities</strong> in the Dynamic Island and on the Lock Screen are drawn on the phone. Cadence doesn't use Apple's push service for them.</li>
+      <li><strong>Unpairing.</strong> <em>Forget All iPhones</em> on the Mac changes the key, so no phone can connect until it's paired again. Unpairing on the phone deletes the Mac's saved agenda.</li>
+    </ul>
 
     <h2>AI assistants</h2>
     <p>Cadence includes an optional local server that AI assistants on your Mac (such as Claude, Cursor or Windsurf) can use through the Model Context Protocol (MCP). Nothing uses it until you connect an assistant, and you can turn it off completely in <em>Settings → Assistants</em>.</p>
@@ -105,9 +149,9 @@
 
     <h2>Your choices</h2>
     <ul>
-      <li>Calendar and location access can be granted or revoked any time in <em>System Settings → Privacy &amp; Security</em>.</li>
-      <li>Disconnect Google or Microsoft accounts, or remove ICS feeds, in <em>Cadence → Settings → Accounts</em>. You can also revoke access from your account: Google at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>, Microsoft at <a href="https://account.live.com/consent/Manage">account.live.com/consent/Manage</a> (personal accounts) or <a href="https://myapps.microsoft.com/">myapps.microsoft.com</a> (work or school accounts).</li>
-      <li>Deleting the app, its preferences and its Application Support folder removes everything Cadence stores. Its Keychain items can be removed in Keychain Access (search for <code>com.cadence.calendarmonitor</code>).</li>
+      <li>Calendar and location access can be granted or revoked any time in <em>System Settings → Privacy &amp; Security</em> on the Mac, and calendar, camera and local network access in <em>Settings → Privacy &amp; Security</em> on the iPhone.</li>
+      <li>Disconnect Google, Microsoft or Slack accounts, or remove ICS feeds, in <em>Cadence → Settings → Accounts</em>. You can also revoke access from your account: Google at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>, Microsoft at <a href="https://account.live.com/consent/Manage">account.live.com/consent/Manage</a> (personal accounts) or <a href="https://myapps.microsoft.com/">myapps.microsoft.com</a> (work or school accounts), Slack under your workspace's <em>Manage apps</em> page.</li>
+      <li>Deleting the app, its preferences and its Application Support folder removes everything Cadence stores. Its Keychain items can be removed in Keychain Access (search for <code>com.cadence.calendarmonitor</code>). Deleting the iPhone app removes everything it stores on the phone.</li>
     </ul>
 
     <h2>Children</h2>
