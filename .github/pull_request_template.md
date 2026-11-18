@@ -14,6 +14,7 @@
 ## How it was tested
 
 - [ ] `scripts/test.sh` passes
+- [ ] iPhone changes: `scripts/ios-test.sh` passes
 - [ ] Built and ran the app (`scripts/build.sh --run`) and tried the change
 - [ ] New or changed logic in `CadenceCore` has tests
 

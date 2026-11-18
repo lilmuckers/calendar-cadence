@@ -1,7 +1,10 @@
 name: CI
 
-# Runs the CadenceCore unit tests on every push to main and every pull request.
-# Deliberately test-only: building, signing and packaging the app lives in release.yml.
+# Runs on every push to main and every pull request:
+#   test — the CadenceCore unit tests on macOS.
+#   ios  — builds the iPhone app for the Simulator, then runs its unit tests there
+#          (the shared CadenceCore suite again, on iOS, plus the iPhone-only tests in iOS/Tests).
+# Building, signing and packaging the Mac app lives in release.yml.
 
 on:
   push:
@@ -50,4 +53,47 @@ jobs:
         with:
           name: junit
           path: build/junit.xml
+          if-no-files-found: warn
+
+  ios:
+    name: iPhone build and tests
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes available
+
+      # Unsigned Simulator build of the app and its widget extension (no team or certificates needed).
+      - name: Build iPhone app
+        run: scripts/ios-build.sh
+
+      - name: Run iPhone tests
+        run: scripts/ios-test.sh --result-bundle build/ios-tests.xcresult
+
+      - name: Convert test results
+        if: ${{ !cancelled() }}
+        run: |
+          if [[ -d build/ios-tests.xcresult ]]; then
+            scripts/xcresult-junit.py build/ios-tests.xcresult build/ios-junit.xml
+          fi
+
+      - name: Publish test results
+        if: ${{ !cancelled() }}
+        uses: EnricoMi/publish-unit-test-result-action/macos@v2
+        with:
+          files: build/ios-junit.xml
+          check_name: iPhone unit test results
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-tests
+          path: |
+            build/ios-junit.xml
+            build/ios-tests.xcresult
           if-no-files-found: warn
