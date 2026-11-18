@@ -46,4 +46,40 @@ struct InviteTests {
         #expect(EventColorChoice.palette.count == 11)
         #expect(EventColorChoice.choice(id: "5")?.name == "Banana")
     }
+
+    @Test func calendarLabelsRenameSwatchesAndAddCustomColours() throws {
+        let json = """
+        {"labelProperties": {"eventLabels": [
+            {"id": "a", "backgroundColor": "#33B679", "name": "Focus time"},
+            {"id": "b", "backgroundColor": "#d50000", "name": ""},
+            {"id": "c", "backgroundColor": "#123456", "name": "Side project"},
+            {"id": "d", "backgroundColor": "nope", "name": "Broken"}
+        ]}}
+        """
+        let labels = try JSONDecoder().decode(GoogleCalendarResource.self, from: Data(json.utf8)).labels
+        let choices = EventColorChoice.palette(labels: labels)
+        #expect(choices.count == 12)
+        let sage = try #require(choices.first { $0.id == "2" })
+        #expect(sage.name == "Focus time")
+        #expect(sage.labelID == "a")
+        #expect(sage.detail == "Focus time (Sage)")
+        // An unnamed label keeps Google's name but still sets the label.
+        let tomato = try #require(choices.first { $0.id == "11" })
+        #expect(tomato.name == "Tomato" && tomato.labelID == "b" && tomato.detail == "Tomato")
+        let custom = try #require(choices.last)
+        #expect(custom.id == "label:c" && custom.name == "Side project" && custom.labelID == "c")
+        #expect(EventColorChoice.palette(labels: []) == EventColorChoice.palette)
+    }
+
+    @Test func eventLabelColourWinsOverLegacyColorId() throws {
+        let json = """
+        {"id": "e1", "summary": "Deep work", "colorId": "5", "eventLabelId": "c",
+         "start": {"dateTime": "2026-11-18T10:00:00Z"}, "end": {"dateTime": "2026-11-18T11:00:00Z"}}
+        """
+        let event = try JSONDecoder().decode(GoogleEvent.self, from: Data(json.utf8))
+        let cal = CalendarInfo(id: "c", title: "c", sourceTitle: "s", color: .gray)
+        let custom = GoogleMapper.color(hex: "#123456")
+        #expect(GoogleMapper.meeting(event, calendar: cal, labels: ["c": custom])?.eventColor == custom)
+        #expect(GoogleMapper.meeting(event, calendar: cal)?.eventColor == GoogleMapper.eventColor(id: "5"))
+    }
 }

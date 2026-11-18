@@ -137,3 +137,72 @@ struct IconButton: View {
         .help(help)
     }
 }
+
+/// Thin line under a row while a reply or colour change saves: a segment sweeps across it,
+/// then it fills solid for a moment when the source confirms, and fades away.
+struct SaveIndicator: View {
+    let state: AppState.SaveState?
+    let tint: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(tint.opacity(0.18))
+                if state == .saving && !reduceMotion {
+                    TimelineView(.animation) { ctx in
+                        let period = 1.1
+                        let t = ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
+                        let eased = t * t * (3 - 2 * t)
+                        let w = max(24, geo.size.width * 0.3)
+                        Capsule().fill(tint.gradient)
+                            .frame(width: w)
+                            .offset(x: -w + (geo.size.width + w) * eased)
+                    }
+                } else if state == .saving {
+                    Capsule().fill(tint.opacity(0.5))
+                } else if state == .saved {
+                    Capsule().fill(tint.gradient)
+                }
+            }
+            .clipShape(Capsule())
+        }
+        .frame(height: 3)
+        .opacity(state == nil ? 0 : 1)
+        .animation(.easeOut(duration: 0.3), value: state)
+        .accessibilityHidden(state == nil)
+        .accessibilityLabel(state == .saving ? "Saving" : "Saved")
+    }
+}
+
+/// A quick glow over a row when a save lands, then it settles back.
+struct SaveFlash: ViewModifier {
+    let state: AppState.SaveState?
+    let tint: Color
+    var cornerRadius: CGFloat = Theme.rowCorner
+    @State private var lit = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(tint.opacity(lit ? 0.22 : 0))
+                    .overlay(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(tint.opacity(lit ? 0.8 : 0), lineWidth: 1.5))
+                    .allowsHitTesting(false)
+            }
+            .onChange(of: state) { _, new in
+                guard new == .saved else { return }
+                withAnimation(.easeOut(duration: 0.12)) { lit = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    withAnimation(.easeOut(duration: 0.7)) { lit = false }
+                }
+            }
+    }
+}
+
+extension View {
+    func saveFlash(_ state: AppState.SaveState?, tint: Color, cornerRadius: CGFloat = Theme.rowCorner) -> some View {
+        modifier(SaveFlash(state: state, tint: tint, cornerRadius: cornerRadius))
+    }
+}

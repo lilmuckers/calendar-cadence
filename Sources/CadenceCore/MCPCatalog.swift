@@ -72,7 +72,7 @@ public enum MCPCatalog {
                                      "reply": ["type": "string", "enum": ["accept", "tentative", "decline"]]],
                                     required: ["meeting_id", "reply"]), isAction: true),
         MCPTool(name: "set_event_color", title: "Set event colour",
-                description: "Colour an event (Google's palette names: Tomato, Flamingo, Tangerine, Banana, Sage, Basil, Peacock, Blueberry, Lavender, Grape, Graphite), or null for the calendar colour. The user confirms in Cadence first.",
+                description: "Colour an event, or null for the calendar colour. Use the calendar's own colour label names (the user may have named colours in Google Calendar) or Google's palette names: Tomato, Flamingo, Tangerine, Banana, Sage, Basil, Peacock, Blueberry, Lavender, Grape, Graphite. The user confirms in Cadence first.",
                 inputSchema: schema(["meeting_id": meetingID,
                                      "color": ["type": ["string", "null"], "description": "Colour name, or null."]],
                                     required: ["meeting_id"]), isAction: true),

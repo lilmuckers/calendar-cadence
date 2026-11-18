@@ -127,7 +127,8 @@ final class MicrosoftCalendarProvider: CalendarProvider {
         let token = try await auth.validAccessToken(for: account)
         let action = ["accept": "accept", "tentative": "tentativelyAccept", "decline": "decline"][reply.rawValue]!
         try await post("me/events/\(escape(eventID))/\(action)", body: ["sendResponse": true], token: token)
-        await refreshRemote()
+        // Microsoft has it; Cadence shows the reply straight away and re-reads in the background.
+        Task { await refreshRemote() }
     }
 
     // MARK: HTTP

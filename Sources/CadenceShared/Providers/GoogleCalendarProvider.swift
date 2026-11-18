@@ -17,6 +17,10 @@ final class GoogleCalendarProvider: CalendarProvider {
     /// Meeting id → where it lives in Google, for replies and colour changes.
     private var refs: [String: (calendarID: String, eventID: String)] = [:]
     private var primary: (entry: GoogleCalendarListEntry, info: CalendarInfo)?
+    /// Google calendar id → the colour labels the user set up for it in Google Calendar.
+    private var labels: [String: [GoogleEventLabel]] = [:]
+    /// Set if Google ever refuses `eventLabelVersion` on a read, so we stop sending it.
+    private var labelReadsRejected = false
 
     init(accountID: String, auth: GoogleAuth) {
         self.accountID = accountID
@@ -59,6 +63,8 @@ final class GoogleCalendarProvider: CalendarProvider {
             }
             primary = zip(entries, cachedCalendars).first { $0.0.primary == true }.map { ($0.0, $0.1) }
 
+            await refreshLabels(entries, token: token)
+
             let cal = Calendar.current
             let from = cal.startOfDay(for: Date())
             let to = cal.date(byAdding: .day, value: 2, to: from)!
@@ -74,7 +80,7 @@ final class GoogleCalendarProvider: CalendarProvider {
                         "conferenceDataVersion": "1",
                     ]
                     if let pageToken { query["pageToken"] = pageToken }
-                    let page: GoogleEventList = try await get(path, query: query, token: token)
+                    let page = try await events(path, query: query, calendarID: entry.id, token: token)
                     meetings += map(page.items ?? [], calendarID: entry.id, info: info)
                     pageToken = page.nextPageToken
                 } while pageToken != nil
@@ -91,9 +97,40 @@ final class GoogleCalendarProvider: CalendarProvider {
         onChange?()
     }
 
+    /// Reads each calendar's colour labels. Failures keep what we had: labels are a nicety.
+    private func refreshLabels(_ entries: [GoogleCalendarListEntry], token: String) async {
+        var fresh: [String: [GoogleEventLabel]] = [:]
+        for entry in entries {
+            if let resource: GoogleCalendarResource = try? await get("calendars/\(escape(entry.id))", query: [:], token: token) {
+                if !resource.labels.isEmpty { fresh[entry.id] = resource.labels }
+            } else if let old = labels[entry.id] {
+                fresh[entry.id] = old
+            }
+        }
+        labels = fresh
+    }
+
+    /// An events page; asks for colour labels on calendars that have them.
+    private func events(_ path: String, query: [String: String], calendarID: String, token: String) async throws -> GoogleEventList {
+        guard labels[calendarID] != nil, !labelReadsRejected else { return try await get(path, query: query, token: token) }
+        var labelled = query
+        labelled["eventLabelVersion"] = "1"
+        do {
+            return try await get(path, query: labelled, token: token)
+        } catch where error.localizedDescription.hasSuffix("HTTP 400") {
+            labelReadsRejected = true
+            return try await get(path, query: query, token: token)
+        }
+    }
+
+    private func labelColors(_ calendarID: String) -> [String: RGBAColor] {
+        Dictionary((labels[calendarID] ?? []).map { ($0.id, GoogleMapper.color(hex: $0.backgroundColor)) }) { a, _ in a }
+    }
+
     private func map(_ events: [GoogleEvent], calendarID: String, info: CalendarInfo) -> [Meeting] {
-        events.compactMap { e in
-            guard let m = GoogleMapper.meeting(e, calendar: info) else { return nil }
+        let colors = labelColors(calendarID)
+        return events.compactMap { e in
+            guard let m = GoogleMapper.meeting(e, calendar: info, labels: colors) else { return nil }
             refs[m.id] = (calendarID, e.id)
             return m
         }
@@ -118,7 +155,7 @@ final class GoogleCalendarProvider: CalendarProvider {
             var pages = 0
             repeat {
                 if let pageToken { query["pageToken"] = pageToken }
-                let page: GoogleEventList = try await get(eventsPath(primary.entry.id), query: query, token: token)
+                let page = try await events(eventsPath(primary.entry.id), query: query, calendarID: primary.entry.id, token: token)
                 let pending = (page.items ?? []).filter { e in
                     e.status != "cancelled" && e.attendees?.contains { $0.isSelf == true && $0.responseStatus == "needsAction" } == true
                 }
@@ -138,6 +175,11 @@ final class GoogleCalendarProvider: CalendarProvider {
 
     func canSetColor(_ meeting: Meeting) -> Bool { canRespond(meeting) }
 
+    func colorChoices(for meeting: Meeting) -> [EventColorChoice]? {
+        guard let ref = refs[meeting.id], let labels = labels[ref.calendarID] else { return nil }
+        return EventColorChoice.palette(labels: labels)
+    }
+
     func respond(_ meeting: Meeting, _ reply: RSVP) async throws {
         let (token, ref) = try await writable(meeting)
         // PATCH replaces the whole attendee list, so fetch it and change only our own entry.
@@ -147,16 +189,40 @@ final class GoogleCalendarProvider: CalendarProvider {
               let me = attendees.firstIndex(where: { $0["self"] as? Bool == true }) else { throw ProviderError.unsupported }
         attendees[me]["responseStatus"] = ["accept": "accepted", "tentative": "tentative", "decline": "declined"][reply.rawValue]
         _ = try await send("PATCH", path, query: ["sendUpdates": "all"], body: ["attendees": attendees], token: token)
-        await refreshRemote()
+        // Google has it; show it now and pick up the rest of the change in the background.
+        updateCached(matching: ref.eventID, series: false) { $0.participation = reply.participation }
+        Task { await refreshRemote() }
     }
 
     func setColor(_ meeting: Meeting, _ choice: EventColorChoice?) async throws {
         let (token, ref) = try await writable(meeting)
         // On a recurring event, colour the whole series.
         let eventID = meeting.recurs ? (ref.eventID.split(separator: "_").first.map(String.init) ?? ref.eventID) : ref.eventID
-        _ = try await send("PATCH", "\(eventsPath(ref.calendarID))/\(escape(eventID))",
-                           body: ["colorId": choice?.id ?? NSNull()], token: token)
-        await refreshRemote()
+        let path = "\(eventsPath(ref.calendarID))/\(escape(eventID))"
+        if let label = choice?.labelID {
+            _ = try await send("PATCH", path, query: ["eventLabelVersion": "1"], body: ["eventLabelId": label], token: token)
+        } else if choice == nil, labels[ref.calendarID] != nil {
+            // Clear both systems so neither a label nor a legacy colour lingers.
+            _ = try await send("PATCH", path, query: ["eventLabelVersion": "1"], body: ["eventLabelId": ""], token: token)
+            _ = try await send("PATCH", path, body: ["colorId": NSNull()], token: token)
+        } else {
+            _ = try await send("PATCH", path, body: ["colorId": choice?.id ?? NSNull()], token: token)
+        }
+        updateCached(matching: eventID, series: meeting.recurs) { $0.eventColor = choice?.color }
+        Task { await refreshRemote() }
+    }
+
+    /// Applies a confirmed change to cached events so it shows without waiting for a full re-fetch.
+    private func updateCached(matching eventID: String, series: Bool, _ change: (inout Meeting) -> Void) {
+        let hits = Set(refs.filter { $0.value.eventID == eventID || (series && $0.value.eventID.hasPrefix(eventID + "_")) }.keys)
+        guard !hits.isEmpty else { return }
+        cachedMeetings = cachedMeetings.map { m in
+            guard hits.contains(m.id) else { return m }
+            var m = m
+            change(&m)
+            return m
+        }
+        onChange?()
     }
 
     private func writable(_ meeting: Meeting) async throws -> (String, (calendarID: String, eventID: String)) {

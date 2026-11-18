@@ -13,8 +13,31 @@ public struct GoogleCalendarListEntry: Decodable, Sendable {
     public var backgroundColor: String?
     public var primary: Bool?
     public var selected: Bool?
+    public var accessRole: String?
 
     public var title: String { summaryOverride ?? summary ?? id }
+}
+
+/// A calendar's own colour labels (Calendars resource `labelProperties`): the names the user gave
+/// event colours in Google Calendar, plus any custom colours.
+public struct GoogleEventLabel: Decodable, Hashable, Sendable {
+    public var id: String
+    public var backgroundColor: String?
+    public var name: String?
+
+    public init(id: String, backgroundColor: String?, name: String?) {
+        self.id = id
+        self.backgroundColor = backgroundColor
+        self.name = name
+    }
+}
+
+public struct GoogleCalendarResource: Decodable, Sendable {
+    public struct LabelProperties: Decodable, Sendable {
+        public var eventLabels: [GoogleEventLabel]?
+    }
+    public var labelProperties: LabelProperties?
+    public var labels: [GoogleEventLabel] { labelProperties?.eventLabels ?? [] }
 }
 
 public struct GoogleEventList: Decodable, Sendable {
@@ -63,6 +86,7 @@ public struct GoogleEvent: Decodable, Sendable {
     public var conferenceData: Conference?
     public var eventType: String?
     public var colorId: String?
+    public var eventLabelId: String?
     public var recurringEventId: String?
     public var recurrence: [String]?
 }
@@ -114,7 +138,14 @@ public enum GoogleMapper {
         return nil
     }
 
-    public static func meeting(_ e: GoogleEvent, calendar: CalendarInfo) -> Meeting? {
+    /// Normalised "#rrggbb" for comparing label colours with the fixed palette.
+    static func normalisedHex(_ hex: String?) -> String? {
+        guard let s = hex?.trimmingCharacters(in: .whitespaces).lowercased(), s.hasPrefix("#"), s.count == 7 else { return nil }
+        return s
+    }
+
+    /// `labels`: the calendar's colour labels (label id → colour), so events tagged with a label get its colour.
+    public static func meeting(_ e: GoogleEvent, calendar: CalendarInfo, labels: [String: RGBAColor] = [:]) -> Meeting? {
         // Working-location and out-of-office entries aren't meetings.
         if let type = e.eventType, type == "workingLocation" || type == "outOfOffice" || type == "focusTime" { return nil }
         guard let start = parse(e.start), let end = parse(e.end) else { return nil }
@@ -152,7 +183,7 @@ public enum GoogleMapper {
             participation: participation,
             availability: e.transparency == "transparent" ? .free : (participation == .tentative ? .tentative : .busy),
             joinLink: link,
-            eventColor: eventColor(id: e.colorId),
+            eventColor: e.eventLabelId.flatMap { $0.isEmpty ? nil : labels[$0] } ?? eventColor(id: e.colorId),
             recurs: e.recurringEventId != nil || e.recurrence?.isEmpty == false
         )
     }
