@@ -235,7 +235,10 @@ final class PhoneState {
         if isActive, let last = lastRemoteRefresh, now.timeIntervalSince(last) > 600 { Task { await refreshRemote() } }
         // Connected: the Mac sends alerts. Standalone: plan our own.
         if !link.isConnected { checkAlert() }
-        if let alerting, let closeAt = autoDismissDate(for: alerting), now > closeAt { self.alerting = nil }
+        // Previews stay up until dismissed, so a short auto-close can't cut the meltdown preview off.
+        if let alerting, !alerting.id.hasPrefix("preview"), let closeAt = autoDismissDate(for: alerting), now > closeAt {
+            self.alerting = nil
+        }
         if Int(now.timeIntervalSince1970) % 30 == 0 { updateLiveActivity() }
     }
 
@@ -318,6 +321,17 @@ final class PhoneState {
             calendar: CalendarInfo(id: "preview", title: "Work", sourceTitle: "Preview", color: RGBAColor(red: 0.35, green: 0.45, blue: 1)),
             attendeeCount: 6,
             joinLink: MeetingLink(service: .zoom, url: URL(string: "https://zoom.us/j/123456789")!))
+    }
+
+    /// Settings → Alerts → Preview meltdown: a demo meeting that's nearly three minutes late.
+    func previewLateAlert(lateBy: TimeInterval = 172) {
+        let start = Date().addingTimeInterval(-lateBy)
+        alerting = Meeting(
+            id: "preview-late", title: "Design Review",
+            start: start, end: start.addingTimeInterval(1800),
+            calendar: CalendarInfo(id: "preview", title: "Work", sourceTitle: "Preview", color: RGBAColor(red: 0.35, green: 0.45, blue: 1)),
+            attendeeCount: 6,
+            joinLink: MeetingLink(service: .zoom, url: URL(string: "https://example.com/cadence-preview")!))
     }
 
     // MARK: - Background

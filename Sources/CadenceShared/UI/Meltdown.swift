@@ -1,6 +1,7 @@
-import AppKit
 import CadenceCore
 import SwiftUI
+
+// Shared by the Mac's takeover and the iPhone's full-screen alert.
 
 /// Where each breakable character sits on screen, collected from the views that draw them.
 struct GlyphAnchorKey: PreferenceKey {
@@ -13,11 +14,12 @@ struct GlyphAnchorKey: PreferenceKey {
 enum GlyphStyle {
     case heading, title, countdown
 
-    func font(level: Double) -> Font {
+    /// `scale` shrinks everything together (the phone's screen is smaller than the Mac's).
+    func font(level: Double, scale: Double = 1) -> Font {
         switch self {
-        case .heading: .system(size: 15 + 5 * level, weight: .heavy)
-        case .title: .system(size: 40, weight: .bold, design: .rounded)
-        case .countdown: .system(size: 88, weight: .semibold, design: .rounded).monospacedDigit()
+        case .heading: .system(size: (15 + 5 * level) * scale, weight: .heavy)
+        case .title: .system(size: 40 * scale, weight: .bold, design: .rounded)
+        case .countdown: .system(size: 88 * scale, weight: .semibold, design: .rounded).monospacedDigit()
         }
     }
 }
@@ -37,9 +39,13 @@ final class MeltdownModel {
     private var nextLetter: Date?
     private var nextDigit: Date?
 
+    /// What broke off, for a sound or a haptic.
+    enum Break { case letter, digit }
+
     /// `glyphs` maps each still-breakable character id to its frame (root coordinates) and character.
+    /// `ringRadius` is the inside of the ring the countdown's loose characters rattle around in.
     func tick(date: Date, secondsLate: TimeInterval, glyphs: [String: (CGRect, Character, GlyphStyle)],
-              ringCenter: CGPoint?, screen: CGSize, sound: Bool) {
+              ringCenter: CGPoint?, ringRadius: Double = 124, screen: CGSize, onBreak: ((Break) -> Void)? = nil) {
         let dt = lastTick.map { min(1.0 / 20, max(0, date.timeIntervalSince($0))) } ?? 0
         lastTick = date
         guard Meltdown.isActive(secondsLate: secondsLate) else { return }
@@ -59,7 +65,7 @@ final class MeltdownModel {
                 fallingGlyph[id] = (g.1, g.2)
                 falling.append(.launch(id: id, from: Vec2(g.0.midX, g.0.midY),
                                        r: (.random(in: 0...1), .random(in: 0...1), .random(in: 0...1))))
-                if sound { NSSound(named: "Pop")?.play() }
+                onBreak?(.letter)
             }
         }
 
@@ -75,7 +81,7 @@ final class MeltdownModel {
                                           position: Vec2(frame.midX - ringCenter.x, frame.midY - ringCenter.y),
                                           velocity: Vec2(.random(in: -300...300), .random(in: -500 ... -150)),
                                           spin: .random(in: -6...6)))
-                if sound { NSSound(named: "Tink")?.play() }
+                onBreak?(.digit)
             }
         }
 
@@ -87,7 +93,7 @@ final class MeltdownModel {
         let violence = 7000 + 9000 * progress
         for i in bottle.indices {
             let kick = Vec2(.random(in: -1...1), .random(in: -1...1)) * violence
-            bottle[i].step(dt: dt, radius: 124, shake: kick)
+            bottle[i].step(dt: dt, radius: ringRadius, shake: kick)
         }
     }
 }

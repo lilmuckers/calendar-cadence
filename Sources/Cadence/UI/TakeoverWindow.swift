@@ -324,8 +324,10 @@ struct TakeoverView: View {
         }
         let ring = anchors["ring"].map { geo[$0] }
         meltdown.tick(date: date, secondsLate: -remaining, glyphs: glyphs,
-                      ringCenter: ring.map { CGPoint(x: $0.midX, y: $0.midY) }, screen: geo.size,
-                      sound: state.prefs.takeoverSound)
+                      ringCenter: ring.map { CGPoint(x: $0.midX, y: $0.midY) }, screen: geo.size) { piece in
+            guard state.prefs.takeoverSound else { return }
+            NSSound(named: piece == .letter ? "Pop" : "Tink")?.play()
+        }
         return true
     }
 

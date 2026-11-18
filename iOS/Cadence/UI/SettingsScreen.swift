@@ -52,8 +52,9 @@ struct SettingsScreen: View {
                         Text("Never").tag(0)
                     }
                     Button("Preview alert") { dismiss(); state.previewAlert() }
+                    Button("Preview meltdown") { dismiss(); state.previewLateAlert() }
                 } header: { Text("Alerts") } footer: {
-                    Text("Once a meeting has started the alert gets redder and more insistent for the first 3 minutes. While connected, the Mac decides when alerts fire and when they close, using its own settings.")
+                    Text("Once a meeting has started the alert gets redder and more insistent for the first 3 minutes, then starts falling apart (not with Reduce Motion). While connected, the Mac decides when alerts fire and when they close, using its own settings.")
                 }
                 Section("Notifications when Cadence isn't open") {
                     Toggle("Notify me", isOn: $state.prefs.backgroundNotifications)
