@@ -8,11 +8,18 @@ struct MenuBarLabel: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(nsImage: MenuBarIcon.image(mood))
+            Image(nsImage: MenuBarIcon.image(mood, phone: phone))
             if state.prefs.showMenuBarTitle, let text {
                 Text(text).monospacedDigit()
             }
         }
+    }
+
+    /// A paired iPhone: connected, or on the desk showing Cadence (the Mac is quiet).
+    private var phone: MenuBarIcon.Phone {
+        let hub = state.companion
+        if hub.phoneDisplaying { return .displaying }
+        return hub.isConnected ? .connected : .none
     }
 
     /// Gets more anxious as the next meeting approaches.

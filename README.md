@@ -91,6 +91,22 @@ Each morning Cadence gathers every invite still waiting for a reply and asks you
 
 <br clear="right">
 
+## 📱 iPhone desk companion
+
+Put your iPhone on a MagSafe stand and it becomes a desk display for your calendar: the time, a big countdown to your next meeting, a **Join** button and the rest of your day. Portrait or landscape, it lays itself out to fit.
+
+- **Desk mode turns on by itself while charging** (or tap *Desk mode*). The screen stays on and dims when nothing's close.
+- **Your Mac goes quiet.** While the phone is paired, connected *and* showing desk mode, the Mac hides the countdown panel, banners and reminders and sends them to the phone. The full-screen alert stays on the Mac too, unless you pick *Only on the iPhone* in **Settings → iPhone**. Pick the phone up, switch apps or walk away and the Mac is back to normal straight away.
+- **Join goes where you work.** Tap Join on the phone and the meeting opens **on the Mac** while they're connected, or on the phone when they're not. Snooze and Dismiss on either device close the alert on both.
+- **Works on its own, too.** The iPhone app reads its own calendars (iPhone Calendar accounts, Google, Microsoft 365, ICS), runs its own full-screen alert, schedules time-sensitive notifications for when it's in the background, and shows a **Live Activity** with a Join button in the **Dynamic Island**, on the Lock Screen and in StandBy: it counts down once the next meeting is under 30 minutes away (adjustable) and shows the start time before that.
+- **Same alert, same nagging.** The phone's full-screen alert escalates like the Mac's once you're late (redder, faster, shakier, with a haptic at each step), falls apart three minutes in like the Mac's meltdown (Settings → Alerts → Preview meltdown), and closes itself after the same *If ignored* time.
+
+**Pairing.** On the Mac open **Settings → iPhone → Show Pairing Code** and scan it with the iPhone app (or with the Camera app, or copy the link across). The code carries a random 256-bit key that both devices then use for an encrypted (TLS pre-shared-key) connection, found over Bonjour on your Wi-Fi or directly between the devices when they're not on the same network. **Forget All iPhones** rotates the key.
+
+**Building the iPhone app.** Open `iOS/CadenceCompanion.xcodeproj` in Xcode (it shares `Sources/CadenceCore` and `Sources/CadenceShared` with the Mac app). Copy `iOS/Config/Local.xcconfig.example` to `iOS/Config/Local.xcconfig` and set your `DEVELOPMENT_TEAM` and bundle ID. `scripts/ios-build.sh` builds for the Simulator.
+
+To sign in to Google on the phone, create a second OAuth client of type **iOS** (bundle ID as above) and put the part before `.apps.googleusercontent.com` in `GOOGLE_IOS_CLIENT_PREFIX`. For Microsoft, add the redirect URI `msauth.<your bundle ID>://auth` under *Authentication → iOS / macOS* in the same app registration and set `MICROSOFT_CLIENT_ID`.
+
 ## 🤖 Ask your assistant about your day
 
 Cadence includes a local [MCP](https://modelcontextprotocol.io) server, so Claude (Desktop or Code), Cursor or any other MCP client on your Mac can read your merged calendar, act on it, and hear about things as they happen. It sees exactly what Cadence sees: every source merged, filtered and de-duplicated.
@@ -125,7 +141,7 @@ claude mcp add --scope user cadence -- "/Applications/Cadence.app/Contents/MacOS
 - **⌨️ Global join shortcut.** <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>J</kbd> (re-bindable) joins whatever's starting in the next 10 minutes — or the meeting you're already late for.
 - **🚗 "Leave now" reminders.** For in-person meetings, Cadence watches live traffic and pings you at configurable offsets before you need to leave (default: 10 minutes before, and "time to leave").
 - **🔔 Heads-up notifications.** Optional nudge N minutes before each meeting (default 5).
-- **🗣️ Wrap-up nudge.** Five minutes before a meeting ends (configurable). If another one starts straight after, it says so: *"Dude, you have 5 minutes to the next meeting and you're still talking."* Its Join button opens the next meeting.
+- **🗣️ Wrap-up nudge.** Five minutes before a meeting ends (configurable). If another one starts straight after, it says so: *"Wrap up: Design Review in 5 min."* Its Join button opens the next meeting. For online meetings it only goes out while your mic is still in use, so it stays quiet if you've already left the call.
 - **☀️ Morning summary & tomorrow.** A good-morning notification with how many meetings you have, when the first starts, when you're done and how many invites need a reply. In the evening (or once today is over) the agenda shows tomorrow too.
 - **🎨 Event colours.** Colour an event in Google Calendar (or give it a `COLOR` in an ICS feed) and Cadence uses that colour instead of the calendar's. Toggle in *Settings → Calendars*.
 - **🧹 Filters.** Toggle calendars; hide all-day, declined, tentative, free or link-less events; include/exclude by title keyword; minimum duration.
@@ -187,8 +203,10 @@ If your build has a Microsoft app built in, skip this and click **Sign in with M
 No Xcode project, no SwiftPM, no dependencies — just the Xcode Command Line Tools on macOS 14+.
 
 ```bash
-scripts/test.sh            # 88 unit tests (Swift Testing)
+scripts/test.sh            # 120 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
+scripts/ios-build.sh       # build the iPhone app for the Simulator
+scripts/ios-test.sh        # iPhone unit tests in the Simulator (needs Xcode)
 ```
 
 ### Building in a Google OAuth client
@@ -218,7 +236,11 @@ build/Cadence.app/Contents/MacOS/Cadence --screenshots docs/screenshots   # rege
 
 ### CI and releases
 
-- **CI** ([`ci.yml`](.github/workflows/ci.yml)) runs `scripts/test.sh` on every pull request and push to `main`. It only runs the tests; it doesn't build the app.
+- **CI** ([`ci.yml`](.github/workflows/ci.yml)) runs on every pull request and push to `main`, in two jobs:
+  - **Unit tests** runs `scripts/test.sh` on macOS. It doesn't build the Mac app.
+  - **iPhone build and tests** builds the iPhone app for the Simulator with `scripts/ios-build.sh`, then runs `scripts/ios-test.sh`. That runs the shared `CadenceCore` suite again, this time on iOS, plus the iPhone-only tests in `iOS/Tests`.
+  - Each job posts its results as a check (*Unit test results*, *iPhone unit test results*).
+  - CI and release builds use the Xcode set by `XCODE_VERSION` at the top of each workflow (`scripts/ci-select-xcode.sh`), not the runner's default. It's 26.6, the newest on GitHub's stable `macos-26` runner, so CI also catches code that only builds on a newer Xcode.
 - **Release labels.** Every PR needs exactly one of `major`, `minor` or `patch` ([`pr-labels.yml`](.github/workflows/pr-labels.yml) fails the check otherwise). Add `skip-changelog` to leave a PR out of the release notes. Run *Actions → Sync labels* once to create the labels.
 - **Release** ([`release.yml`](.github/workflows/release.yml)): start it from *Actions → Release → Run workflow* on `main`. It:
   1. Works out the next version from the highest label on PRs merged since the last `vX.Y.Z` tag (`scripts/next-version.sh`; the first release uses the version in `Info.plist`). You can force a bump instead.
@@ -257,13 +279,15 @@ Sources/
 │   ├── Invites               RSVP horizon, invite merging, event colour palette
 │   ├── Reminders             heads-up, leave-now, wrap-up, morning summary, clashes
 │   ├── PanelPlanner          what the countdown panel shows, and how big
-│   └── MCP*                  MCP protocol, tools catalogue, events, free-time finder
+│   ├── MCP*                  MCP protocol, tools catalogue, events, free-time finder
+│   └── Companion*, Pairing   iPhone link messages, framing, routing and pairing links
 └── Cadence/              The app
-    ├── Sources/              EventKit, ICS, Google and Microsoft providers, OAuth, Keychain
-    ├── Engine/               system context, alert routing, travel, hotkey, notifications
+    ├── Engine/               system context, alert routing, travel, hotkey, notifications, iPhone link
     ├── MCP/                  Unix-socket bridge and tool implementations for assistants
     └── UI/                   menu, panel, takeover, banner, clash, invite and approval cards, settings
+Sources/CadenceShared/    Shared by the Mac and iPhone apps: EventKit, ICS, Google and Microsoft providers, OAuth, Keychain, the encrypted link
 Sources/CadenceMCP/       cadence-mcp, the stdio relay bundled in the app
+iOS/                      The iPhone app (Xcode project), its Live Activity widget and config
 ```
 
 New sources plug in by conforming to `CalendarProvider`. Ideas that are parked live in [BACKLOG.md](BACKLOG.md).

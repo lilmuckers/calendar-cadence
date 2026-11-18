@@ -1,9 +1,11 @@
 // Draws the Cadence app icon: a panicking calendar page with googly eyes, late for a meeting.
-// Usage: swift scripts/make-icon.swift <output.png>
+// Usage: swift scripts/make-icon.swift <output.png> [--ios]
+// --ios: full-bleed, opaque square (iOS rounds the corners itself) instead of the Mac's inset squircle.
 import AppKit
 
 let size: CGFloat = 1024
-let out = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "AppIcon.png"
+let out = CommandLine.arguments.dropFirst().first { !$0.hasPrefix("--") } ?? "AppIcon.png"
+let iOS = CommandLine.arguments.contains("--ios")
 
 let rep = NSBitmapImageRep(
     bitmapDataPlanes: nil, pixelsWide: Int(size), pixelsHigh: Int(size),
@@ -24,10 +26,16 @@ func shadow(_ blur: CGFloat, y: CGFloat, _ c: NSColor) {
 }
 
 // --- Background squircle (Apple's 824pt grid inside 1024) ---
+// iOS: blow the whole drawing up so the 824pt square fills the tile, with square corners.
+if iOS {
+    ctx.translateBy(x: 512, y: 512)
+    ctx.scaleBy(x: size / 824, y: size / 824)
+    ctx.translateBy(x: -512, y: -512)
+}
 let bgRect = CGRect(x: 100, y: 100, width: 824, height: 824)
-let bg = NSBezierPath(roundedRect: bgRect, xRadius: 186, yRadius: 186)
+let bg = iOS ? NSBezierPath(rect: bgRect) : NSBezierPath(roundedRect: bgRect, xRadius: 186, yRadius: 186)
 ctx.saveGState()
-shadow(28, y: -12, color(0x000000, 0.35))
+if !iOS { shadow(28, y: -12, color(0x000000, 0.35)) }
 color(0x7B2FF7).setFill()
 bg.fill()
 ctx.restoreGState()
@@ -191,5 +199,14 @@ for (i, y) in [400.0, 470.0, 540.0].enumerated() {
 }
 
 NSGraphicsContext.restoreGraphicsState()
-try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
+if iOS {
+    // App Store icons must have no alpha channel: redraw onto an opaque bitmap.
+    let opaque = CGContext(data: nil, width: Int(size), height: Int(size), bitsPerComponent: 8, bytesPerRow: 0,
+                           space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    opaque.draw(rep.cgImage!, in: CGRect(x: 0, y: 0, width: size, height: size))
+    let flat = NSBitmapImageRep(cgImage: opaque.makeImage()!)
+    try! flat.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
+} else {
+    try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
+}
 print("Wrote \(out)")

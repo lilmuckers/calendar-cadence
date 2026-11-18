@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate Support/AppIcon.icns from scripts/make-icon.swift.
+# Regenerate Support/AppIcon.icns and the iPhone app icon from scripts/make-icon.swift.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TMP="$(mktemp -d)"
@@ -17,3 +17,5 @@ for s in 16 32 128 256 512; do
 done
 iconutil -c icns "$SET" -o "$ROOT/Support/AppIcon.icns"
 echo "Wrote Support/AppIcon.icns"
+"$TMP/make-icon" "$ROOT/iOS/Cadence/Assets.xcassets/AppIcon.appiconset/AppIcon.png" --ios
+echo "Wrote the iPhone app icon"

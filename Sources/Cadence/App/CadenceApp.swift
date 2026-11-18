@@ -1,4 +1,5 @@
 import AppKit
+import CadenceCore
 import SwiftUI
 
 @main
@@ -75,14 +76,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotKey.register(registered)
         }
         state.start()
+        startCompanion(router: router)
         bridge.sync()
 
         // Re-evaluate panel visibility whenever the observed state it depends on changes.
         observePanel()
     }
 
+    private func startCompanion(router: AlertRouter) {
+        let hub = state.companion
+        hub.snapshot = { [weak self] in self?.state.companionSnapshot() ?? CompanionSnapshot(macName: "", generatedAt: Date(), meetings: []) }
+        hub.onJoin = { [weak self] id in
+            guard let self, let meeting = self.state.meeting(id: id) else { return }
+            self.state.join(meeting)
+            router.closeAlert(for: id)
+        }
+        hub.onSnooze = { [weak self] id, seconds in
+            if let meeting = self?.state.meeting(id: id) { self?.state.snooze(meeting, seconds: seconds) }
+            router.closeAlert(for: id)
+        }
+        hub.onDismiss = { id in router.closeAlert(for: id) }
+        if state.prefs.companionEnabled { hub.start() }
+        var enabled = state.prefs.companionEnabled
+        let previous = state.onPrefsChanged
+        state.onPrefsChanged = { [weak self] in
+            previous?()
+            guard let self, self.state.prefs.companionEnabled != enabled else { return }
+            enabled = self.state.prefs.companionEnabled
+            if enabled { hub.start() } else { hub.stop() }
+        }
+    }
+
     private func observePanel() {
         withObservationTracking {
+            _ = state.companion.phoneDisplaying
             _ = state.canShowAgenda
             _ = state.prefs.showPanel
             _ = state.prefs.panelHidesWhenIdle

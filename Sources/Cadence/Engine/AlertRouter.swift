@@ -15,10 +15,24 @@ final class AlertRouter {
         takeover = TakeoverController(state: state)
         banner = BannerController(state: state)
         notifier = Notifier(state: state)
+        // Handled on the Mac (joined, dismissed, snoozed, timed out) → close it on the phone too.
+        takeover.onClosed = { [weak state] id in state?.companion.broadcast(.dismissAlert(meetingID: id)) }
     }
 
+    private var phoneDisplaying: Bool { state.companion.phoneDisplaying }
+
     func remind(_ reminder: Reminder) {
-        notifier.notify(reminder)
+        if CompanionRouting.macShowsReminders(phoneDisplaying: phoneDisplaying) {
+            notifier.notify(reminder)
+        } else {
+            state.companion.broadcast(.reminder(CompanionReminder(reminder)))
+        }
+    }
+
+    /// The phone joined, snoozed or dismissed this meeting's alert.
+    func closeAlert(for meetingID: String) {
+        if takeover.currentID == meetingID { takeover.dismiss(notify: false) }
+        banner.dismiss()
     }
 
     func notifyInvites(_ invites: [Meeting]) {
@@ -28,7 +42,7 @@ final class AlertRouter {
     func alert(_ meeting: Meeting, forcing style: BusyAlertStyle? = nil) {
         let context = SystemContext.current()
         let prefs = state.prefs
-        let plan: AlertPlan
+        var plan: AlertPlan
         if let style {
             // Preview: pretend we're busy so the chosen style is used, but still avoid presented displays.
             plan = AlertPolicy.plan(
@@ -45,7 +59,10 @@ final class AlertRouter {
                 whileOnCall: prefs.whileOnCall
             )
         }
-        NSLog("Cadence: alert for \(meeting.title): \(plan) — \(SystemContext.describe(context))")
+        let sendToPhone = CompanionRouting.sendsToPhone(connected: state.companion.isConnected, phoneDisplaying: phoneDisplaying)
+        if sendToPhone { state.companion.broadcast(.alert(meeting)) }
+        plan = CompanionRouting.macPlan(plan, phoneDisplaying: phoneDisplaying, mode: prefs.companionTakeover)
+        NSLog("Cadence: alert for \(meeting.title): \(plan)\(sendToPhone ? " + iPhone" : "") — \(SystemContext.describe(context))")
 
         switch plan {
         case .fullScreen(let displays):

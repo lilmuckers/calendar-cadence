@@ -56,6 +56,9 @@ final class TakeoverController {
     }
 
     var isPresented: Bool { !windows.isEmpty }
+    var currentID: String? { current?.id }
+    /// Called with the meeting id whenever the takeover closes, unless the phone closed it.
+    var onClosed: ((String) -> Void)?
 
     /// Cover the given displays (by CGDirectDisplayID). The first one gets the keyboard hints.
     func present(_ meeting: Meeting, displays: [UInt32]) {
@@ -96,7 +99,8 @@ final class TakeoverController {
         }
     }
 
-    func dismiss() {
+    func dismiss(notify: Bool = true) {
+        if notify, let id = current?.id { onClosed?(id) }
         autoClose?.invalidate()
         autoClose = nil
         current = nil
@@ -320,8 +324,10 @@ struct TakeoverView: View {
         }
         let ring = anchors["ring"].map { geo[$0] }
         meltdown.tick(date: date, secondsLate: -remaining, glyphs: glyphs,
-                      ringCenter: ring.map { CGPoint(x: $0.midX, y: $0.midY) }, screen: geo.size,
-                      sound: state.prefs.takeoverSound)
+                      ringCenter: ring.map { CGPoint(x: $0.midX, y: $0.midY) }, screen: geo.size) { piece in
+            guard state.prefs.takeoverSound else { return }
+            NSSound(named: piece == .letter ? "Pop" : "Tink")?.play()
+        }
         return true
     }
 

@@ -5,18 +5,56 @@ import AppKit
 enum MenuBarIcon {
     enum Mood { case calm, nervous, panicking }
 
-    private static var cache: [Mood: NSImage] = [:]
+    /// A paired iPhone, shown as a small phone beside the page.
+    enum Phone {
+        case none
+        /// Connected, but not on display: phone outline.
+        case connected
+        /// On the desk showing Cadence, so the Mac is quiet: phone with a lit (filled) screen.
+        case displaying
+    }
 
-    static func image(_ mood: Mood) -> NSImage {
-        if let cached = cache[mood] { return cached }
-        let image = NSImage(size: NSSize(width: 20, height: 18), flipped: false) { _ in
+    private struct Key: Hashable { var mood: Mood; var phone: Phone }
+    private static var cache: [Key: NSImage] = [:]
+
+    static func image(_ mood: Mood, phone: Phone = .none) -> NSImage {
+        let key = Key(mood: mood, phone: phone)
+        if let cached = cache[key] { return cached }
+        let width: CGFloat = phone == .none ? 20 : 26
+        let image = NSImage(size: NSSize(width: width, height: 18), flipped: false) { _ in
+            NSGraphicsContext.saveGraphicsState()
             draw(mood)
+            NSGraphicsContext.restoreGraphicsState()
+            if phone != .none { drawPhone(lit: phone == .displaying) }
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "Cadence"
-        cache[mood] = image
+        image.accessibilityDescription = switch phone {
+        case .none: "Cadence"
+        case .connected: "Cadence, iPhone connected"
+        case .displaying: "Cadence, showing on iPhone"
+        }
+        cache[key] = image
         return image
+    }
+
+    /// A tiny phone in the bottom-right corner, clear of the page and the sweat drop.
+    private static func drawPhone(lit: Bool) {
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSColor.black.set()
+        let body = NSRect(x: 19.6, y: 0.8, width: 5.4, height: 9.2)
+        let outline = NSBezierPath(roundedRect: body, xRadius: 1.4, yRadius: 1.4)
+        outline.lineWidth = 1.1
+        outline.stroke()
+        if lit {
+            // Lit screen with the notch left dark.
+            NSBezierPath(roundedRect: body.insetBy(dx: 1.15, dy: 1.15), xRadius: 0.6, yRadius: 0.5).fill()
+            NSGraphicsContext.current?.compositingOperation = .clear
+            NSBezierPath(roundedRect: NSRect(x: body.midX - 0.9, y: body.maxY - 2.3, width: 1.8, height: 0.8), xRadius: 0.4, yRadius: 0.4).fill()
+        } else {
+            NSBezierPath(roundedRect: NSRect(x: body.midX - 0.9, y: body.maxY - 2.1, width: 1.8, height: 0.7), xRadius: 0.35, yRadius: 0.35).fill()
+        }
     }
 
     private static func draw(_ mood: Mood) {

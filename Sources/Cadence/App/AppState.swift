@@ -72,6 +72,8 @@ final class AppState {
     @ObservationIgnored private var travelInFlight: Set<String> = []
     @ObservationIgnored private var travelFailures: [String: Date] = [:]
 
+    /// Link to a paired iPhone. Observable on its own, so views can watch `companion.phoneDisplaying`.
+    @ObservationIgnored let companion = CompanionHub()
     @ObservationIgnored private let eventKit = EventKitProvider()
     @ObservationIgnored let googleAuth = GoogleAuth()
     @ObservationIgnored let microsoftAuth = MicrosoftAuth()
@@ -158,6 +160,7 @@ final class AppState {
     private func recompute() {
         let previous = meetings
         meetings = visibleMeetings()
+        companion.pushSnapshot()
         clashes = ClashDetector.clashes(in: meetings, after: Date())
         emitChanges(from: previous)
         let live = Set(clashes.map(\.key))
@@ -420,7 +423,14 @@ final class AppState {
            UserDefaults.standard.string(forKey: "Cadence.lastSummary") != summary.key {
             reminders.append(summary)
         }
+        // Checked only when a call-dependent reminder is due. Not marked sent when skipped, so if the
+        // call starts again within the reminder's grace period it still goes out.
+        var onCall: Bool?
         for r in ReminderPlanner.due(reminders, now: now, sent: sentReminders) {
+            if r.needsActiveCall {
+                if onCall == nil { onCall = SystemContext.microphoneApp() != nil }
+                if onCall == false { continue }
+            }
             sentReminders.insert(r.key)
             if r.isSummary { UserDefaults.standard.set(r.key, forKey: "Cadence.lastSummary") }
             onReminder?(r)
@@ -719,6 +729,25 @@ final class AppState {
             NSWorkspace.shared.openApplication(at: app, configuration: .init())
         }
     }
+
+    // MARK: - iPhone companion
+
+    /// What a paired phone mirrors: the same filtered, merged meetings the Mac shows (from an hour ago on).
+    func companionSnapshot() -> CompanionSnapshot {
+        let cutoff = Date().addingTimeInterval(-3600)
+        let mirrored = meetings.filter { $0.end > cutoff }.map { m -> Meeting in
+            var m = m
+            m.notes = nil // join links are already extracted; invite bodies can be huge
+            return m
+        }
+        return CompanionSnapshot(macName: companion.macName, generatedAt: Date(), meetings: mirrored,
+                                 suppressedIDs: suppressedByClash, takeoverEnabled: prefs.takeoverEnabled,
+                                 takeoverLeadSeconds: prefs.takeoverLeadSeconds,
+                                 takeoverAutoDismissMinutes: prefs.takeoverAutoDismissMinutes)
+    }
+
+    /// A meeting by id, for actions coming from the phone.
+    func meeting(id: String) -> Meeting? { meetings.first { $0.id == id } ?? allMeetings.first { $0.id == id } }
 
     // MARK: - Countdown panel
 

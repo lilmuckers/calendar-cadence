@@ -11,8 +11,9 @@ Ideas that are parked, not planned. Newest decisions at the top.
 
 ## 🗂️ Backlog
 
-- **Widgets.** Notification Centre / desktop widget showing the next meeting and today's agenda.
-  Needs a WidgetKit extension, so an Xcode project (the app currently builds with the Command Line Tools only).
+- **Mac widgets.** Notification Centre / desktop widget showing the next meeting and today's agenda.
+  The iPhone app now has an Xcode project with a WidgetKit extension; a macOS target could reuse it.
+- **RSVP and colours on iPhone.** The phone's providers already support replies and colours; it needs the UI.
 
 ## ⏭️ Skipped
 

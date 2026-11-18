@@ -2,13 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleName</key>
-	<string>Cadence</string>
 	<key>CFBundleDisplayName</key>
 	<string>Cadence</string>
+	<key>CFBundleExecutable</key>
+	<string>Cadence</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.cadence.calendarmonitor</string>
-	<key>CFBundleExecutable</key>
+	<key>CFBundleName</key>
 	<string>Cadence</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
@@ -16,23 +18,27 @@
 	<string>0.1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
-	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.productivity</string>
-	<key>NSHighResolutionCapable</key>
-	<true/>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_cadence._tcp</string>
+	</array>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Cadence reads your calendars to show upcoming meetings, countdowns and join links.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Cadence reads your calendars to show upcoming meetings, countdowns and join links.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Cadence uses your location to estimate travel time to in-person meetings.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Cadence talks to Cadence on your iPhone so it can show your meetings on your desk.</string>
 	<key>NSLocationUsageDescription</key>
+	<string>Cadence uses your location to estimate travel time to in-person meetings.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Cadence uses your location to estimate travel time to in-person meetings.</string>
 </dict>
 </plist>

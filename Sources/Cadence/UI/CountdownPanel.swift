@@ -72,6 +72,7 @@ final class CountdownPanelController: NSObject, NSWindowDelegate {
         // With an "only within N minutes" window, an empty panel is pointless, so hide it.
         let idleVisible = !state.prefs.panelHidesWhenIdle && state.prefs.panelWithinMinutes == 0
         let visible = state.prefs.showPanel && (focus != nil && state.canShowAgenda || idleVisible)
+            && CompanionRouting.macShowsPanel(phoneDisplaying: state.companion.phoneDisplaying)
         resize(to: state.panelStyle, animated: panel.isVisible)
         if visible && !panel.isVisible {
             panel.alphaValue = 0

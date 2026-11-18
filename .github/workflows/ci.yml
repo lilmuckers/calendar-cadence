@@ -1,7 +1,10 @@
 name: CI
 
-# Runs the CadenceCore unit tests on every push to main and every pull request.
-# Deliberately test-only: building, signing and packaging the app lives in release.yml.
+# Runs on every push to main and every pull request:
+#   test — the CadenceCore unit tests on macOS.
+#   ios  — builds the iPhone app for the Simulator, then runs its unit tests there
+#          (the shared CadenceCore suite again, on iOS, plus the iPhone-only tests in iOS/Tests).
+# Building, signing and packaging the Mac app lives in release.yml.
 
 on:
   push:
@@ -13,6 +16,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Xcode every macOS job builds with, pinned so it doesn't drift with the runner image's default
+# (scripts/ci-select-xcode.sh fails if it isn't installed). 26.6 is the newest on macos-26; local
+# development is on Xcode 27, so CI also checks the code still builds on the older compiler.
+# Move to Xcode 27 once GitHub ships a stable macOS 27 runner (only the xcode-27 preview has it today).
+env:
+  XCODE_VERSION: "26.6"
+
 permissions:
   contents: read
   checks: write          # test results check run
@@ -21,11 +31,13 @@ permissions:
 jobs:
   test:
     name: Unit tests
-    # The app uses macOS 26 SDK APIs, so stay on the macOS 26 image (Xcode 26 / Swift 6.2+).
+    # The app uses macOS 26 SDK APIs, so stay on the macOS 26 image. Xcode is pinned above.
     runs-on: macos-26
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: scripts/ci-select-xcode.sh
 
       - name: Toolchain
         run: |
@@ -50,4 +62,49 @@ jobs:
         with:
           name: junit
           path: build/junit.xml
+          if-no-files-found: warn
+
+  ios:
+    name: iPhone build and tests
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: scripts/ci-select-xcode.sh
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes available
+
+      # Unsigned Simulator build of the app and its widget extension (no team or certificates needed).
+      - name: Build iPhone app
+        run: scripts/ios-build.sh
+
+      - name: Run iPhone tests
+        run: scripts/ios-test.sh --result-bundle build/ios-tests.xcresult
+
+      - name: Convert test results
+        if: ${{ !cancelled() }}
+        run: |
+          if [[ -d build/ios-tests.xcresult ]]; then
+            scripts/xcresult-junit.py build/ios-tests.xcresult build/ios-junit.xml
+          fi
+
+      - name: Publish test results
+        if: ${{ !cancelled() }}
+        uses: EnricoMi/publish-unit-test-result-action/macos@v2
+        with:
+          files: build/ios-junit.xml
+          check_name: iPhone unit test results
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-tests
+          path: |
+            build/ios-junit.xml
+            build/ios-tests.xcresult
           if-no-files-found: warn

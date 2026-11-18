@@ -1,4 +1,3 @@
-import AppKit
 import CadenceCore
 import CryptoKit
 import Foundation
@@ -59,7 +58,7 @@ final class MicrosoftAuth {
     /// Injected by scripts/build.sh from MICROSOFT_CLIENT_ID, if set at build time.
     static let bundledClientID: String? = {
         let id = Bundle.main.infoDictionary?["CadenceMicrosoftClientID"] as? String
-        return id?.isEmpty == false ? id : nil
+        return id?.isEmpty == false && id?.hasPrefix("$(") == false ? id : nil
     }()
 
     var customClientID: String? {
@@ -115,6 +114,20 @@ final class MicrosoftAuth {
 
     // MARK: Sign in
 
+    #if os(macOS)
+    /// Microsoft matches "http://localhost" redirect URIs on any port.
+    static func redirectSession() async throws -> OAuthRedirectSession {
+        try await LoopbackRedirectSession.start(host: "localhost")
+    }
+    #else
+    /// Add this redirect under the app registration's "iOS / macOS" platform.
+    static var redirectURI: String { "msauth.\(Bundle.main.bundleIdentifier ?? "com.cadence.companion")://auth" }
+
+    static func redirectSession() async throws -> OAuthRedirectSession {
+        WebRedirectSession(redirectURI: redirectURI)
+    }
+    #endif
+
     @discardableResult
     func signIn() async throws -> MicrosoftAccount {
         guard let clientID else { throw AuthError.missingClient }
@@ -122,10 +135,8 @@ final class MicrosoftAuth {
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64URL
         let state = GoogleAuth.randomURLSafe(24)
 
-        let server = LoopbackServer()
-        let port = try await server.start()
-        // Microsoft matches "http://localhost" redirect URIs on any port.
-        let redirect = "http://localhost:\(port)"
+        let session = try await Self.redirectSession()
+        let redirect = session.redirectURI
 
         var comps = URLComponents(string: "\(Self.authority)/authorize")!
         comps.queryItems = [
@@ -139,9 +150,7 @@ final class MicrosoftAuth {
             .init(name: "state", value: state),
             .init(name: "prompt", value: "select_account"),
         ]
-        NSWorkspace.shared.open(comps.url!)
-
-        let callback = try await server.waitForCallback()
+        let callback = try await session.authorize(comps.url!)
         let items = callback.queryItems ?? []
         if let error = items.first(where: { $0.name == "error" })?.value {
             throw AuthError.denied(items.first { $0.name == "error_description" }?.value ?? error)

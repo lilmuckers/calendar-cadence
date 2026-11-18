@@ -1,6 +1,7 @@
-import AppKit
 import CadenceCore
 import SwiftUI
+
+// Shared by the Mac's takeover and the iPhone's full-screen alert.
 
 /// Where each breakable character sits on screen, collected from the views that draw them.
 struct GlyphAnchorKey: PreferenceKey {
@@ -13,11 +14,12 @@ struct GlyphAnchorKey: PreferenceKey {
 enum GlyphStyle {
     case heading, title, countdown
 
-    func font(level: Double) -> Font {
+    /// `scale` shrinks everything together (the phone's screen is smaller than the Mac's).
+    func font(level: Double, scale: Double = 1) -> Font {
         switch self {
-        case .heading: .system(size: 15 + 5 * level, weight: .heavy)
-        case .title: .system(size: 40, weight: .bold, design: .rounded)
-        case .countdown: .system(size: 88, weight: .semibold, design: .rounded).monospacedDigit()
+        case .heading: .system(size: (15 + 5 * level) * scale, weight: .heavy)
+        case .title: .system(size: 40 * scale, weight: .bold, design: .rounded)
+        case .countdown: .system(size: 88 * scale, weight: .semibold, design: .rounded).monospacedDigit()
         }
     }
 }
@@ -37,9 +39,13 @@ final class MeltdownModel {
     private var nextLetter: Date?
     private var nextDigit: Date?
 
+    /// What broke off, for a sound or a haptic.
+    enum Break { case letter, digit }
+
     /// `glyphs` maps each still-breakable character id to its frame (root coordinates) and character.
+    /// `ringRadius` is the inside of the ring the countdown's loose characters rattle around in.
     func tick(date: Date, secondsLate: TimeInterval, glyphs: [String: (CGRect, Character, GlyphStyle)],
-              ringCenter: CGPoint?, screen: CGSize, sound: Bool) {
+              ringCenter: CGPoint?, ringRadius: Double = 124, screen: CGSize, onBreak: ((Break) -> Void)? = nil) {
         let dt = lastTick.map { min(1.0 / 20, max(0, date.timeIntervalSince($0))) } ?? 0
         lastTick = date
         guard Meltdown.isActive(secondsLate: secondsLate) else { return }
@@ -59,7 +65,7 @@ final class MeltdownModel {
                 fallingGlyph[id] = (g.1, g.2)
                 falling.append(.launch(id: id, from: Vec2(g.0.midX, g.0.midY),
                                        r: (.random(in: 0...1), .random(in: 0...1), .random(in: 0...1))))
-                if sound { NSSound(named: "Pop")?.play() }
+                onBreak?(.letter)
             }
         }
 
@@ -75,7 +81,7 @@ final class MeltdownModel {
                                           position: Vec2(frame.midX - ringCenter.x, frame.midY - ringCenter.y),
                                           velocity: Vec2(.random(in: -300...300), .random(in: -500 ... -150)),
                                           spin: .random(in: -6...6)))
-                if sound { NSSound(named: "Tink")?.play() }
+                onBreak?(.digit)
             }
         }
 
@@ -87,7 +93,7 @@ final class MeltdownModel {
         let violence = 7000 + 9000 * progress
         for i in bottle.indices {
             let kick = Vec2(.random(in: -1...1), .random(in: -1...1)) * violence
-            bottle[i].step(dt: dt, radius: 124, shake: kick)
+            bottle[i].step(dt: dt, radius: ringRadius, shake: kick)
         }
     }
 }
@@ -189,22 +195,39 @@ struct CenteredFlow: Layout {
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width ?? .infinity
         let rows = rows(subviews, width: width)
-        let widest = rows.map { r in r.map(\.1.width).reduce(0, +) + spacing * CGFloat(max(0, r.count - 1)) }.max() ?? 0
-        let height = rows.map { $0.map(\.1.height).max() ?? 0 }.reduce(0, +) + lineSpacing * CGFloat(max(0, rows.count - 1))
+        var widest: CGFloat = 0
+        var height: CGFloat = 0
+        for row in rows {
+            widest = max(widest, rowWidth(row))
+            height += rowHeight(row)
+        }
+        height += lineSpacing * CGFloat(max(0, rows.count - 1))
         return CGSize(width: min(widest, width), height: height)
+    }
+
+    // Spelled out with explicit types: the one-line map/reduce versions time out the type checker on slower machines (CI).
+    private func rowWidth(_ row: [(Int, CGSize)]) -> CGFloat {
+        var total: CGFloat = 0
+        for (_, size) in row { total += size.width }
+        return total + spacing * CGFloat(max(0, row.count - 1))
+    }
+
+    private func rowHeight(_ row: [(Int, CGSize)]) -> CGFloat {
+        var tallest: CGFloat = 0
+        for (_, size) in row { tallest = max(tallest, size.height) }
+        return tallest
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         var y = bounds.minY
         for row in rows(subviews, width: bounds.width) {
-            let rowWidth = row.map(\.1.width).reduce(0, +) + spacing * CGFloat(max(0, row.count - 1))
-            let rowHeight = row.map(\.1.height).max() ?? 0
-            var x = bounds.midX - rowWidth / 2
+            let w = rowWidth(row), h = rowHeight(row)
+            var x = bounds.midX - w / 2
             for (i, size) in row {
-                subviews[i].place(at: CGPoint(x: x, y: y + (rowHeight - size.height) / 2), proposal: ProposedViewSize(size))
+                subviews[i].place(at: CGPoint(x: x, y: y + (h - size.height) / 2), proposal: ProposedViewSize(size))
                 x += size.width + spacing
             }
-            y += rowHeight + lineSpacing
+            y += h + lineSpacing
         }
     }
 }

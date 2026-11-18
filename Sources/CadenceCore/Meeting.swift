@@ -75,7 +75,7 @@ public enum CalendarKind: String, Codable, Sendable {
 }
 
 /// A calendar the user can toggle on or off.
-public struct CalendarInfo: Identifiable, Hashable, Sendable {
+public struct CalendarInfo: Identifiable, Hashable, Codable, Sendable {
     public var id: String
     public var title: String
     public var sourceTitle: String
@@ -92,7 +92,7 @@ public struct CalendarInfo: Identifiable, Hashable, Sendable {
 }
 
 /// A provider-agnostic calendar event.
-public struct Meeting: Identifiable, Hashable, Sendable {
+public struct Meeting: Identifiable, Hashable, Codable, Sendable {
     /// Unique per occurrence (recurring events share an EventKit identifier, so the start time is folded in).
     public var id: String
     public var title: String

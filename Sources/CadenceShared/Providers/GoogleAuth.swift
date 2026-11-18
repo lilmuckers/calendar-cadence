@@ -1,8 +1,6 @@
-import AppKit
 import CryptoKit
 import Foundation
 import CadenceCore
-import Network
 import Observation
 
 /// A signed-in Google account. The refresh token lives in the Keychain under `refreshKey`.
@@ -28,7 +26,15 @@ struct GoogleAccount: Codable, Identifiable, Equatable {
 final class GoogleAuth {
     struct Credentials: Equatable {
         var clientID: String
+        /// Empty for iOS clients, which have no secret.
         var clientSecret: String
+
+        func form(_ fields: [String: String]) -> [String: String] {
+            var out = fields
+            out["client_id"] = clientID
+            if !clientSecret.isEmpty { out["client_secret"] = clientSecret }
+            return out
+        }
     }
 
     enum AuthError: LocalizedError {
@@ -73,8 +79,12 @@ final class GoogleAuth {
     var customCredentials: Credentials? {
         let id = UserDefaults.standard.string(forKey: "Cadence.google.clientID") ?? ""
         let secret = Keychain.get(Self.secretKey) ?? ""
-        return id.isEmpty || secret.isEmpty ? nil : Credentials(clientID: id, clientSecret: secret)
+        return id.isEmpty || (Self.needsSecret && secret.isEmpty) ? nil : Credentials(clientID: id, clientSecret: secret)
     }
+
+    #if os(macOS)
+    /// Desktop clients use a (non-confidential) secret; iOS clients don't have one.
+    static let needsSecret = true
 
     /// Injected by scripts/build.sh from GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, if set at build time.
     static let bundledCredentials: Credentials? = {
@@ -83,6 +93,29 @@ final class GoogleAuth {
               let secret = info?["CadenceGoogleClientSecret"] as? String, !secret.isEmpty else { return nil }
         return Credentials(clientID: id, clientSecret: secret)
     }()
+
+    static func redirectSession(clientID: String) async throws -> OAuthRedirectSession {
+        try await LoopbackRedirectSession.start(host: "127.0.0.1")
+    }
+    #else
+    static let needsSecret = false
+
+    /// From GOOGLE_IOS_CLIENT_PREFIX (an "iOS" type client) in iOS/Config/Local.xcconfig.
+    static let bundledCredentials: Credentials? = {
+        guard let prefix = Bundle.main.infoDictionary?["CadenceGoogleIOSClientPrefix"] as? String,
+              !prefix.isEmpty, !prefix.hasPrefix("$(") else { return nil }
+        return Credentials(clientID: prefix + ".apps.googleusercontent.com", clientSecret: "")
+    }()
+
+    /// iOS clients redirect to the reversed client ID: com.googleusercontent.apps.<id>:/oauth2redirect.
+    static func redirectScheme(clientID: String) -> String {
+        "com.googleusercontent.apps." + clientID.replacingOccurrences(of: ".apps.googleusercontent.com", with: "")
+    }
+
+    static func redirectSession(clientID: String) async throws -> OAuthRedirectSession {
+        WebRedirectSession(redirectURI: redirectScheme(clientID: clientID) + ":/oauth2redirect")
+    }
+    #endif
 
     var hasBundledClient: Bool { Self.bundledCredentials != nil }
 
@@ -168,9 +201,8 @@ final class GoogleAuth {
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64URL
         let state = Self.randomURLSafe(24)
 
-        let server = LoopbackServer()
-        let port = try await server.start()
-        let redirect = "http://127.0.0.1:\(port)"
+        let session = try await Self.redirectSession(clientID: creds.clientID)
+        let redirect = session.redirectURI
 
         var comps = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
         comps.queryItems = [
@@ -185,9 +217,7 @@ final class GoogleAuth {
             // Always show the account chooser so a second account can be added.
             .init(name: "prompt", value: "select_account consent"),
         ]
-        NSWorkspace.shared.open(comps.url!)
-
-        let callback = try await server.waitForCallback()
+        let callback = try await session.authorize(comps.url!)
         let items = callback.queryItems ?? []
         if let error = items.first(where: { $0.name == "error" })?.value { throw AuthError.denied(error) }
         guard items.first(where: { $0.name == "state" })?.value == state,
@@ -195,14 +225,12 @@ final class GoogleAuth {
             throw AuthError.badResponse("missing code")
         }
 
-        let response = try await tokenRequest([
+        let response = try await tokenRequest(creds.form([
             "code": code,
-            "client_id": creds.clientID,
-            "client_secret": creds.clientSecret,
             "redirect_uri": redirect,
             "grant_type": "authorization_code",
             "code_verifier": verifier,
-        ])
+        ]))
         guard let refresh = response.refresh_token else { throw AuthError.badResponse("no refresh token") }
         let email = response.id_token.flatMap(JWT.email(in:))
 
@@ -229,12 +257,10 @@ final class GoogleAuth {
             throw AuthError.clientChanged
         }
         do {
-            let response = try await tokenRequest([
-                "client_id": creds.clientID,
-                "client_secret": creds.clientSecret,
+            let response = try await tokenRequest(creds.form([
                 "refresh_token": refresh,
                 "grant_type": "refresh_token",
-            ])
+            ]))
             tokens[account.id] = (response.access_token, Date().addingTimeInterval(response.expires_in ?? 3600))
             needsReconnect.remove(account.id)
             if let scope = response.scope { setCanWrite(scope.contains(Self.writeScope), for: account.id) }
@@ -287,61 +313,6 @@ extension Data {
     var base64URL: String {
         base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
-    }
-}
-
-/// One-shot HTTP server on the loopback interface that captures the OAuth redirect.
-final class LoopbackServer: @unchecked Sendable {
-    private let queue = DispatchQueue(label: "cadence.oauth.loopback")
-    private var listener: NWListener?
-
-    func start() async throws -> UInt16 {
-        // Listen on every loopback address (IPv4 and IPv6) so both http://127.0.0.1 and
-        // http://localhost redirects reach us; nothing off this Mac can connect.
-        let params = NWParameters.tcp
-        params.acceptLocalOnly = true
-        let listener = try NWListener(using: params, on: .any)
-        self.listener = listener
-        return try await withCheckedThrowingContinuation { cont in
-            let once = Once()
-            listener.stateUpdateHandler = { state in
-                switch state {
-                case .ready: once.run { cont.resume(returning: listener.port?.rawValue ?? 0) }
-                case .failed(let error): once.run { cont.resume(throwing: error) }
-                default: break
-                }
-            }
-            listener.newConnectionHandler = { _ in }
-            listener.start(queue: queue)
-        }
-    }
-
-    /// Waits (up to 5 minutes) for the browser to hit the redirect URL.
-    func waitForCallback() async throws -> URLComponents {
-        guard let listener else { throw URLError(.cannotConnectToHost) }
-        defer { listener.cancel() }
-        return try await withCheckedThrowingContinuation { cont in
-            let once = Once()
-            let finish: @Sendable (Result<URLComponents, Error>) -> Void = { result in
-                once.run { cont.resume(with: result) }
-            }
-            queue.asyncAfter(deadline: .now() + 300) { finish(.failure(URLError(.timedOut))) }
-            listener.newConnectionHandler = { [queue] connection in
-                connection.start(queue: queue)
-                connection.receive(minimumIncompleteLength: 1, maximumLength: 16_384) { data, _, _, _ in
-                    let request = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-                    let path = request.split(separator: " ").dropFirst().first.map(String.init) ?? "/"
-                    let comps = URLComponents(string: "http://127.0.0.1\(path)")
-                    let isCallback = comps?.queryItems?.contains { $0.name == "code" || $0.name == "error" } == true
-                    let body = isCallback
-                        ? OAuthLandingPage.html(error: comps?.queryItems?.first { $0.name == "error" }?.value)
-                        : ""
-                    let response = "HTTP/1.1 \(isCallback ? "200 OK" : "404 Not Found")\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
-                    connection.send(content: Data(response.utf8), completion: .contentProcessed { _ in connection.cancel() })
-                    if isCallback, let comps { finish(.success(comps)) }
-                }
-            }
-        }
     }
 }
 
