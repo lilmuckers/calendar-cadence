@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="referrer" content="no-referrer">
+  <title>Cadence — connecting Slack</title>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <style>
+    body { font: 16px -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 20vh 16px; color: #222; background: #fff; }
+    @media (prefers-color-scheme: dark) { body { color: #eee; background: #1c1c1e; } a { color: #6ab0ff; } }
+  </style>
+  <script>
+    // Slack only allows HTTPS redirects for distributed apps, so it sends you here and this page hands
+    // the result straight to Cadence, which is listening on this Mac only. The sign-in is protected by
+    // PKCE: the code below is useless without the secret Cadence kept to itself. Nothing is stored or sent elsewhere.
+    (function () {
+      var q = new URLSearchParams(location.search);
+      if (!q.get("state") || !(q.get("code") || q.get("error"))) return;
+      var target = "http://localhost:53682/slack" + location.search;
+      window.__cadenceTarget = target;
+      location.replace(target);
+    })();
+  </script>
+</head>
+<body>
+  <h2>Handing you back to Cadence…</h2>
+  <p id="fallback">If nothing happens, make sure Cadence is open and try signing in to Slack again.</p>
+  <script>
+    if (window.__cadenceTarget) {
+      document.getElementById("fallback").innerHTML = 'If nothing happens, <a id="go">click here</a>.';
+      document.getElementById("go").href = window.__cadenceTarget;
+    } else {
+      document.getElementById("fallback").textContent = "This page finishes signing Cadence in to Slack. There's nothing to do here on its own.";
+    }
+  </script>
+</body>
+</html>
