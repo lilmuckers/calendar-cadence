@@ -23,6 +23,8 @@ protocol CalendarProvider: AnyObject {
     /// Whether this source can store an event colour (otherwise Cadence keeps it locally).
     func canSetColor(_ meeting: Meeting) -> Bool
     func setColor(_ meeting: Meeting, _ choice: EventColorChoice?) async throws
+    /// The colours this source offers for `meeting` with its own names (Google colour labels), or nil for the standard palette.
+    func colorChoices(for meeting: Meeting) -> [EventColorChoice]?
 }
 
 enum ProviderError: LocalizedError {
@@ -46,6 +48,7 @@ extension CalendarProvider {
     func respond(_ meeting: Meeting, _ reply: RSVP) async throws { throw ProviderError.unsupported }
     func canSetColor(_ meeting: Meeting) -> Bool { false }
     func setColor(_ meeting: Meeting, _ choice: EventColorChoice?) async throws { throw ProviderError.unsupported }
+    func colorChoices(for meeting: Meeting) -> [EventColorChoice]? { nil }
 
     func owns(_ meeting: Meeting) -> Bool { calendars().contains { $0.id == meeting.calendar.id } }
 }

@@ -102,7 +102,8 @@ The moment Cadence spots two meetings that overlap — real clashes, not the sam
 Each morning Cadence gathers every invite still waiting for a reply and asks you, in one card: **Accept**, **Maybe** or **Decline**. The organiser gets your reply as usual. A new invite gets the same card (or a notification with reply buttons) as soon as it arrives.
 
 - **How far ahead to look:** today, the next 2 days, a week, or all time.
-- **Colour while you're at it.** Turn on the 🎨 palette next to a calendar and its invites show Google's eleven event colours too. Right-click any event for **Colour ▸** at any time.
+- **Colour while you're at it.** Turn on the 🎨 palette next to a calendar and its invites show Google's eleven event colours too, under the names you gave them in Google Calendar's colour labels (plus any custom label colours). Right-click any event for **Colour ▸** at any time.
+- **Instant feedback.** The button or swatch you press lights up straight away, a line sweeps along the row while Google or Microsoft saves it, and the row flashes when it's done.
 - Replies go straight to **Google** and **Microsoft 365** accounts signed in under *Accounts*. Invites that only come through macOS Calendar open in Calendar, because Apple doesn't let other apps reply.
 
 <br clear="right">

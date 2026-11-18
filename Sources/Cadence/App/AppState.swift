@@ -245,6 +245,14 @@ final class AppState {
         var shown = allMeetings.filter { prefs.filters.allows($0) }
         if !prefs.useEventColors { shown = shown.map { var m = $0; m.eventColor = nil; return m } }
         shown = shown.map(applyLocalColor)
+        if !pendingColors.isEmpty {
+            shown = shown.map { m in
+                guard let p = pendingColors[colorKey(m)] else { return m }
+                var m = m
+                m.eventColor = p.color
+                return m
+            }
+        }
         meetings = MeetingDeduplicator.dedupe(shown)
         agendaOnlyIDs = prefs.filters.agendaOnlyIDs(in: meetings, sources: shown)
         activeMeetings = agendaOnlyIDs.isEmpty ? meetings : meetings.filter { !agendaOnlyIDs.contains($0.id) }
@@ -323,7 +331,7 @@ final class AppState {
             openInCalendar(meeting)
             return
         }
-        try await provider.respond(target, reply)
+        try await track(meeting.id) { try await provider.respond(target, reply) }
         onInviteAnswered?(meeting.id)
         answered.insert(meeting.seriesID)
         allMeetings = allMeetings.map { m in
@@ -337,14 +345,63 @@ final class AppState {
     }
 
     /// Colour an event: stored in Google when possible, otherwise kept by Cadence. nil = back to the calendar colour.
+    /// The new colour shows at once while the source saves it; it snaps back if the save fails.
     func setColor(_ meeting: Meeting, _ choice: EventColorChoice?) async throws {
-        if let (provider, target) = actionable(meeting, { $0.canSetColor($1) }) {
-            try await provider.setColor(target, choice)
-            prefs.localEventColors[colorKey(meeting)] = nil
-        } else {
-            prefs.localEventColors[colorKey(meeting)] = choice?.id
+        let key = colorKey(meeting)
+        pendingColors[key] = PendingColor(color: choice?.color)
+        recompute()
+        defer {
+            pendingColors[key] = nil
+            recompute()
+        }
+        try await track(meeting.id) {
+            if let (provider, target) = actionable(meeting, { $0.canSetColor($1) }) {
+                try await provider.setColor(target, choice)
+                prefs.localEventColors[key] = nil
+            } else {
+                prefs.localEventColors[key] = choice?.id
+            }
         }
         rebuildInvites(announce: false)
+    }
+
+    /// The colours offered for `meeting`, named as its calendar names them (Google colour labels).
+    func colorChoices(for meeting: Meeting) -> [EventColorChoice] {
+        if let (provider, target) = actionable(meeting, { $0.canSetColor($1) }), let choices = provider.colorChoices(for: target) {
+            return choices
+        }
+        return EventColorChoice.palette
+    }
+
+    /// The choice matching `meeting`'s current colour, if any.
+    func currentColor(of meeting: Meeting, in choices: [EventColorChoice]) -> EventColorChoice? {
+        meeting.eventColor.flatMap { c in choices.first { $0.color == c } }
+    }
+
+    // MARK: - Save feedback
+
+    enum SaveState: Equatable { case saving, saved }
+
+    /// Meeting id → a reply or colour change being saved, or just saved (for the "done" flash).
+    private(set) var saveStates: [String: SaveState] = [:]
+    /// Colour key → the colour being saved, shown before the source confirms it.
+    private var pendingColors: [String: PendingColor] = [:]
+    private struct PendingColor { var color: RGBAColor? }
+
+    /// Runs a save for `id`, marking it saving, then briefly saved.
+    func track(_ id: String, _ work: () async throws -> Void) async throws {
+        saveStates[id] = .saving
+        do {
+            try await work()
+        } catch {
+            saveStates[id] = nil
+            throw error
+        }
+        saveStates[id] = .saved
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(1.1))
+            if self?.saveStates[id] == .saved { self?.saveStates[id] = nil }
+        }
     }
 
     func wantsColorPrompt(_ meeting: Meeting) -> Bool { prefs.colorPromptCalendarIDs.contains(meeting.calendar.id) }
@@ -793,7 +850,7 @@ final class AppState {
         browsers.refresh()
         guard let route = joinRoute(for: meeting) else { return }
         switch route {
-        case .native(let url), .defaultBrowser(let url): NSWorkspace.shared.open(url)
+        case .native(let url), .defaultBrowser(let url): BrowserLauncher.open(url)
         case .profile(let profile, let url): BrowserLauncher.open(url, in: profile)
         }
     }
@@ -811,7 +868,7 @@ final class AppState {
             case .series: prefs.profileRules.series[meeting.seriesID] = profile.id
             }
         }
-        if let profile { BrowserLauncher.open(link.url, in: profile) } else { NSWorkspace.shared.open(link.url) }
+        if let profile { BrowserLauncher.open(link.url, in: profile) } else { BrowserLauncher.open(link.url) }
     }
 
     /// Drops any per-meeting or per-series choice for `meeting`.
@@ -835,7 +892,7 @@ final class AppState {
         let base = meeting.id.split(separator: "@").first.map(String.init) ?? meeting.id
         if let encoded = base.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
            let url = URL(string: "ical://ekevent/\(encoded)?method=show&options=more") {
-            NSWorkspace.shared.open(url)
+            BrowserLauncher.open(url)
         } else if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") {
             NSWorkspace.shared.openApplication(at: app, configuration: .init())
         }

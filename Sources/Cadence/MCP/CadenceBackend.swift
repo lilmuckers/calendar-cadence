@@ -176,9 +176,14 @@ final class CadenceBackend: MCPBackend {
             perform = { try await self.state.respond(m, reply) }
         case "set_event_color":
             let raw = a["color"]?.stringValue
-            let choice = raw.flatMap { name in EventColorChoice.palette.first { $0.name.caseInsensitiveCompare(name) == .orderedSame } }
+            // The calendar's own label names win; Google's standard names still work.
+            let choices = state.colorChoices(for: m)
+            let choice = raw.flatMap { name in
+                choices.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+                    ?? choices.first { EventColorChoice.choice(id: $0.id)?.name.caseInsensitiveCompare(name) == .orderedSame }
+            }
             if raw != nil && choice == nil {
-                throw MCPToolError("Unknown colour. Use one of: " + EventColorChoice.palette.map(\.name).joined(separator: ", ") + ", or null.")
+                throw MCPToolError("Unknown colour. Use one of: " + choices.map(\.detail).joined(separator: ", ") + ", or null.")
             }
             summary = choice.map { "Colour it \($0.name)" } ?? "Reset it to the calendar colour"
             perform = { try await self.state.setColor(m, choice) }

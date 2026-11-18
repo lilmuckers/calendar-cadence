@@ -49,7 +49,7 @@ enum ScreenshotRenderer {
         model.reason = .daily
         state.prefs.colorPromptCalendarIDs = [demo.work.id]
         render(InviteReviewView(model: model, close: {}, changed: {}), state: state, name: "invites", to: dir,
-               size: CGSize(width: 360, height: 76 + 116 + 84 + 84), wallpaper: true, pad: 28)
+               size: CGSize(width: 360, height: 76 + 134 + 88 + 88), wallpaper: true, pad: 28)
         state.prefs.colorPromptCalendarIDs = []
 
         // The three moods of the menu bar icon, big.

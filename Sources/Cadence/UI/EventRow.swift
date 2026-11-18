@@ -92,7 +92,11 @@ struct EventRow: View {
             .contentShape(Rectangle())
             .onTapGesture { if canExpand { toggle() } }
 
-            if isLive {
+            if let save = state.saveStates[meeting.id] {
+                SaveIndicator(state: save, tint: meeting.tint)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 6)
+            } else if isLive {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(meeting.tint.opacity(0.18))
@@ -115,6 +119,8 @@ struct EventRow: View {
             RoundedRectangle(cornerRadius: Theme.rowCorner, style: .continuous)
                 .fill(background)
         )
+        .saveFlash(state.saveStates[meeting.id], tint: meeting.tint)
+        .animation(.easeOut(duration: 0.25), value: meeting.eventColor)
         .opacity(isPast && !expanded ? 0.45 : 1)
         .onHover { hovering = $0 }
         .contextMenu {

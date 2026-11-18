@@ -80,23 +80,45 @@ final class BrowserProfileStore {
 }
 
 enum BrowserLauncher {
+    /// Opens `url` in whatever handles it (default browser, Zoom, Calendar…) and brings that app
+    /// and its new tab or window to the front.
+    ///
+    /// Since macOS 14 activation is cooperative: an app only comes forward if the active app hands
+    /// over. Cadence is a menu bar app whose panels don't activate it, so without this the browser
+    /// often opened the link behind whatever you were using.
+    @MainActor
+    static func open(_ url: URL) {
+        let ws = NSWorkspace.shared
+        let bundleID = ws.urlForApplication(toOpen: url).flatMap { Bundle(url: $0)?.bundleIdentifier }
+        handOver(to: bundleID)
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+        ws.open(url, configuration: config) { app, _ in
+            let id = app?.bundleIdentifier ?? bundleID
+            DispatchQueue.main.async { if let id { bringForward(id) } }
+        }
+    }
+
     /// Opens `url` in `profile`, falling back to the default browser if anything goes wrong.
+    @MainActor
     static func open(_ url: URL, in profile: BrowserProfile) {
         let ws = NSWorkspace.shared
-        guard let app = ws.urlForApplication(withBundleIdentifier: profile.browser.bundleID),
+        let bundleID = profile.browser.bundleID
+        guard let app = ws.urlForApplication(withBundleIdentifier: bundleID),
               let exe = Bundle(url: app)?.executableURL else {
-            ws.open(url)
+            open(url)
             return
         }
         let args = profile.launchArguments(for: url)
-        let running = !NSRunningApplication.runningApplications(withBundleIdentifier: profile.browser.bundleID).isEmpty
+        handOver(to: bundleID)
+        let running = !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
         guard running else {
             // Not running: a normal launch delivers the arguments and keeps the browser independent of Cadence.
             let config = NSWorkspace.OpenConfiguration()
             config.arguments = args
             config.activates = true
             ws.openApplication(at: app, configuration: config) { _, error in
-                if error != nil { DispatchQueue.main.async { ws.open(url) } }
+                DispatchQueue.main.async { if error != nil { open(url) } else { bringForward(bundleID) } }
             }
             return
         }
@@ -109,11 +131,32 @@ enum BrowserLauncher {
         process.standardError = FileHandle.nullDevice
         do {
             try process.run()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                NSRunningApplication.runningApplications(withBundleIdentifier: profile.browser.bundleID).first?.activate()
-            }
+            bringForward(bundleID, after: 0.25)
         } catch {
-            ws.open(url)
+            open(url)
+        }
+    }
+
+    /// Makes Cadence the active app for a moment (you just clicked it, so macOS allows that) and
+    /// lets it pass activation on to `bundleID`.
+    @MainActor
+    private static func handOver(to bundleID: String?) {
+        if !NSApp.isActive { NSApp.activate() }
+        if let bundleID { NSApp.yieldActivation(toApplicationWithBundleIdentifier: bundleID) }
+    }
+
+    /// Activates `bundleID`'s frontmost window, which is where the browser just put the link. Tries
+    /// a few times: a running browser can take a moment to take the URL, and may not be listed yet.
+    @MainActor
+    static func bringForward(_ bundleID: String, after delay: TimeInterval = 0, attempts: Int = 5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first else {
+                if attempts > 1 { bringForward(bundleID, after: 0.3, attempts: attempts - 1) }
+                return
+            }
+            if app.isActive { return }
+            if !app.activate(from: .current, options: []) { app.activate() }
+            if attempts > 1 { bringForward(bundleID, after: 0.3, attempts: attempts - 1) }
         }
     }
 }

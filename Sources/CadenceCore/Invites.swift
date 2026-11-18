@@ -49,14 +49,18 @@ public enum InviteHorizon: String, Codable, CaseIterable, Sendable {
 /// A colour the user can give an event.
 public struct EventColorChoice: Identifiable, Hashable, Sendable {
     /// Google's colorId for the colour, which is also the key for local overrides.
+    /// Custom label colours (no colorId) use "label:<label id>".
     public var id: String
     public var name: String
     public var color: RGBAColor
+    /// The Google colour label this choice sets (`eventLabelId`), when the calendar has labels.
+    public var labelID: String?
 
-    public init(id: String, name: String, color: RGBAColor) {
+    public init(id: String, name: String, color: RGBAColor, labelID: String? = nil) {
         self.id = id
         self.name = name
         self.color = color
+        self.labelID = labelID
     }
 
     /// Google Calendar's eleven event colours, in the order its colour menu lists them.
@@ -66,6 +70,30 @@ public struct EventColorChoice: Identifiable, Hashable, Sendable {
     ].map { EventColorChoice(id: $0.0, name: $0.1, color: GoogleMapper.eventColor(id: $0.0)!) }
 
     public static func choice(id: String) -> EventColorChoice? { palette.first { $0.id == id } }
+
+    /// The palette as one calendar labels it: a label on one of the standard colours renames that
+    /// swatch; a label with a colour of its own is added after them.
+    public static func palette(labels: [GoogleEventLabel]) -> [EventColorChoice] {
+        var out = palette
+        for label in labels {
+            let hex = GoogleMapper.normalisedHex(label.backgroundColor)
+            let name = label.name?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            if let hex, let i = out.firstIndex(where: { $0.labelID == nil && GoogleMapper.eventColors[$0.id] == hex }) {
+                out[i].labelID = label.id
+                if let name { out[i].name = name }
+            } else if hex != nil {
+                out.append(EventColorChoice(id: "label:\(label.id)", name: name ?? "Custom colour",
+                                            color: GoogleMapper.color(hex: hex), labelID: label.id))
+            }
+        }
+        return out
+    }
+
+    /// "Sage" for an unlabelled standard colour; "Focus time (Sage)" when the calendar renamed it.
+    public var detail: String {
+        guard let base = Self.choice(id: id)?.name, base != name else { return name }
+        return "\(name) (\(base))"
+    }
 }
 
 public enum InvitePlanner {
