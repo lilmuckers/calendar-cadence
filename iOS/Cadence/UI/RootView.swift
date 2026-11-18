@@ -15,6 +15,11 @@ struct RootView: View {
                 AgendaScreen(showSettings: $showSettings, showPairing: $showPairing)
                     .transition(.opacity)
             }
+            if !state.desk.isOn {
+                // Desk mode places the strip itself (bottom in portrait, agenda column in landscape).
+                VStack { Spacer(); PromptStrip(style: .strip) }
+                    .zIndex(5)
+            }
             if let alerting = state.alerting {
                 AlertOverlay(meeting: alerting)
                     .transition(.opacity.combined(with: .scale(scale: 1.04)))
@@ -89,6 +94,13 @@ private struct AgendaScreen: View {
                 Label(state.link.mac?.name ?? "Mac", systemImage: "laptopcomputer")
                 Spacer()
                 Text(statusText).font(.caption).foregroundStyle(.secondary)
+            }
+            if state.link.needsRescan {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Can't reach your Mac. Make sure Cadence is open on it and you're on the same Wi-Fi, or scan its pairing code again.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Scan Pairing Code") { showPairing = true }.font(.callout)
+                }
             }
         }
     }

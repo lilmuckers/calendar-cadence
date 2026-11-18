@@ -12,11 +12,18 @@ public struct PairingInvite: Equatable, Sendable {
     public var macID: String
     public var macName: String
     public var key: Data
+    /// The Mac's LAN addresses and listening port, so the phone can dial it directly when Bonjour
+    /// can't find it (networks or security software that drop multicast DNS). Optional: older invites
+    /// don't carry them.
+    public var hosts: [String]
+    public var port: UInt16?
 
-    public init(macID: String, macName: String, key: Data) {
+    public init(macID: String, macName: String, key: Data, hosts: [String] = [], port: UInt16? = nil) {
         self.macID = macID
         self.macName = macName
         self.key = key
+        self.hosts = hosts
+        self.port = port
     }
 
     public var url: URL {
@@ -28,7 +35,7 @@ public struct PairingInvite: Equatable, Sendable {
             .init(name: "id", value: macID),
             .init(name: "name", value: macName),
             .init(name: "k", value: Self.base64URL(key)),
-        ]
+        ] + hosts.map { .init(name: "h", value: $0) } + (port.map { [.init(name: "p", value: String($0))] } ?? [])
         return c.url!
     }
 
@@ -38,7 +45,9 @@ public struct PairingInvite: Equatable, Sendable {
         func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
         guard let id = value("id"), !id.isEmpty,
               let k = value("k").flatMap(Self.data(base64URL:)), k.count == Self.keyLength else { return nil }
-        self.init(macID: id, macName: value("name") ?? "Mac", key: k)
+        self.init(macID: id, macName: value("name") ?? "Mac", key: k,
+                  hosts: items.filter { $0.name == "h" }.compactMap(\.value).filter { !$0.isEmpty },
+                  port: value("p").flatMap(UInt16.init).flatMap { $0 == 0 ? nil : $0 })
     }
 
     public init?(string: String) {

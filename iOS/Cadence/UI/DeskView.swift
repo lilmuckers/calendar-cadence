@@ -23,22 +23,32 @@ struct DeskView: View {
                                 Spacer(minLength: 8)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            AgendaColumn(limit: 8)
-                                .frame(width: min(360, geo.size.width * 0.42))
+                            // Pop-ups sit under the agenda, so the countdown keeps the whole left side.
+                            VStack(alignment: .leading, spacing: 12) {
+                                AgendaColumn(limit: prompting ? 2 : 8)
+                                Spacer(minLength: 0)
+                                PromptStrip(style: .panel)
+                            }
+                            .frame(width: min(360, geo.size.width * 0.42))
                         }
                         .padding(.horizontal, 28).padding(.vertical, 20)
                     } else {
-                        VStack(alignment: .leading, spacing: 0) {
-                            header
-                            Spacer(minLength: 12)
-                            FocusBlock(scale: min(1.15, geo.size.width / 360))
-                            Spacer(minLength: 12)
-                            AgendaColumn(limit: 4)
+                        VStack(spacing: 0) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                header
+                                Spacer(minLength: 12)
+                                FocusBlock(scale: min(1.15, geo.size.width / 360))
+                                Spacer(minLength: 12)
+                                AgendaColumn(limit: prompting ? 2 : 4)
+                            }
+                            .padding(.horizontal, 22).padding(.vertical, 16)
+                            // The lower third: full width along the bottom edge.
+                            PromptStrip(style: .strip)
                         }
-                        .padding(.horizontal, 22).padding(.vertical, 16)
                     }
                 }
-                .opacity(dimmed ? 0.55 : 1)
+                // A pop-up wakes it: nothing dims while one is up.
+                .opacity(dimmed && !prompting ? 0.55 : 1)
             }
             .foregroundStyle(.white)
             .contentShape(Rectangle())
@@ -47,6 +57,8 @@ struct DeskView: View {
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
     }
+
+    private var prompting: Bool { state.currentPrompt != nil }
 
     /// Between meetings with nothing close, fade back so it's not a bright slab on the desk.
     private var dimmed: Bool {
@@ -156,34 +168,7 @@ private struct AgendaColumn: View {
                 Text("LATER TODAY").font(.caption.weight(.heavy)).kerning(1.2).foregroundStyle(.white.opacity(0.5))
                 ForEach(later) { MeetingRow(meeting: $0, compact: true) }
             }
-            if let banner = state.banner {
-                ReminderBanner(reminder: banner)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-/// A heads-up / wrap-up reminder forwarded from the Mac.
-struct ReminderBanner: View {
-    @Environment(PhoneState.self) private var state
-    let reminder: CompanionReminder
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "bell.badge.fill").foregroundStyle(.yellow)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(reminder.title).font(.subheadline.weight(.semibold)).lineLimit(2)
-                Text(reminder.body).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-            }
-            Spacer(minLength: 4)
-            if let id = reminder.joinMeetingID {
-                Button("Join") { state.join(id: id); state.banner = nil }.buttonStyle(.borderedProminent)
-            }
-        }
-        .padding(12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .onTapGesture { state.banner = nil }
-        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 }

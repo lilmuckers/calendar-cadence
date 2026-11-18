@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var router: AlertRouter?
     private var clashPrompt: ClashPromptController?
     private var inviteReview: InviteReviewController?
+    private var phonePrompts: PhonePrompts?
     private var approvals: ApprovalController?
     private var bridge: MCPBridge?
 
@@ -47,13 +48,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         state.onAlert = { meeting, style in router.alert(meeting, forcing: style) }
         state.onReminder = { reminder in router.remind(reminder) }
-        state.onClash = { clash in clashPrompt.enqueue(clash) }
         let inviteReview = InviteReviewController(state: state)
         self.inviteReview = inviteReview
-        state.onInvites = { [weak self] invites, reason in
+        let showNewInvitesOnMac: ([Meeting]) -> Void = { [weak self] invites in
             guard let self else { return }
-            if reason == .new && self.state.prefs.newInviteAlert == .notification {
+            if self.state.prefs.newInviteAlert == .notification {
                 router.notifyInvites(invites)
+            } else {
+                inviteReview.show(invites, reason: .new)
+            }
+        }
+        // While the iPhone is connected, new invites and clashes pop up there instead of here.
+        let phonePrompts = PhonePrompts(state: state, hub: state.companion,
+                                        showClashOnMac: { clashPrompt.enqueue($0) },
+                                        showInvitesOnMac: showNewInvitesOnMac)
+        self.phonePrompts = phonePrompts
+        state.onClash = { clash in phonePrompts.clash(clash) }
+        state.onInvites = { invites, reason in
+            if reason == .new {
+                phonePrompts.newInvites(invites)
             } else {
                 inviteReview.show(invites, reason: reason)
             }

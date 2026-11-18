@@ -92,6 +92,8 @@ struct Preferences: Codable, Equatable {
     var companionEnabled = true
     /// Full-screen alert on the Mac too while the iPhone is displaying, or only on the phone.
     var companionTakeover: CompanionTakeoverMode = .macAndPhone
+    /// Still late with the alert on the phone only: bring it up on the Mac after this long.
+    var companionEscalation: CompanionEscalation = .thirtySeconds
     /// Which browser profile opens which meeting (default browser only).
     var profileRules = ProfileRules()
 
@@ -162,6 +164,7 @@ extension Preferences {
         panelHiddenSeries = try c.decodeIfPresent(Set<String>.self, forKey: .panelHiddenSeries) ?? d.panelHiddenSeries
         companionEnabled = try c.decodeIfPresent(Bool.self, forKey: .companionEnabled) ?? d.companionEnabled
         companionTakeover = (try? c.decodeIfPresent(CompanionTakeoverMode.self, forKey: .companionTakeover)) ?? d.companionTakeover
+        companionEscalation = (try? c.decodeIfPresent(CompanionEscalation.self, forKey: .companionEscalation)) ?? d.companionEscalation
         profileRules = (try? c.decodeIfPresent(ProfileRules.self, forKey: .profileRules)) ?? d.profileRules
     }
 }
