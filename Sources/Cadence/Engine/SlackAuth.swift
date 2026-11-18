@@ -113,7 +113,7 @@ final class SlackAuth {
             .init(name: "code_challenge", value: challenge),
             .init(name: "code_challenge_method", value: "S256"),
         ]
-        NSWorkspace.shared.open(comps.url!)
+        BrowserLauncher.open(comps.url!)
 
         let callback = try await server.waitForCallback()
         let items = callback.queryItems ?? []

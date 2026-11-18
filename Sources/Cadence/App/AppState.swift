@@ -850,7 +850,7 @@ final class AppState {
         browsers.refresh()
         guard let route = joinRoute(for: meeting) else { return }
         switch route {
-        case .native(let url), .defaultBrowser(let url): NSWorkspace.shared.open(url)
+        case .native(let url), .defaultBrowser(let url): BrowserLauncher.open(url)
         case .profile(let profile, let url): BrowserLauncher.open(url, in: profile)
         }
     }
@@ -868,7 +868,7 @@ final class AppState {
             case .series: prefs.profileRules.series[meeting.seriesID] = profile.id
             }
         }
-        if let profile { BrowserLauncher.open(link.url, in: profile) } else { NSWorkspace.shared.open(link.url) }
+        if let profile { BrowserLauncher.open(link.url, in: profile) } else { BrowserLauncher.open(link.url) }
     }
 
     /// Drops any per-meeting or per-series choice for `meeting`.
@@ -892,7 +892,7 @@ final class AppState {
         let base = meeting.id.split(separator: "@").first.map(String.init) ?? meeting.id
         if let encoded = base.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
            let url = URL(string: "ical://ekevent/\(encoded)?method=show&options=more") {
-            NSWorkspace.shared.open(url)
+            BrowserLauncher.open(url)
         } else if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") {
             NSWorkspace.shared.openApplication(at: app, configuration: .init())
         }
