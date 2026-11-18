@@ -11,6 +11,8 @@ struct PhonePrefs: Codable, Equatable {
     var takeoverLeadSeconds: Double = 30
     var takeoverOnlyWithLink = false
     var alertSound = true
+    /// Minutes after the start an ignored alert closes by itself; 0 = never (as on the Mac).
+    var takeoverAutoDismissMinutes = 5
 
     // Notifications while Cadence isn't on screen.
     var backgroundNotifications = true
@@ -53,6 +55,7 @@ extension PhonePrefs {
         takeoverLeadSeconds = v(.takeoverLeadSeconds, d.takeoverLeadSeconds)
         takeoverOnlyWithLink = v(.takeoverOnlyWithLink, d.takeoverOnlyWithLink)
         alertSound = v(.alertSound, d.alertSound)
+        takeoverAutoDismissMinutes = v(.takeoverAutoDismissMinutes, d.takeoverAutoDismissMinutes)
         backgroundNotifications = v(.backgroundNotifications, d.backgroundNotifications)
         headsUpEnabled = v(.headsUpEnabled, d.headsUpEnabled)
         headsUpMinutes = v(.headsUpMinutes, d.headsUpMinutes)

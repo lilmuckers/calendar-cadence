@@ -735,7 +735,8 @@ final class AppState {
         }
         return CompanionSnapshot(macName: companion.macName, generatedAt: Date(), meetings: mirrored,
                                  suppressedIDs: suppressedByClash, takeoverEnabled: prefs.takeoverEnabled,
-                                 takeoverLeadSeconds: prefs.takeoverLeadSeconds)
+                                 takeoverLeadSeconds: prefs.takeoverLeadSeconds,
+                                 takeoverAutoDismissMinutes: prefs.takeoverAutoDismissMinutes)
     }
 
     /// A meeting by id, for actions coming from the phone.

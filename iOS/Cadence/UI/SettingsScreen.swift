@@ -47,9 +47,13 @@ struct SettingsScreen: View {
                     }
                     Toggle("Only meetings with a join link", isOn: $state.prefs.takeoverOnlyWithLink)
                     Toggle("Sound", isOn: $state.prefs.alertSound)
+                    Picker("If ignored, close after", selection: $state.prefs.takeoverAutoDismissMinutes) {
+                        ForEach([1, 2, 5, 10], id: \.self) { Text("\($0) min").tag($0) }
+                        Text("Never").tag(0)
+                    }
                     Button("Preview alert") { dismiss(); state.previewAlert() }
                 } header: { Text("Alerts") } footer: {
-                    Text("While connected, the Mac decides when alerts fire, using its own settings.")
+                    Text("Once a meeting has started the alert gets redder and more insistent for the first 3 minutes. While connected, the Mac decides when alerts fire and when they close, using its own settings.")
                 }
                 Section("Notifications when Cadence isn't open") {
                     Toggle("Notify me", isOn: $state.prefs.backgroundNotifications)
@@ -64,12 +68,14 @@ struct SettingsScreen: View {
                 } header: { Text("Desk mode") } footer: {
                     Text("Put your iPhone on a MagSafe stand or charger and Cadence becomes a desk clock for your meetings. While it's showing and connected, your Mac stays quiet.")
                 }
-                Section("Lock Screen & StandBy") {
+                Section {
                     Toggle("Live Activity", isOn: $state.prefs.liveActivityEnabled)
-                    Picker("Show from", selection: $state.prefs.liveActivityLeadMinutes) {
+                    Picker("Count down from", selection: $state.prefs.liveActivityLeadMinutes) {
                         ForEach([10, 15, 30, 60, 120], id: \.self) { Text($0 >= 60 ? "\($0 / 60) h before" : "\($0) min before").tag($0) }
                     }
                     .disabled(!state.prefs.liveActivityEnabled)
+                } header: { Text("Dynamic Island, Lock Screen & StandBy") } footer: {
+                    Text("A countdown to your next meeting in the Dynamic Island and on the Lock Screen, with a Join button. Before then it shows when the meeting starts.")
                 }
                 Section("Filters") {
                     Toggle("Hide all-day events", isOn: $state.prefs.filters.hideAllDay)

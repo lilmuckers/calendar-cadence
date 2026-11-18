@@ -142,6 +142,8 @@ final class PhoneState {
         } else {
             link.stop()
             scheduleBackgroundWork()
+            // Last chance to start a Live Activity until the app is opened again.
+            updateLiveActivity(leaving: true)
         }
         displayChanged()
     }
@@ -233,8 +235,17 @@ final class PhoneState {
         if isActive, let last = lastRemoteRefresh, now.timeIntervalSince(last) > 600 { Task { await refreshRemote() } }
         // Connected: the Mac sends alerts. Standalone: plan our own.
         if !link.isConnected { checkAlert() }
-        if let alerting, now > alerting.start.addingTimeInterval(120) { self.alerting = nil }
+        if let alerting, let closeAt = autoDismissDate(for: alerting), now > closeAt { self.alerting = nil }
         if Int(now.timeIntervalSince1970) % 30 == 0 { updateLiveActivity() }
+    }
+
+    /// When an ignored alert closes itself: the auto-dismiss minutes after the start (the Mac's while
+    /// connected), but never past the meeting's end. Nil = stays until acted on.
+    private func autoDismissDate(for meeting: Meeting) -> Date? {
+        let minutes = link.isConnected ? snapshot?.takeoverAutoDismissMinutes ?? prefs.takeoverAutoDismissMinutes
+                                       : prefs.takeoverAutoDismissMinutes
+        guard minutes > 0 else { return nil }
+        return min(meeting.start.addingTimeInterval(TimeInterval(minutes) * 60), max(meeting.end, meeting.start))
     }
 
     private func checkAlert() {
@@ -317,17 +328,30 @@ final class PhoneState {
         updateLiveActivity()
     }
 
-    private func updateLiveActivity() {
+    /// Live Activity (Lock Screen, StandBy, Dynamic Island): a countdown once the next meeting is within
+    /// `liveActivityLeadMinutes`. iOS only lets an app start one while it's open, so when leaving
+    /// (`leaving`) one for a later meeting today starts early, showing the start time, and turns into
+    /// the countdown by itself at the lead time.
+    private func updateLiveActivity(leaving: Bool = false) {
         guard prefs.liveActivityEnabled else { liveActivity.end(); return }
-        let f = focus
+        let now = Date()
         let lead = Double(prefs.liveActivityLeadMinutes) * 60
-        if let f, f.live || f.meeting.start.timeIntervalSince(now) <= lead {
+        guard let f = focus else { liveActivity.end(); return }
+        let countdownFrom = f.meeting.start.addingTimeInterval(-lead)
+        let early = leaving && Calendar.current.isDate(f.meeting.start, inSameDayAs: now)
+            && f.meeting.start.timeIntervalSince(now) < Self.earlyStartLimit
+        if f.live || now >= countdownFrom || early {
             let after = laterToday.first { $0.start >= f.meeting.start && $0.id != f.meeting.id }
-            liveActivity.show(f.meeting, live: f.live, next: after, onMac: link.isConnected ? link.mac?.name : nil)
-        } else {
+            liveActivity.show(f.meeting, live: f.live, next: after, onMac: link.isConnected ? link.mac?.name : nil,
+                              countdownFrom: f.live ? now : countdownFrom)
+        } else if isActive {
+            // Back in the app with nothing close: drop an early one; it'll come back when it's due.
             liveActivity.end()
         }
     }
+
+    /// iOS ends Live Activities after 8 hours; don't start one so early it would expire first.
+    private static let earlyStartLimit: TimeInterval = 7 * 3600
 
     // MARK: - Accounts (same shape as the Mac's AppState)
 
