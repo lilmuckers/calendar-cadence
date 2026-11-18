@@ -334,7 +334,7 @@ final class LoopbackServer: @unchecked Sendable {
                     let comps = URLComponents(string: "http://127.0.0.1\(path)")
                     let isCallback = comps?.queryItems?.contains { $0.name == "code" || $0.name == "error" } == true
                     let body = isCallback
-                        ? "<html><body style='font:16px -apple-system;text-align:center;padding-top:20vh'><h2>Cadence is connected 🎉</h2><p>You can close this tab.</p></body></html>"
+                        ? OAuthLandingPage.html(error: comps?.queryItems?.first { $0.name == "error" }?.value)
                         : ""
                     let response = "HTTP/1.1 \(isCallback ? "200 OK" : "404 Not Found")\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
                     connection.send(content: Data(response.utf8), completion: .contentProcessed { _ in connection.cancel() })
