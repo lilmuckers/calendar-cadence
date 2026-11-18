@@ -1,0 +1,17 @@
+// Shared build settings for the iPhone app and its widget extension.
+// Personal values (team, OAuth clients) go in Local.xcconfig, which is git-ignored.
+// Copy Local.xcconfig.example to Local.xcconfig to set them.
+
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+SWIFT_VERSION = 5.0
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+CADENCE_BUNDLE_ID = com.cadence.companion
+
+// Google "iOS" OAuth client: the part before ".apps.googleusercontent.com".
+GOOGLE_IOS_CLIENT_PREFIX =
+// Microsoft app registration (same one the Mac uses; add the iOS redirect).
+MICROSOFT_CLIENT_ID =
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

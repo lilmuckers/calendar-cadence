@@ -14,7 +14,7 @@ finds the join link wherever it's hiding, and — 30 seconds before you're due �
 <img alt="Swift" src="https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white">
 <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-0A84FF?style=flat-square">
 <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-0-34C759?style=flat-square">
-<img alt="Tests" src="https://img.shields.io/badge/tests-73%20passing-34C759?style=flat-square">
+<img alt="Tests" src="https://img.shields.io/badge/tests-86%20passing-34C759?style=flat-square">
 </p>
 
 <img src="docs/screenshots/menubar.png" width="560" alt="Menu bar showing Cadence: 8m · Design Review">
@@ -90,6 +90,21 @@ Each morning Cadence gathers every invite still waiting for a reply and asks you
 
 <br clear="right">
 
+## 📱 iPhone desk companion
+
+Put your iPhone on a MagSafe stand and it becomes a desk display for your calendar: the time, a big countdown to your next meeting, a **Join** button and the rest of your day. Portrait or landscape, it lays itself out to fit.
+
+- **Desk mode turns on by itself while charging** (or tap *Desk mode*). The screen stays on and dims when nothing's close.
+- **Your Mac goes quiet.** While the phone is paired, connected *and* showing desk mode, the Mac hides the countdown panel, banners and reminders and sends them to the phone. The full-screen alert stays on the Mac too, unless you pick *Only on the iPhone* in **Settings → iPhone**. Pick the phone up, switch apps or walk away and the Mac is back to normal straight away.
+- **Join goes where you work.** Tap Join on the phone and the meeting opens **on the Mac** while they're connected, or on the phone when they're not. Snooze and Dismiss on either device close the alert on both.
+- **Works on its own, too.** The iPhone app reads its own calendars (iPhone Calendar accounts, Google, Microsoft 365, ICS), runs its own full-screen alert, schedules time-sensitive notifications for when it's in the background, and shows a **Live Activity** with a countdown and Join button on the Lock Screen and in StandBy.
+
+**Pairing.** On the Mac open **Settings → iPhone → Show Pairing Code** and scan it with the iPhone app (or with the Camera app, or copy the link across). The code carries a random 256-bit key that both devices then use for an encrypted (TLS pre-shared-key) connection, found over Bonjour on your Wi-Fi or directly between the devices when they're not on the same network. **Forget All iPhones** rotates the key.
+
+**Building the iPhone app.** Open `iOS/CadenceCompanion.xcodeproj` in Xcode (it shares `Sources/CadenceCore` and `Sources/CadenceShared` with the Mac app). Copy `iOS/Config/Local.xcconfig.example` to `iOS/Config/Local.xcconfig` and set your `DEVELOPMENT_TEAM` and bundle ID. `scripts/ios-build.sh` builds for the Simulator.
+
+To sign in to Google on the phone, create a second OAuth client of type **iOS** (bundle ID as above) and put the part before `.apps.googleusercontent.com` in `GOOGLE_IOS_CLIENT_PREFIX`. For Microsoft, add the redirect URI `msauth.<your bundle ID>://auth` under *Authentication → iOS / macOS* in the same app registration and set `MICROSOFT_CLIENT_ID`.
+
 ## ✨ Everything else
 
 - **🔗 Join links from anywhere.** URL field, location, or buried in an HTML invite body. Zoom, Google Meet, Microsoft Teams, Webex, GoTo, Whereby, Jitsi, Chime, Slack huddles, BlueJeans, Skype, Discord, FaceTime, Around, Tuple and RingCentral. Outlook SafeLinks, Google and Proofpoint redirect wrappers are unwrapped, and Zoom/Teams open straight in their apps.
@@ -158,8 +173,9 @@ If your build has a Microsoft app built in, skip this and click **Sign in with M
 No Xcode project, no SwiftPM, no dependencies — just the Xcode Command Line Tools on macOS 14+.
 
 ```bash
-scripts/test.sh            # 73 unit tests (Swift Testing)
+scripts/test.sh            # 86 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
+scripts/ios-build.sh       # build the iPhone app for the Simulator
 ```
 
 ### Building in a Google OAuth client
@@ -209,11 +225,14 @@ Sources/
 │   ├── MicrosoftGraphModels  Microsoft Graph → Meeting
 │   ├── Invites               RSVP horizon, invite merging, event colour palette
 │   ├── Reminders             heads-up, leave-now, wrap-up, morning summary, clashes
-│   └── PanelPlanner          what the countdown panel shows, and how big
+│   ├── PanelPlanner          what the countdown panel shows, and how big
+│   └── Companion*, Pairing   iPhone link messages, framing, routing and pairing links
 └── Cadence/              The app
     ├── Sources/              EventKit, ICS, Google and Microsoft providers, OAuth, Keychain
-    ├── Engine/               system context, alert routing, travel, hotkey, notifications
+    ├── Engine/               system context, alert routing, travel, hotkey, notifications, iPhone link
     └── UI/                   menu, panel, takeover, banner, clash and invite cards, settings
+Sources/CadenceShared/    Shared by the Mac and iPhone apps: providers, OAuth, Keychain, the encrypted link
+iOS/                      The iPhone app (Xcode project), its Live Activity widget and config
 ```
 
 New sources plug in by conforming to `CalendarProvider`. Ideas that are parked live in [BACKLOG.md](BACKLOG.md).

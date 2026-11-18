@@ -1,11 +1,15 @@
-import AppKit
+import CoreGraphics
 import CadenceCore
 import EventKit
 
-/// Reads every account configured in macOS Calendar: iCloud, Google, Exchange/Outlook, CalDAV, subscriptions.
+/// Reads every account configured in the system Calendar: iCloud, Google, Exchange/Outlook, CalDAV, subscriptions.
 @MainActor
 final class EventKitProvider: CalendarProvider {
+    #if os(macOS)
     let name = "macOS Calendar"
+    #else
+    let name = "iPhone Calendar"
+    #endif
     var onChange: (() -> Void)?
 
     private let store = EKEventStore()
@@ -75,7 +79,7 @@ final class EventKitProvider: CalendarProvider {
             id: cal.calendarIdentifier,
             title: cal.title,
             sourceTitle: cal.source?.title ?? "Other",
-            color: rgba(cal.color),
+            color: rgba(cal.cgColor),
             kind: kind(cal)
         )
     }
@@ -97,9 +101,11 @@ final class EventKitProvider: CalendarProvider {
         }
     }
 
-    private static func rgba(_ color: NSColor?) -> RGBAColor {
-        guard let c = color?.usingColorSpace(.sRGB) else { return .gray }
-        return RGBAColor(red: c.redComponent, green: c.greenComponent, blue: c.blueComponent, alpha: c.alphaComponent)
+    private static func rgba(_ color: CGColor?) -> RGBAColor {
+        guard let srgb = CGColorSpace(name: CGColorSpace.sRGB),
+              let c = color?.converted(to: srgb, intent: .defaultIntent, options: nil),
+              let parts = c.components, parts.count >= 3 else { return .gray }
+        return RGBAColor(red: parts[0], green: parts[1], blue: parts[2], alpha: c.alpha)
     }
 
     private static func meeting(_ event: EKEvent) -> Meeting {

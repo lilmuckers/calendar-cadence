@@ -60,6 +60,8 @@ final class AppState {
     @ObservationIgnored private var travelInFlight: Set<String> = []
     @ObservationIgnored private var travelFailures: [String: Date] = [:]
 
+    /// Link to a paired iPhone. Observable on its own, so views can watch `companion.phoneDisplaying`.
+    @ObservationIgnored let companion = CompanionHub()
     @ObservationIgnored private let eventKit = EventKitProvider()
     @ObservationIgnored let googleAuth = GoogleAuth()
     @ObservationIgnored let microsoftAuth = MicrosoftAuth()
@@ -144,6 +146,7 @@ final class AppState {
 
     private func recompute() {
         meetings = visibleMeetings()
+        companion.pushSnapshot()
         clashes = ClashDetector.clashes(in: meetings, after: Date())
         let live = Set(clashes.map(\.key))
         clashChoices = clashChoices.filter { live.contains($0.key) }
@@ -560,6 +563,24 @@ final class AppState {
             NSWorkspace.shared.openApplication(at: app, configuration: .init())
         }
     }
+
+    // MARK: - iPhone companion
+
+    /// What a paired phone mirrors: the same filtered, merged meetings the Mac shows (from an hour ago on).
+    func companionSnapshot() -> CompanionSnapshot {
+        let cutoff = Date().addingTimeInterval(-3600)
+        let mirrored = meetings.filter { $0.end > cutoff }.map { m -> Meeting in
+            var m = m
+            m.notes = nil // join links are already extracted; invite bodies can be huge
+            return m
+        }
+        return CompanionSnapshot(macName: companion.macName, generatedAt: Date(), meetings: mirrored,
+                                 suppressedIDs: suppressedByClash, takeoverEnabled: prefs.takeoverEnabled,
+                                 takeoverLeadSeconds: prefs.takeoverLeadSeconds)
+    }
+
+    /// A meeting by id, for actions coming from the phone.
+    func meeting(id: String) -> Meeting? { meetings.first { $0.id == id } ?? allMeetings.first { $0.id == id } }
 
     // MARK: - Countdown panel
 

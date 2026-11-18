@@ -54,6 +54,8 @@ enum ScreenshotRenderer {
 
         // The three moods of the menu bar icon, big.
         render(Moods(), state: state, name: "moods", to: dir, size: CGSize(width: 360, height: 110), wallpaper: false, pad: 0)
+        render(Moods(phone: .connected), state: state, name: "moods-phone", to: dir, size: CGSize(width: 420, height: 110), wallpaper: false, pad: 0)
+        render(Moods(phone: .displaying), state: state, name: "moods-phone-desk", to: dir, size: CGSize(width: 420, height: 110), wallpaper: false, pad: 0)
         print("Screenshots written to \(dir.path)")
     }
 
@@ -112,12 +114,14 @@ private struct FakeMenuBar: View {
 }
 
 private struct Moods: View {
+    var phone: MenuBarIcon.Phone = .none
+
     var body: some View {
         HStack(spacing: 40) {
             ForEach([("Calm", MenuBarIcon.Mood.calm), ("15 min", .nervous), ("5 min", .panicking)], id: \.0) { label, mood in
                 VStack(spacing: 8) {
-                    Image(nsImage: MenuBarIcon.image(mood)).renderingMode(.template).resizable()
-                        .frame(width: 60, height: 54).foregroundStyle(.white)
+                    Image(nsImage: MenuBarIcon.image(mood, phone: phone)).renderingMode(.template).resizable()
+                        .aspectRatio(contentMode: .fit).frame(height: 54).foregroundStyle(.white)
                     Text(label).font(.system(size: 12, weight: .medium, design: .rounded)).foregroundStyle(.white.opacity(0.7))
                 }
             }

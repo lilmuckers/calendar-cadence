@@ -77,6 +77,10 @@ struct Preferences: Codable, Equatable {
     /// Single occurrences (Meeting.id) and whole series (Meeting.seriesID) kept off the panel.
     var panelHiddenMeetings: Set<String> = []
     var panelHiddenSeries: Set<String> = []
+    /// Listen for a paired iPhone.
+    var companionEnabled = true
+    /// Full-screen alert on the Mac too while the iPhone is displaying, or only on the phone.
+    var companionTakeover: CompanionTakeoverMode = .macAndPhone
 
     private static let key = "Cadence.preferences.v1"
 
@@ -137,5 +141,7 @@ extension Preferences {
         panelShowDuringMeetings = try c.decodeIfPresent(Bool.self, forKey: .panelShowDuringMeetings) ?? d.panelShowDuringMeetings
         panelHiddenMeetings = try c.decodeIfPresent(Set<String>.self, forKey: .panelHiddenMeetings) ?? d.panelHiddenMeetings
         panelHiddenSeries = try c.decodeIfPresent(Set<String>.self, forKey: .panelHiddenSeries) ?? d.panelHiddenSeries
+        companionEnabled = try c.decodeIfPresent(Bool.self, forKey: .companionEnabled) ?? d.companionEnabled
+        companionTakeover = (try? c.decodeIfPresent(CompanionTakeoverMode.self, forKey: .companionTakeover)) ?? d.companionTakeover
     }
 }

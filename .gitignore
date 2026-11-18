@@ -5,3 +5,7 @@ build/
 DerivedData/
 .DS_Store
 Support/Secrets.env
+!iOS/CadenceCompanion.xcodeproj
+xcuserdata/
+*.xcworkspace/xcuserdata/
+iOS/Config/Local.xcconfig
