@@ -1,0 +1,93 @@
+name: 🐛 Bug report
+description: Something in Cadence isn't working as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please **don't paste real meeting titles, attendees, join links, tokens or OAuth secrets** —
+        swap them for placeholders like "Team sync" or `https://zoom.us/j/XXXX`.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what did you expect instead?
+      placeholder: The full-screen alert didn't appear for a Google Meet event, but the countdown panel showed it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create an event 2 minutes from now with a Meet link in the description
+        2. Wait for the alert
+        3. …
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Cadence?
+      multiple: true
+      options:
+        - Menu bar / agenda
+        - Floating countdown panel
+        - Full-screen alert / banner
+        - Join links / browser profiles
+        - Clash detection
+        - Invites / RSVP
+        - Notifications and reminders
+        - Travel time / leave now
+        - Settings
+        - Assistants (MCP server)
+        - Sign-in (Google / Microsoft)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: sources
+    attributes:
+      label: Calendar sources involved
+      multiple: true
+      options:
+        - macOS Calendar (iCloud / Exchange / CalDAV)
+        - Google (signed in to Cadence)
+        - Microsoft 365 (signed in to Cadence)
+        - ICS feed
+        - Not sure
+
+  - type: input
+    id: cadence-version
+    attributes:
+      label: Cadence version
+      description: From the release you downloaded, or the commit if you built it yourself.
+      placeholder: 0.2.0
+    validations:
+      required: true
+
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: macOS 26.1
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Optional. In Console.app, filter by process **Cadence** and copy anything relevant. Remove personal details first.
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, number of displays, whether you were presenting or on a call, etc.

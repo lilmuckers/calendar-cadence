@@ -14,7 +14,8 @@ finds the join link wherever it's hiding, and — 30 seconds before you're due �
 <img alt="Swift" src="https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white">
 <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-0A84FF?style=flat-square">
 <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-0-34C759?style=flat-square">
-<img alt="Tests" src="https://img.shields.io/badge/tests-119%20passing-34C759?style=flat-square">
+<a href="https://github.com/lilmuckers/calendar-cadence/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/lilmuckers/calendar-cadence?include_prereleases&sort=semver&display_name=tag&style=flat-square&label=release"></a>
+<a href="https://github.com/lilmuckers/calendar-cadence/actions/workflows/ci.yml?query=branch%3Amain"><img alt="Tests on main" src="https://img.shields.io/github/actions/workflow/status/lilmuckers/calendar-cadence/ci.yml?branch=main&style=flat-square&label=tests"></a>
 </p>
 
 <img src="docs/screenshots/menubar.png" width="560" alt="Menu bar showing Cadence: 8m · Design Review">
@@ -202,9 +203,10 @@ If your build has a Microsoft app built in, skip this and click **Sign in with M
 No Xcode project, no SwiftPM, no dependencies — just the Xcode Command Line Tools on macOS 14+.
 
 ```bash
-scripts/test.sh            # 119 unit tests (Swift Testing)
+scripts/test.sh            # 120 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
 scripts/ios-build.sh       # build the iPhone app for the Simulator
+scripts/ios-test.sh        # iPhone unit tests in the Simulator (needs Xcode)
 ```
 
 ### Building in a Google OAuth client
@@ -230,6 +232,27 @@ CONFIG=debug scripts/build.sh                                     # debug build
 CODESIGN_IDENTITY="Apple Development: you@example.com" scripts/build.sh   # stable signature
 scripts/icon.sh                                                   # regenerate the app icon
 build/Cadence.app/Contents/MacOS/Cadence --screenshots docs/screenshots   # regenerate these images
+```
+
+### CI and releases
+
+- **CI** ([`ci.yml`](.github/workflows/ci.yml)) runs on every pull request and push to `main`, in two jobs:
+  - **Unit tests** runs `scripts/test.sh` on macOS. It doesn't build the Mac app.
+  - **iPhone build and tests** builds the iPhone app for the Simulator with `scripts/ios-build.sh`, then runs `scripts/ios-test.sh`. That runs the shared `CadenceCore` suite again, this time on iOS, plus the iPhone-only tests in `iOS/Tests`.
+  - Each job posts its results as a check (*Unit test results*, *iPhone unit test results*).
+- **Release labels.** Every PR needs exactly one of `major`, `minor` or `patch` ([`pr-labels.yml`](.github/workflows/pr-labels.yml) fails the check otherwise). Add `skip-changelog` to leave a PR out of the release notes. Run *Actions → Sync labels* once to create the labels.
+- **Release** ([`release.yml`](.github/workflows/release.yml)): start it from *Actions → Release → Run workflow* on `main`. It:
+  1. Works out the next version from the highest label on PRs merged since the last `vX.Y.Z` tag (`scripts/next-version.sh`; the first release uses the version in `Info.plist`). You can force a bump instead.
+  2. Runs the tests, builds `Cadence.app`, and packages `Cadence-<version>.dmg`, `Cadence-<version>.zip` and `SHA256SUMS.txt`.
+  3. Tags the commit `v<version>` and publishes a GitHub release with those files attached. The notes come from [`RELEASE_NOTES_TEMPLATE.md`](.github/RELEASE_NOTES_TEMPLATE.md), with a changelog of the merged PRs grouped by label ([`.github/release.yml`](.github/release.yml)).
+  - `dry_run` builds everything without tagging or releasing; `draft` creates the release as a draft.
+- **Signing.** Signing and notarization turn on when the Developer ID and notary secrets listed at the top of `release.yml` are added. Until then builds are ad-hoc signed and published as **pre-releases**, and Gatekeeper blocks them on other Macs.
+
+Preview the next version or the release notes locally:
+
+```bash
+scripts/next-version.sh
+scripts/release-notes.sh v0.1.0 "" patch false /dev/null   # tag, previous tag, bump, notarized, checksums file
 ```
 
 > [!TIP]

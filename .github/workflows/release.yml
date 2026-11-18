@@ -1,0 +1,238 @@
+name: Release
+
+# Release flow: work out the version → test → build Cadence.app → DMG + zip → tag → GitHub release.
+#
+# Version: the highest major/minor/patch label among PRs merged into main since the last vX.Y.Z tag
+# (see scripts/next-version.sh). The first release uses the version in Support/Info.plist.
+# Release notes: .github/RELEASE_NOTES_TEMPLATE.md, with the merged-PR changelog grouped by .github/release.yml.
+#
+# Signing and notarization switch on by themselves once these repository secrets exist. Until then the
+# app is ad-hoc signed, the DMG is NOT notarized, and the release is marked as a pre-release.
+#
+#   MACOS_CERTIFICATE_P12        base64 of a "Developer ID Application" certificate exported as .p12
+#   MACOS_CERTIFICATE_PASSWORD   password for that .p12
+#   CODESIGN_IDENTITY            e.g. "Developer ID Application: Your Name (TEAMID)"
+#   APPLE_ID                     Apple ID email used for notarization
+#   APPLE_TEAM_ID                10-character team ID
+#   APPLE_APP_PASSWORD           app-specific password for that Apple ID
+#
+# Optional, bundled into Info.plist (see Support/Secrets.env.example):
+#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, MICROSOFT_CLIENT_ID
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump. auto = highest major/minor/patch label on PRs merged since the last release"
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+      draft:
+        description: "Create the GitHub release as a draft"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Build everything but don't tag or release"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Work out version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      tag: ${{ steps.next.outputs.tag }}
+      previous_tag: ${{ steps.next.outputs.previous_tag }}
+      bump: ${{ steps.next.outputs.bump }}
+    steps:
+      - name: Releases come from main
+        if: ${{ github.ref != 'refs/heads/main' && !inputs.dry_run }}
+        run: |
+          echo "::error::Run the release from main (this run is on ${{ github.ref_name }}). Use dry_run to test other branches."
+          exit 1
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: next
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/next-version.sh "${{ inputs.bump }}"
+      - name: Summary
+        run: |
+          {
+            echo "### Releasing ${{ steps.next.outputs.tag }}"
+            echo "- Bump: **${{ steps.next.outputs.bump }}** from ${{ steps.next.outputs.previous_tag || 'nothing (first release)' }}"
+            echo "- PRs merged since then: ${{ steps.next.outputs.prs }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  test:
+    name: Unit tests
+    needs: version
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/test.sh
+
+  build:
+    name: Build app and DMG
+    needs: [version, test]
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.CODESIGN_IDENTITY != '' }}
+      HAS_NOTARY: ${{ secrets.APPLE_ID != '' && secrets.APPLE_TEAM_ID != '' && secrets.APPLE_APP_PASSWORD != '' }}
+    outputs:
+      notarized: ${{ steps.notarize.outputs.notarized || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp version into Info.plist
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Support/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Support/Info.plist
+
+      - name: Import signing certificate
+        if: env.HAS_SIGNING == 'true'
+        env:
+          P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+
+      - name: Build Cadence.app
+        env:
+          CODESIGN_IDENTITY: ${{ env.HAS_SIGNING == 'true' && secrets.CODESIGN_IDENTITY || '' }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+        run: |
+          if [[ "$HAS_SIGNING" != "true" ]]; then
+            echo "::warning::No signing secrets — building ad-hoc signed. The DMG will not open cleanly on other Macs."
+          fi
+          scripts/build.sh
+          codesign --verify --deep --strict --verbose=2 build/Cadence.app
+
+      - name: Notarize app
+        id: notarize
+        if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          # Notarize the app itself so the zip download is stapled too, then the DMG below.
+          ditto -c -k --keepParent build/Cadence.app "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" \
+            --wait --timeout 30m
+          xcrun stapler staple build/Cadence.app
+          echo "notarized=true" >> "$GITHUB_OUTPUT"
+
+      - name: Notarization skipped
+        if: steps.notarize.outcome != 'success'
+        run: echo "::warning::Notarization skipped — add the Developer ID and notary secrets to enable it. The release will be a pre-release."
+
+      - name: Package DMG and zip
+        env:
+          CODESIGN_IDENTITY: ${{ env.HAS_SIGNING == 'true' && secrets.CODESIGN_IDENTITY || '' }}
+        run: |
+          scripts/dmg.sh "$VERSION"
+          ditto -c -k --keepParent build/Cadence.app "build/Cadence-$VERSION.zip"
+
+      - name: Notarize DMG
+        if: steps.notarize.outcome == 'success'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          DMG="build/Cadence-$VERSION.dmg"
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" \
+            --wait --timeout 30m
+          xcrun stapler staple "$DMG"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
+
+      - name: Collect artefacts
+        run: |
+          mkdir -p dist
+          mv "build/Cadence-$VERSION.dmg" "build/Cadence-$VERSION.zip" dist/
+          (cd dist && shasum -a 256 Cadence-* | tee SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cadence-${{ needs.version.outputs.version }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Clean up keychain
+        if: always() && env.HAS_SIGNING == 'true'
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+
+  release:
+    name: Tag and publish release
+    needs: [version, build]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
+      PREV_TAG: ${{ needs.version.outputs.previous_tag }}
+      BUMP: ${{ needs.version.outputs.bump }}
+      NOTARIZED: ${{ needs.build.outputs.notarized }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: Cadence-${{ needs.version.outputs.version }}
+          path: dist
+
+      # Tag only after the build succeeded, so a failed run never leaves a stray tag behind.
+      - name: Create tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Cadence $VERSION" "$GITHUB_SHA"
+          git push origin "$TAG"
+
+      - name: Write release notes
+        run: scripts/release-notes.sh "$TAG" "$PREV_TAG" "$BUMP" "$NOTARIZED" dist/SHA256SUMS.txt > "$RUNNER_TEMP/notes.md"
+
+      - name: Create GitHub release
+        run: |
+          FLAGS=(--verify-tag --title "Cadence $VERSION" --notes-file "$RUNNER_TEMP/notes.md")
+          [[ "${{ inputs.draft }}" == "true" ]] && FLAGS+=(--draft)
+          # Un-notarized builds are pre-releases so they never show up as "Latest".
+          if [[ "$NOTARIZED" == "true" ]]; then FLAGS+=(--latest); else FLAGS+=(--prerelease --latest=false); fi
+          gh release create "$TAG" dist/* "${FLAGS[@]}"
+          {
+            echo "### Released $TAG"
+            gh release view "$TAG" --json url --jq '"- " + .url'
+          } >> "$GITHUB_STEP_SUMMARY"

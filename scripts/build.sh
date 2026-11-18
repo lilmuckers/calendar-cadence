@@ -40,15 +40,19 @@ else
   echo "No Microsoft app registration bundled; users enter their own in Settings → Accounts"
 fi
 
+# Notarization needs a secure timestamp; ad-hoc signatures can't have one.
+SIGN_FLAGS=(--force --options runtime)
+[[ -n "${CODESIGN_IDENTITY:-}" ]] && SIGN_FLAGS+=(--timestamp)
+
 # stdio MCP helper for AI assistants (relays to the app's Unix socket).
 swiftc -target "$TARGET" "${OPT[@]}" -module-name CadenceMCP \
   -I "$BUILD/core" -L "$BUILD/core" -lCadenceCore \
   -o "$APP/Contents/MacOS/cadence-mcp" \
   "$ROOT/Sources/CadenceMCP/main.swift"
-codesign --force --options runtime --identifier com.cadence.calendarmonitor.mcp \
+codesign "${SIGN_FLAGS[@]}" --identifier com.cadence.calendarmonitor.mcp \
   --sign "${CODESIGN_IDENTITY:--}" "$APP/Contents/MacOS/cadence-mcp"
 
-codesign --force --options runtime --sign "${CODESIGN_IDENTITY:--}" \
+codesign "${SIGN_FLAGS[@]}" --sign "${CODESIGN_IDENTITY:--}" \
   --entitlements "$ROOT/Support/Cadence.entitlements" "$APP"
 
 echo "Built $APP"
