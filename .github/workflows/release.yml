@@ -40,10 +40,12 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-# Xcode the project is developed with. The runner image's default Xcode lags behind,
-# so every macOS job switches to this one (scripts/ci-select-xcode.sh fails if it isn't installed).
+# Xcode every macOS job builds with, pinned so it doesn't drift with the runner image's default
+# (scripts/ci-select-xcode.sh fails if it isn't installed). 26.6 is the newest on macos-26; local
+# development is on Xcode 27, so CI also checks the code still builds on the older compiler.
+# Move to Xcode 27 once GitHub ships a stable macOS 27 runner (only the xcode-27 preview has it today).
 env:
-  XCODE_VERSION: "27.2"
+  XCODE_VERSION: "26.6"
 
 permissions:
   contents: read
