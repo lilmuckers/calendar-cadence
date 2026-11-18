@@ -240,6 +240,7 @@ build/Cadence.app/Contents/MacOS/Cadence --screenshots docs/screenshots   # rege
   - **Unit tests** runs `scripts/test.sh` on macOS. It doesn't build the Mac app.
   - **iPhone build and tests** builds the iPhone app for the Simulator with `scripts/ios-build.sh`, then runs `scripts/ios-test.sh`. That runs the shared `CadenceCore` suite again, this time on iOS, plus the iPhone-only tests in `iOS/Tests`.
   - Each job posts its results as a check (*Unit test results*, *iPhone unit test results*).
+  - CI and release builds use the Xcode set by `XCODE_VERSION` at the top of each workflow (`scripts/ci-select-xcode.sh`), not the runner's default. Bump it when you move to a new Xcode.
 - **Release labels.** Every PR needs exactly one of `major`, `minor` or `patch` ([`pr-labels.yml`](.github/workflows/pr-labels.yml) fails the check otherwise). Add `skip-changelog` to leave a PR out of the release notes. Run *Actions → Sync labels* once to create the labels.
 - **Release** ([`release.yml`](.github/workflows/release.yml)): start it from *Actions → Release → Run workflow* on `main`. It:
   1. Works out the next version from the highest label on PRs merged since the last `vX.Y.Z` tag (`scripts/next-version.sh`; the first release uses the version in `Info.plist`). You can force a bump instead.

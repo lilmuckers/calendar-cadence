@@ -16,6 +16,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Xcode the project is developed with. The runner image's default Xcode lags behind,
+# so every macOS job switches to this one (scripts/ci-select-xcode.sh fails if it isn't installed).
+env:
+  XCODE_VERSION: "27.2"
+
 permissions:
   contents: read
   checks: write          # test results check run
@@ -24,11 +29,13 @@ permissions:
 jobs:
   test:
     name: Unit tests
-    # The app uses macOS 26 SDK APIs, so stay on the macOS 26 image (Xcode 26 / Swift 6.2+).
+    # The app uses macOS 26 SDK APIs, so stay on the macOS 26 image. Xcode is pinned above.
     runs-on: macos-26
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: scripts/ci-select-xcode.sh
 
       - name: Toolchain
         run: |
@@ -61,6 +68,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: scripts/ci-select-xcode.sh
 
       - name: Toolchain
         run: |

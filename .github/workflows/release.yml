@@ -40,6 +40,11 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+# Xcode the project is developed with. The runner image's default Xcode lags behind,
+# so every macOS job switches to this one (scripts/ci-select-xcode.sh fails if it isn't installed).
+env:
+  XCODE_VERSION: "27.2"
+
 permissions:
   contents: read
 
@@ -83,6 +88,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: scripts/ci-select-xcode.sh
       - run: scripts/test.sh
 
   build:
@@ -98,6 +105,8 @@ jobs:
       notarized: ${{ steps.notarize.outputs.notarized || 'false' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: scripts/ci-select-xcode.sh
 
       - name: Stamp version into Info.plist
         run: |
