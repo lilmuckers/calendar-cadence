@@ -49,7 +49,9 @@ struct EventRow: View {
                             Image(systemName: state.suppressedByClash.contains(meeting.id) ? "bell.slash.fill" : "exclamationmark.triangle.fill")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.orange)
-                                .help(state.suppressedByClash.contains(meeting.id) ? "Clash — you chose not to be alerted for this one" : "Overlaps another meeting")
+                                .help(state.suppressedByClash.contains(meeting.id)
+                                      ? "Clash — you chose not to be alerted for this one. Right-click → Clash Alerts to change."
+                                      : "Overlaps another meeting. Right-click → Clash Alerts to choose which one alerts.")
                         }
                         if state.isHiddenFromPanel(meeting) {
                             Image(systemName: "eye.slash")
@@ -124,6 +126,7 @@ struct EventRow: View {
             Button("Show in Calendar") { state.openInCalendar(meeting) }
             if !meeting.isAllDay {
                 Divider()
+                ClashAlertsMenu(meeting: meeting)
                 PanelVisibilityMenu(meeting: meeting)
             }
         }
@@ -231,6 +234,34 @@ struct PanelVisibilityMenu: View {
             }
         } else {
             Button("Hide from Countdown Panel") { state.hideFromPanel(meeting, series: false) }
+        }
+    }
+}
+
+/// "Clash Alerts ▸" — change or undo the choice made in the clash prompt.
+struct ClashAlertsMenu: View {
+    @Environment(AppState.self) private var state
+    let meeting: Meeting
+
+    var body: some View {
+        ForEach(state.clashes(involving: meeting), id: \.key) { clash in
+            let choice = state.clashChoice(clash)
+            let others = clash.meetings.filter { $0.id != meeting.id }
+            Menu(others.count == 1 ? "Clash Alerts (with \(others[0].title))" : "Clash Alerts") {
+                ForEach(clash.meetings) { m in
+                    item(m.id == meeting.id ? "Alert for This One Only" : "Alert for “\(m.title)” Only",
+                         checked: choice == m.id) { state.resolveClash(clash, choice: m.id) }
+                }
+                item("Alert for All of Them", checked: choice == "all") { state.resolveClash(clash, choice: "all") }
+                Divider()
+                Button("Ask Again…") { state.askAgain(clash) }
+            }
+        }
+    }
+
+    @ViewBuilder private func item(_ title: String, checked: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            if checked { Label(title, systemImage: "checkmark") } else { Text(title) }
         }
     }
 }

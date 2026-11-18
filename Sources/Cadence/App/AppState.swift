@@ -337,6 +337,30 @@ final class AppState {
         UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
     }
 
+    /// Clashes `meeting` is part of.
+    func clashes(involving meeting: Meeting) -> [Clash] {
+        clashes.filter { $0.meetings.contains { $0.id == meeting.id } }
+    }
+
+    /// The saved choice for a clash: a meeting id, "all", or nil (not decided).
+    func clashChoice(_ clash: Clash) -> String? { clashChoices[clash.key] }
+
+    /// Forgets the choice and shows the clash prompt again now.
+    func askAgain(_ clash: Clash) {
+        clashChoices[clash.key] = nil
+        UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
+        promptedClashes.insert(clash.key)
+        onClash?(clash)
+    }
+
+    /// Forgets every clash choice; the prompt asks again for each current clash.
+    func resetClashChoices() {
+        clashChoices = [:]
+        UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
+        promptedClashes = []
+        recompute()
+    }
+
     /// Meetings the user chose not to be alerted for because of a clash.
     var suppressedByClash: Set<String> { ClashDetector.suppressed(clashes: clashes, choices: clashChoices) }
 

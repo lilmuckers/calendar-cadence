@@ -235,6 +235,16 @@ private struct AlertsTab: View {
                 OffsetsField(offsets: $state.prefs.leaveOffsets)
                     .disabled(!state.prefs.leaveEnabled)
                 Toggle("Ask which meeting to alert for when two clash", isOn: $state.prefs.clashPromptEnabled)
+                LabeledContent("Clash choices") {
+                    HStack {
+                        Text(state.clashChoices.isEmpty ? "None — right-click a clashing event to choose" : "\(state.clashChoices.count) saved")
+                            .foregroundStyle(.secondary)
+                        if !state.clashChoices.isEmpty {
+                            Button("Reset") { state.resetClashChoices() }
+                                .help("Alert for every clashing meeting and ask again")
+                        }
+                    }
+                }
                 Toggle(isOn: $state.prefs.wrapUpEnabled) {
                     Text("Wrap-up nudge before meetings end")
                     Text("Names the next meeting when one starts straight after.")

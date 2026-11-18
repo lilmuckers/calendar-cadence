@@ -227,6 +227,7 @@ struct CountdownPanelView: View {
                 Button("Join \(m.title)") { state.join(m) }
                 JoinInMenu(meeting: m)
             }
+            ClashAlertsMenu(meeting: m)
             PanelVisibilityMenu(meeting: m)
             Divider()
         }
