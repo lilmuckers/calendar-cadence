@@ -827,9 +827,10 @@ final class AppState {
 
     // MARK: - iPhone companion
 
-    /// What a paired phone mirrors: the same filtered, merged meetings the Mac shows (from an hour ago on).
+    /// What a paired phone mirrors: the same filtered, merged meetings the Mac shows, for the whole of
+    /// today and tomorrow, so the phone keeps a full agenda (and its alerts) after it disconnects.
     func companionSnapshot() -> CompanionSnapshot {
-        let cutoff = Date().addingTimeInterval(-3600)
+        let cutoff = Calendar.current.startOfDay(for: Date())
         let mirrored = meetings.filter { $0.end > cutoff }.map { m -> Meeting in
             var m = m
             m.notes = nil // join links are already extracted; invite bodies can be huge

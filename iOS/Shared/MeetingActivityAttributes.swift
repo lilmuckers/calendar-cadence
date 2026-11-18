@@ -33,6 +33,11 @@ struct MeetingActivityAttributes: ActivityAttributes {
         /// The stage when this was last updated. Changing it is what makes the app push an update at
         /// each switch; the view still works the stage out from the clock when it's drawn.
         var mood: ActivityMood = .calm
+        /// Colour of the calendar the icon is anxious about (the meeting driving the mood). Nil from
+        /// older builds: falls back to this meeting's colour.
+        var iconRed: Double?
+        var iconGreen: Double?
+        var iconBlue: Double?
 
         var target: Date { live ? end : start }
 

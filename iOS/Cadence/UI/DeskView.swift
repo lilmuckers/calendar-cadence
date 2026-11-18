@@ -144,7 +144,7 @@ struct JoinButton: View {
         Button { state.join(meeting) } label: {
             HStack(spacing: 10) {
                 Image(systemName: meeting.joinLink?.service.symbol ?? "video.fill")
-                Text(state.link.isConnected ? "Join on \(state.link.mac?.name ?? "Mac")" : "Join \(meeting.joinLink?.service.displayName ?? "")")
+                Text(state.link.isConnected ? "Join on \(state.link.mac?.displayName ?? "Mac")" : "Join \(meeting.joinLink?.service.displayName ?? "")")
                     .lineLimit(1)
             }
             .font(.system(size: 20 * scale, weight: .semibold))

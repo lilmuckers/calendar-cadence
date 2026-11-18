@@ -92,7 +92,7 @@ struct ConnectionPill: View {
     }
 
     private var text: String {
-        let mac = state.link.mac?.name ?? "Mac"
+        let mac = state.link.mac?.displayName ?? "Mac"
         switch state.link.status {
         case .connected: return state.displaying ? "\(mac) · quiet" : mac
         case .connecting: return "Connecting to \(mac)…"

@@ -64,16 +64,31 @@ final class PhoneState {
 
     // MARK: - Source of truth
 
-    /// Connected: the Mac's meetings. Otherwise our own, or the Mac's cached ones if we have none.
+    /// Connected: the Mac's meetings. Otherwise the Mac's last copy merged with any calendars on this
+    /// phone, so the agenda, alerts and notifications carry on without the Mac.
     var meetings: [Meeting] {
         if link.isConnected, let snapshot { return snapshot.meetings }
-        if ownMeetings.isEmpty, let snapshot, !hasOwnSources { return snapshot.meetings.filter { $0.end > now } }
-        return ownMeetings
+        return offlineMeetings
     }
 
+    /// The Mac's last snapshot plus this phone's own meetings, duplicates merged.
+    private var offlineMeetings: [Meeting] {
+        guard let cached = macCopy, !cached.isEmpty else { return ownMeetings }
+        guard !ownMeetings.isEmpty else { return cached }
+        return MeetingDeduplicator.dedupe((cached + ownMeetings).sorted { ($0.start, $0.end, $0.title) < ($1.start, $1.end, $1.title) })
+    }
+
+    /// The cached Mac meetings, while paired (unpairing drops them).
+    private var macCopy: [Meeting]? { link.mac == nil ? nil : snapshot?.meetings }
+
     var usingMac: Bool { link.isConnected && snapshot != nil }
+    /// Showing the Mac's saved agenda while it's out of reach.
+    var usingMacCopy: Bool { !link.isConnected && !(macCopy ?? []).isEmpty }
+    /// When the saved agenda was last brought up to date.
+    var macCopyDate: Date? { snapshot?.generatedAt }
     var hasOwnSources: Bool { calendarAccess || !googleProviders.isEmpty || !microsoftProviders.isEmpty || !icsProviders.isEmpty }
-    private var suppressed: Set<String> { usingMac ? snapshot?.suppressedIDs ?? [] : [] }
+    /// Meetings muted by a clash choice on the Mac; still honoured from the saved copy.
+    private var suppressed: Set<String> { link.mac == nil ? [] : snapshot?.suppressedIDs ?? [] }
 
     var todayMeetings: [Meeting] {
         let cal = Calendar.current
@@ -208,12 +223,15 @@ final class PhoneState {
     private func handle(_ message: CompanionMessage) {
         switch message {
         case .welcome:
-            planner = AlertPlanner() // the Mac decides alerts now
+            break // the Mac decides alerts while connected; the planner keeps what's fired for later
         case .snapshot(let snap):
             snapshot = snap
             Self.saveSnapshot(snap)
+            planner.prune(keeping: snap.meetings + ownMeetings)
             updateLiveActivity()
         case .alert(let meeting):
+            // Remembered, so it doesn't fire a second time if the link drops before the meeting starts.
+            planner.markFired(meeting)
             present(meeting)
         case .dismissAlert(let id):
             if alerting?.id == id { alerting = nil }
@@ -279,7 +297,9 @@ final class PhoneState {
 
     private func checkAlert() {
         guard prefs.takeoverEnabled else { return }
-        let candidates = ownMeetings.filter { !prefs.takeoverOnlyWithLink || $0.joinLink != nil }
+        let candidates = offlineMeetings.filter {
+            !suppressed.contains($0.id) && (!prefs.takeoverOnlyWithLink || $0.joinLink != nil)
+        }
         guard let due = planner.due(in: candidates, now: now, leadTime: prefs.takeoverLeadSeconds) else { return }
         planner.markFired(due)
         if isActive { present(due) }
@@ -404,7 +424,7 @@ final class PhoneState {
 
     /// Notifications and the Live Activity keep working while the app is suspended.
     private func scheduleBackgroundWork() {
-        notifier.reschedule(meetings: ownMeetings.isEmpty ? meetings : ownMeetings, prefs: prefs)
+        notifier.reschedule(meetings: offlineMeetings.filter { !suppressed.contains($0.id) }, prefs: prefs)
         updateLiveActivity()
     }
 
@@ -422,10 +442,10 @@ final class PhoneState {
             && f.meeting.start.timeIntervalSince(now) < Self.earlyStartLimit
         if f.live || now >= countdownFrom || early {
             let after = laterToday.first { $0.start >= f.meeting.start && $0.id != f.meeting.id }
-            // Same as the Mac's menu bar: the mood follows the next meeting to start.
-            let moodStart = f.live ? after?.start : f.meeting.start
-            liveActivity.show(f.meeting, live: f.live, next: after, onMac: link.isConnected ? link.mac?.name : nil,
-                              countdownFrom: f.live ? now : countdownFrom, moodStart: moodStart)
+            // Same as the Mac's menu bar: the mood (and the icon's colour) follow the next meeting to start.
+            let moodMeeting = f.live ? after : f.meeting
+            liveActivity.show(f.meeting, live: f.live, next: after, onMac: link.isConnected ? link.mac?.displayName : nil,
+                              countdownFrom: f.live ? now : countdownFrom, moodMeeting: moodMeeting)
         } else if isActive {
             // Back in the app with nothing close: drop an early one; it'll come back when it's due.
             liveActivity.end()
@@ -523,6 +543,11 @@ final class PhoneState {
     @discardableResult
     func open(_ url: URL) -> Bool {
         if let invite = PairingInvite(url: url) {
+            // A different Mac: its agenda replaces the old one's when it connects; don't show the old one meanwhile.
+            if invite.macID != link.mac?.id {
+                snapshot = nil
+                UserDefaults.standard.removeObject(forKey: Self.snapshotKey)
+            }
             link.pair(invite)
             return true
         }

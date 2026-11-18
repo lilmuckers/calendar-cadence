@@ -67,11 +67,17 @@ private struct AgendaScreen: View {
                     }
                 }
 
-                Section(state.usingMac ? "Today · from \(state.link.mac?.name ?? "Mac")" : "Today") {
+                Section {
+                    if state.usingMacCopy, let saved = state.macCopyDate {
+                        Text("\(state.link.mac?.displayName ?? "Mac") is out of reach. This is its agenda from \(Self.savedText(saved)); alerts and Join still work here.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     if state.todayMeetings.isEmpty {
                         Text("No meetings today.").foregroundStyle(.secondary)
                     }
                     ForEach(state.todayMeetings) { MeetingRow(meeting: $0) }
+                } header: {
+                    Text(state.usingMac || state.usingMacCopy ? "Today · from \(state.link.mac?.displayName ?? "Mac")" : "Today")
                 }
             }
             .navigationTitle("Cadence")
@@ -91,7 +97,7 @@ private struct AgendaScreen: View {
             }
         } else {
             HStack {
-                Label(state.link.mac?.name ?? "Mac", systemImage: "laptopcomputer")
+                Label(state.link.mac?.displayName ?? "Mac", systemImage: "laptopcomputer")
                 Spacer()
                 Text(statusText).font(.caption).foregroundStyle(.secondary)
             }
@@ -103,6 +109,12 @@ private struct AgendaScreen: View {
                 }
             }
         }
+    }
+
+    /// "14:05", or "Tue 14:05" when it's from an earlier day.
+    private static func savedText(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date) ? date.formatted(date: .omitted, time: .shortened)
+            : date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
     }
 
     private var statusText: String {

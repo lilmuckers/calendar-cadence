@@ -7,10 +7,15 @@ import UIKit
 /// The Mac this phone paired with.
 struct PairedMac: Codable, Equatable {
     var id: String
+    /// The Mac's own computer name (often a serial number on managed laptops).
     var name: String
+    /// What the user calls it on this phone ("Work laptop"). Nil = use `name`.
+    var nickname: String? = nil
     /// LAN addresses and port from the pairing code, dialled when Bonjour finds nothing.
     var hosts: [String]? = nil
     var port: UInt16? = nil
+
+    var displayName: String { nickname ?? name }
 
     var directEndpoints: [NWEndpoint] {
         guard let port, let p = NWEndpoint.Port(rawValue: port) else { return [] }
@@ -75,11 +80,27 @@ final class CompanionClient {
     func pair(_ invite: PairingInvite) {
         stop()
         CompanionIdentity.store(key: invite.key)
-        mac = PairedMac(id: invite.macID, name: invite.macName, hosts: invite.hosts, port: invite.port)
-        if let data = try? JSONEncoder().encode(mac) { UserDefaults.standard.set(data, forKey: Self.macKey) }
+        // Re-pairing the same Mac keeps the name the user gave it.
+        let nickname = mac?.id == invite.macID ? mac?.nickname : nil
+        mac = PairedMac(id: invite.macID, name: invite.macName, nickname: nickname, hosts: invite.hosts, port: invite.port)
+        saveMac()
         failures = 0
         needsRescan = false
         start()
+    }
+
+    /// Give the paired Mac a name of the user's own; blank goes back to the Mac's computer name.
+    func rename(_ nickname: String) {
+        guard var updated = mac else { return }
+        let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.nickname = trimmed.isEmpty || trimmed == updated.name ? nil : trimmed
+        guard updated != mac else { return }
+        mac = updated
+        saveMac()
+    }
+
+    private func saveMac() {
+        if let data = try? JSONEncoder().encode(mac) { UserDefaults.standard.set(data, forKey: Self.macKey) }
     }
 
     func unpair() {
@@ -240,14 +261,14 @@ final class CompanionClient {
             if mac?.name != macName, var updated = mac {
                 updated.name = macName
                 mac = updated
-                if let data = try? JSONEncoder().encode(mac) { UserDefaults.standard.set(data, forKey: Self.macKey) }
+                saveMac()
             }
         case .address(let hosts, let port):
             guard var updated = mac, updated.hosts != hosts || updated.port != port else { break }
             updated.hosts = hosts
             updated.port = port
             mac = updated
-            if let data = try? JSONEncoder().encode(mac) { UserDefaults.standard.set(data, forKey: Self.macKey) }
+            saveMac()
         case .bye(let reason):
             channel?.close()
             if reason != "stopped" { status = .failed(reason) }
