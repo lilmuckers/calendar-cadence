@@ -37,7 +37,7 @@ private struct CalendarsTab: View {
                 }
             }
             Section {
-                Text("Switch individual calendars on or off. Add sources in the Accounts tab.")
+                Text("Switch individual calendars on or off. The bell makes a calendar agenda only: its events still show, but never alert, remind, clash or count as your current or next meeting. Add sources in the Accounts tab.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Toggle(isOn: Binding(get: { state.prefs.useEventColors }, set: { state.prefs.useEventColors = $0 })) {
@@ -66,6 +66,16 @@ private struct CalendarsTab: View {
                                 }
                                 .buttonStyle(.plain)
                                 .help(asks ? "Invites on this calendar ask for a colour" : "Ask for a colour when reviewing invites on this calendar")
+                                let quiet = state.isCalendarAgendaOnly(cal.id)
+                                Button {
+                                    state.setCalendar(cal.id, agendaOnly: !quiet)
+                                } label: {
+                                    Image(systemName: quiet ? "bell.slash.fill" : "bell")
+                                        .foregroundStyle(quiet ? Color.orange : Color.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help(quiet ? "Agenda only: shown in the agenda, but no alerts, reminders, clashes or assistant events. Click to turn alerts back on."
+                                            : "Make agenda only: keep it in the agenda, but leave it out of alerts, reminders, clashes and automations")
                                 if state.browsers.supportsProfiles {
                                     calendarProfileMenu(cal.id)
                                 }

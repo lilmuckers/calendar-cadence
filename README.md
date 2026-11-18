@@ -161,6 +161,7 @@ claude mcp add --scope user cadence -- "/Applications/Cadence.app/Contents/MacOS
 - **☀️ Morning summary & tomorrow.** A good-morning notification with how many meetings you have, when the first starts, when you're done and how many invites need a reply. In the evening (or once today is over) the agenda shows tomorrow too.
 - **🎨 Event colours.** Colour an event in Google Calendar (or give it a `COLOR` in an ICS feed) and Cadence uses that colour instead of the calendar's. Toggle in *Settings → Calendars*.
 - **🧹 Filters.** Toggle calendars; hide all-day, declined, tentative, free or link-less events; include/exclude by title keyword; minimum duration.
+- **🔕 Agenda-only calendars.** Click the bell next to a calendar (or right-click an event → *Make “…” Agenda Only*) to keep it in the agenda but out of alerts, reminders, clash detection, current/next, free-time and assistant events — for long room bookings and the like.
 - **😰 A menu bar icon with feelings.** Calm, nervous at 15 minutes, sweating at 5.
 
 <p align="center"><img src="docs/screenshots/moods.png" width="360" alt="Menu bar icon moods: calm, nervous, panicking"></p>

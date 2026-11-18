@@ -38,6 +38,20 @@ struct SettingsScreen: View {
                             }
                         }
                     }
+                    Section {
+                        ForEach(state.calendars.filter { state.isCalendarEnabled($0.id) }) { cal in
+                            Toggle(isOn: Binding(get: { state.isCalendarAgendaOnly(cal.id) },
+                                                 set: { state.setCalendar(cal.id, agendaOnly: $0) })) {
+                                Label { Text(cal.title); Text(cal.sourceTitle) } icon: {
+                                    Circle().fill(Color(cal.color)).frame(width: 10, height: 10)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Agenda only")
+                    } footer: {
+                        Text("Shown in the agenda, but never alert, notify or count as your next meeting. Handy for long room bookings. Calendars from the Mac follow its settings.")
+                    }
                 }
                 Section {
                     Toggle("Full-screen alert", isOn: $state.prefs.takeoverEnabled)

@@ -32,19 +32,22 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
     public var macName: String
     public var generatedAt: Date
     public var meetings: [Meeting]
-    /// Meetings muted because the user picked another one in a clash.
+    /// Meetings muted because the user picked another one in a clash, or on an agenda-only calendar.
     public var suppressedIDs: Set<String>
+    /// Meetings on agenda-only calendars (also in `suppressedIDs`). Nil from older Macs.
+    public var agendaOnlyIDs: Set<String>?
     public var takeoverEnabled: Bool
     public var takeoverLeadSeconds: Double
     /// Minutes after the start an ignored alert closes by itself; 0 = never. Nil from older Macs.
     public var takeoverAutoDismissMinutes: Int?
 
     public init(macName: String, generatedAt: Date, meetings: [Meeting], suppressedIDs: Set<String> = [],
-                takeoverEnabled: Bool = true, takeoverLeadSeconds: Double = 30, takeoverAutoDismissMinutes: Int? = nil) {
+                agendaOnlyIDs: Set<String>? = nil, takeoverEnabled: Bool = true, takeoverLeadSeconds: Double = 30, takeoverAutoDismissMinutes: Int? = nil) {
         self.macName = macName
         self.generatedAt = generatedAt
         self.meetings = meetings
         self.suppressedIDs = suppressedIDs
+        self.agendaOnlyIDs = agendaOnlyIDs
         self.takeoverEnabled = takeoverEnabled
         self.takeoverLeadSeconds = takeoverLeadSeconds
         self.takeoverAutoDismissMinutes = takeoverAutoDismissMinutes

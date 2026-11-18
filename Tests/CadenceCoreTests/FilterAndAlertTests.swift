@@ -40,6 +40,44 @@ struct FilterTests {
         #expect(!f.allows(meeting()))
     }
 
+    @Test func agendaOnlyCalendarStillShown() {
+        var f = FilterSettings()
+        f.agendaOnlyCalendarIDs = ["work"]
+        let m = meeting()
+        #expect(f.allows(m))
+        #expect(f.agendaOnlyIDs(in: [m], sources: [m]) == ["m"])
+    }
+
+    @Test func agendaOnlyLosesToACopyOnANormalCalendar() {
+        var f = FilterSettings()
+        f.agendaOnlyCalendarIDs = ["work"]
+        var other = meeting("copy")
+        other.calendar = CalendarInfo(id: "personal", title: "Personal", sourceTitle: "iCloud", color: .gray)
+        let booking = meeting("room", title: "Room 4 booking", minutes: 480)
+        let merged = MeetingDeduplicator.dedupe([meeting(), other, booking])
+        #expect(f.agendaOnlyIDs(in: merged, sources: [meeting(), other, booking]) == ["room"])
+    }
+
+    @Test func agendaOnlyMeetingsDontClash() {
+        var f = FilterSettings()
+        f.agendaOnlyCalendarIDs = ["rooms"]
+        var booking = meeting("room", title: "Room 4 booking", startOffset: 0, minutes: 480)
+        booking.calendar = CalendarInfo(id: "rooms", title: "Rooms", sourceTitle: "ICS", color: .gray)
+        let all = [booking, meeting()]
+        let quiet = f.agendaOnlyIDs(in: all, sources: all)
+        #expect(ClashDetector.clashes(in: all, after: t0).count == 1)
+        #expect(ClashDetector.clashes(in: all.filter { !quiet.contains($0.id) }, after: t0).isEmpty)
+    }
+
+    @Test func agendaOnlySurvivesDecoding() throws {
+        var f = FilterSettings()
+        f.agendaOnlyCalendarIDs = ["rooms"]
+        let back = try JSONDecoder().decode(FilterSettings.self, from: JSONEncoder().encode(f))
+        #expect(back.agendaOnlyCalendarIDs == ["rooms"])
+        let old = try JSONDecoder().decode(FilterSettings.self, from: Data(#"{"hideAllDay":false}"#.utf8))
+        #expect(old.agendaOnlyCalendarIDs.isEmpty)
+    }
+
     @Test func keywords() {
         var f = FilterSettings()
         f.excludeKeywords = ["  LUNCH "]

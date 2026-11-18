@@ -49,7 +49,8 @@ final class CadenceBackend: MCPBackend {
     private func detailed(_ m: Meeting) -> JSONValue {
         let inClash = state.clashes.contains { $0.meetings.contains { $0.id == m.id } }
         let dto = MeetingDTO(m, now: Date(), inClash: inClash, mutedByClash: state.suppressedByClash.contains(m.id),
-                             hiddenFromPanel: state.isHiddenFromPanel(m), includeNotes: true)
+                             hiddenFromPanel: state.isHiddenFromPanel(m), agendaOnly: state.isAgendaOnly(m),
+                             includeNotes: true)
         return (try? JSONValue(encoding: dto)) ?? .null
     }
 
@@ -120,7 +121,7 @@ final class CadenceBackend: MCPBackend {
         }
         let from = max(Date(), try date(a["from"]) ?? Date())
         let to = min(loadedUntil, try date(a["to"]) ?? loadedUntil)
-        let slots = FreeTimeFinder.slots(meetings: state.meetings, from: from, to: to, minDuration: Double(minutes) * 60,
+        let slots = FreeTimeFinder.slots(meetings: state.activeMeetings, from: from, to: to, minDuration: Double(minutes) * 60,
                                          workStart: hours.0, workEnd: hours.1)
         return [
             "slots": .array(slots.map {
@@ -128,7 +129,7 @@ final class CadenceBackend: MCPBackend {
                  "minutes": .number(($0.duration / 60).rounded())]
             }),
             "working_hours": .string(String(format: "%02d:%02d-%02d:%02d", hours.0 / 60, hours.0 % 60, hours.1 / 60, hours.1 % 60)),
-            "note": "Based on the meetings Cadence loads (today and tomorrow), skipping weekends, free and declined events.",
+            "note": "Based on the meetings Cadence loads (today and tomorrow), skipping weekends, free and declined events, and agenda-only calendars.",
         ]
     }
 

@@ -148,6 +148,8 @@ public struct MeetingDTO: Codable, Equatable, Sendable {
     public var in_clash: Bool
     public var muted_by_clash: Bool
     public var hidden_from_panel: Bool
+    /// On an "agenda only" calendar: shown, but never alerts, clashes or counts as current/next.
+    public var agenda_only: Bool
     public var notes: String?
 
     static let iso: ISO8601DateFormatter = {
@@ -160,7 +162,7 @@ public struct MeetingDTO: Codable, Equatable, Sendable {
     public static func format(_ d: Date) -> String { iso.string(from: d) }
 
     public init(_ m: Meeting, now: Date, inClash: Bool = false, mutedByClash: Bool = false,
-                hiddenFromPanel: Bool = false, includeNotes: Bool = false) {
+                hiddenFromPanel: Bool = false, agendaOnly: Bool = false, includeNotes: Bool = false) {
         id = m.id
         title = m.title
         start = Self.format(m.start)
@@ -184,6 +186,7 @@ public struct MeetingDTO: Codable, Equatable, Sendable {
         in_clash = inClash
         muted_by_clash = mutedByClash
         hidden_from_panel = hiddenFromPanel
+        agenda_only = agendaOnly
         if includeNotes, let n = m.notes {
             let text = MeetingLinkDetector.plainText(n)
             notes = text.count > 2000 ? String(text.prefix(2000)) + "…" : (text.isEmpty ? nil : text)
