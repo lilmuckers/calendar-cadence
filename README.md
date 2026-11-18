@@ -14,7 +14,7 @@ finds the join link wherever it's hiding, and — 30 seconds before you're due �
 <img alt="Swift" src="https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white">
 <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-0A84FF?style=flat-square">
 <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-0-34C759?style=flat-square">
-<img alt="Tests" src="https://img.shields.io/badge/tests-86%20passing-34C759?style=flat-square">
+<img alt="Tests" src="https://img.shields.io/badge/tests-116%20passing-34C759?style=flat-square">
 </p>
 
 <img src="docs/screenshots/menubar.png" width="560" alt="Menu bar showing Cadence: 8m · Design Review">
@@ -105,9 +105,37 @@ Put your iPhone on a MagSafe stand and it becomes a desk display for your calend
 
 To sign in to Google on the phone, create a second OAuth client of type **iOS** (bundle ID as above) and put the part before `.apps.googleusercontent.com` in `GOOGLE_IOS_CLIENT_PREFIX`. For Microsoft, add the redirect URI `msauth.<your bundle ID>://auth` under *Authentication → iOS / macOS* in the same app registration and set `MICROSOFT_CLIENT_ID`.
 
+## 🤖 Ask your assistant about your day
+
+Cadence includes a local [MCP](https://modelcontextprotocol.io) server, so Claude (Desktop or Code), Cursor or any other MCP client on your Mac can read your merged calendar, act on it, and hear about things as they happen. It sees exactly what Cadence sees: every source merged, filtered and de-duplicated.
+
+**Connect.** Open *Settings → Assistants*. Cadence finds Claude Desktop, Claude Code, Cursor and Windsurf on your Mac and shows whether each one is running, set up and connected right now. **Install** adds a `cadence` server to that client's MCP config, leaving the rest of the file alone and keeping a `.cadence-backup` of the old version. Claude Code is set up through its own `claude mcp add` command. Cadence then offers to restart the client so it loads the server. If Cadence isn't in Applications, the tab offers to move it there first, so the configured path keeps working.
+
+Prefer to do it by hand? Each client has a disclosure with the command or JSON to copy. For Claude Code:
+
+```bash
+claude mcp add --scope user cadence -- "/Applications/Cadence.app/Contents/MacOS/cadence-mcp"
+```
+
+`cadence-mcp` is a small stdio relay bundled in the app. It talks to Cadence over a Unix socket only your user can open (`~/Library/Application Support/Cadence/mcp.sock`, mode 0600), starts Cadence if it isn't running, and reconnects if Cadence restarts.
+
+| | |
+|---|---|
+| **Read** | `get_agenda` · `get_next_meeting` · `get_current_meeting` · `list_invites` · `list_clashes` · `find_free_time` · `list_calendars` · `get_status` (presenting / on a call) |
+| **Act** | `respond_to_invite` · `set_event_color` · `join_meeting` · `hide_from_panel` · `snooze_alert` |
+| **Resources** | `cadence://agenda/today` · `agenda/tomorrow` · `next` · `invites` · `clashes` · `status` (subscribable) |
+| **Prompts** | `daily_briefing` · `prepare_for_meeting` · `triage_invites` |
+
+**You stay in charge.** Every action pops a card in Cadence naming the assistant and what it wants to do: **Allow**, **Deny** or **Always allow**. Unanswered requests are denied after a minute. Per-action auto-approval lives in *Settings → Assistants*.
+
+**See what they did.** *Settings → Assistants → Activity* shows calls today and over the last week, actions done and denied, a chart per tool and per day, and a list of recent calls with their outcome. It can be filtered by assistant. The history stays on this Mac for 30 days and can be cleared.
+
+**Events.** Cadence pushes `meeting.starting_soon`, `meeting.started`, `meeting.ending_soon`, `meeting.ended`, `invite.new`, `meeting.changed`, `meeting.canceled`, `clash.new`, `status.presenting` and `status.on_call`. They arrive as MCP log notifications and as `resources/updated` for subscribed resources. Clients differ in what they do with unsolicited notifications, so there's also `wait_for_event`: a long-poll tool (up to 5 minutes) that returns everything since the last call. An agent can loop on it to react to your calendar.
+
 ## ✨ Everything else
 
 - **🔗 Join links from anywhere.** URL field, location, or buried in an HTML invite body. Zoom, Google Meet, Microsoft Teams, Webex, GoTo, Whereby, Jitsi, Chime, Slack huddles, BlueJeans, Skype, Discord, FaceTime, Around, Tuple and RingCentral. Outlook SafeLinks, Google and Proofpoint redirect wrappers are unwrapped, and Zoom/Teams open straight in their apps.
+- **🧭 The right browser profile.** Several clients, several signed-in profiles? Cadence opens each meeting in the right one of your default browser (Chrome, Edge, Brave, Vivaldi or Firefox, including Firefox containers). Pick a profile per account or calendar in *Settings → Calendars*, add organizer rules like *@client.com → Client profile* in *Settings → Browser*, or right-click Join → **Join in** for one meeting or a whole series. You choose per service whether an assigned profile beats the Zoom or Teams app. With Safari as the default, links open as usual.
 - **⌨️ Global join shortcut.** <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>J</kbd> (re-bindable) joins whatever's starting in the next 10 minutes — or the meeting you're already late for.
 - **🚗 "Leave now" reminders.** For in-person meetings, Cadence watches live traffic and pings you at configurable offsets before you need to leave (default: 10 minutes before, and "time to leave").
 - **🔔 Heads-up notifications.** Optional nudge N minutes before each meeting (default 5).
@@ -173,7 +201,7 @@ If your build has a Microsoft app built in, skip this and click **Sign in with M
 No Xcode project, no SwiftPM, no dependencies — just the Xcode Command Line Tools on macOS 14+.
 
 ```bash
-scripts/test.sh            # 86 unit tests (Swift Testing)
+scripts/test.sh            # 116 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
 scripts/ios-build.sh       # build the iPhone app for the Simulator
 ```
@@ -208,7 +236,7 @@ build/Cadence.app/Contents/MacOS/Cadence --screenshots docs/screenshots   # rege
 
 ## 🔒 Privacy
 
-Everything runs locally. Cadence talks only to the services you connect (Google's and Microsoft's APIs, your ICS feed hosts) and Apple Maps for travel times. Presentation and call detection read window positions and microphone *usage* — never screen contents or audio — and need no Screen Recording or Microphone permission.
+Everything runs locally. Cadence talks only to the services you connect (Google's and Microsoft's APIs, your ICS feed hosts) and Apple Maps for travel times. Presentation and call detection read window positions and microphone *usage* — never screen contents or audio — and need no Screen Recording or Microphone permission. The assistant server listens only on a private Unix socket (no network port). What an assistant reads goes wherever that assistant sends it, so connect only ones you trust.
 
 ## 🧬 How it's built
 
@@ -226,12 +254,14 @@ Sources/
 │   ├── Invites               RSVP horizon, invite merging, event colour palette
 │   ├── Reminders             heads-up, leave-now, wrap-up, morning summary, clashes
 │   ├── PanelPlanner          what the countdown panel shows, and how big
+│   ├── MCP*                  MCP protocol, tools catalogue, events, free-time finder
 │   └── Companion*, Pairing   iPhone link messages, framing, routing and pairing links
 └── Cadence/              The app
-    ├── Sources/              EventKit, ICS, Google and Microsoft providers, OAuth, Keychain
     ├── Engine/               system context, alert routing, travel, hotkey, notifications, iPhone link
-    └── UI/                   menu, panel, takeover, banner, clash and invite cards, settings
-Sources/CadenceShared/    Shared by the Mac and iPhone apps: providers, OAuth, Keychain, the encrypted link
+    ├── MCP/                  Unix-socket bridge and tool implementations for assistants
+    └── UI/                   menu, panel, takeover, banner, clash, invite and approval cards, settings
+Sources/CadenceShared/    Shared by the Mac and iPhone apps: EventKit, ICS, Google and Microsoft providers, OAuth, Keychain, the encrypted link
+Sources/CadenceMCP/       cadence-mcp, the stdio relay bundled in the app
 iOS/                      The iPhone app (Xcode project), its Live Activity widget and config
 ```
 

@@ -125,6 +125,7 @@ public enum GraphMapper {
             location: location,
             notes: notes,
             organizer: e.organizer?.emailAddress?.name ?? e.organizer?.emailAddress?.address,
+            organizerEmail: e.organizer?.emailAddress?.address,
             attendeeCount: e.attendees?.count ?? 0,
             participation: participation,
             availability: availability,

@@ -14,6 +14,7 @@ public struct ICSEvent: Equatable, Sendable {
     public var status: String?
     public var transparent: Bool
     public var organizer: String?
+    public var organizerEmail: String? = nil
     public var attendeeCount: Int
     public var rrule: RecurrenceRule?
     public var exdates: [Date]
@@ -210,6 +211,7 @@ public enum ICSParser {
             notes: e.description,
             url: e.url,
             organizer: e.organizer,
+            organizerEmail: e.organizerEmail,
             attendeeCount: e.attendeeCount,
             participation: .unknown,
             availability: e.transparent ? .free : (e.status?.uppercased() == "TENTATIVE" ? .tentative : .busy),
@@ -354,9 +356,12 @@ public enum ICSParser {
             exdates += p.value.split(separator: ",").compactMap { parseDate(String($0), tz: tz)?.date }
         }
 
-        let organizer = prop("ORGANIZER").map { p in
-            p.params["CN"] ?? p.value.replacingOccurrences(of: "mailto:", with: "", options: .caseInsensitive)
+        let organizerProp = prop("ORGANIZER")
+        let organizerEmail = organizerProp.flatMap { p -> String? in
+            let v = p.value.replacingOccurrences(of: "mailto:", with: "", options: .caseInsensitive)
+            return v.contains("@") ? v : nil
         }
+        let organizer = organizerProp.map { p in p.params["CN"] ?? organizerEmail ?? p.value }
 
         return ICSEvent(
             uid: text("UID") ?? UUID().uuidString,
@@ -371,6 +376,7 @@ public enum ICSParser {
             status: text("STATUS"),
             transparent: text("TRANSP")?.uppercased() == "TRANSPARENT",
             organizer: organizer,
+            organizerEmail: organizerEmail,
             attendeeCount: props.filter { $0.name == "ATTENDEE" }.count,
             rrule: prop("RRULE").flatMap { RecurrenceRule($0.value, timeZone: start.tz) },
             exdates: exdates,

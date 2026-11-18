@@ -34,6 +34,8 @@ struct Preferences: Codable, Equatable {
     var takeoverAllScreens = true
     var takeoverOnlyWithLink = false
     var takeoverSound = true
+    /// Minutes after the start time an ignored full-screen alert closes itself; 0 = stays until you act.
+    var takeoverAutoDismissMinutes = 5
     var whilePresenting: BusyAlertStyle = .banner
     var whileOnCall: BusyAlertStyle = .banner
     var showPanel = true
@@ -50,6 +52,13 @@ struct Preferences: Codable, Equatable {
     var leaveOffsets: [Int] = [10, 0]
     var clashPromptEnabled = true
     var panelStyle: PanelStyle = .standard
+    /// Let AI assistants on this Mac connect through cadence-mcp.
+    var mcpEnabled = true
+    /// Assistant actions (tool names) that run without asking.
+    var mcpAutoApprove: Set<String> = []
+    /// Working hours for find_free_time, minutes after midnight.
+    var workStart = 9 * 60
+    var workEnd = 17 * 60 + 30
     var inviteHorizon: InviteHorizon = .twoDays
     /// Ask about unanswered invites once a day, at the morning summary time.
     var inviteReviewDaily = true
@@ -81,6 +90,8 @@ struct Preferences: Codable, Equatable {
     var companionEnabled = true
     /// Full-screen alert on the Mac too while the iPhone is displaying, or only on the phone.
     var companionTakeover: CompanionTakeoverMode = .macAndPhone
+    /// Which browser profile opens which meeting (default browser only).
+    var profileRules = ProfileRules()
 
     private static let key = "Cadence.preferences.v1"
 
@@ -108,6 +119,7 @@ extension Preferences {
         takeoverAllScreens = try c.decodeIfPresent(Bool.self, forKey: .takeoverAllScreens) ?? d.takeoverAllScreens
         takeoverOnlyWithLink = try c.decodeIfPresent(Bool.self, forKey: .takeoverOnlyWithLink) ?? d.takeoverOnlyWithLink
         takeoverSound = try c.decodeIfPresent(Bool.self, forKey: .takeoverSound) ?? d.takeoverSound
+        takeoverAutoDismissMinutes = try c.decodeIfPresent(Int.self, forKey: .takeoverAutoDismissMinutes) ?? d.takeoverAutoDismissMinutes
         whilePresenting = try c.decodeIfPresent(BusyAlertStyle.self, forKey: .whilePresenting) ?? d.whilePresenting
         whileOnCall = try c.decodeIfPresent(BusyAlertStyle.self, forKey: .whileOnCall) ?? d.whileOnCall
         showPanel = try c.decodeIfPresent(Bool.self, forKey: .showPanel) ?? d.showPanel
@@ -123,6 +135,10 @@ extension Preferences {
         leaveOffsets = try c.decodeIfPresent([Int].self, forKey: .leaveOffsets) ?? d.leaveOffsets
         clashPromptEnabled = try c.decodeIfPresent(Bool.self, forKey: .clashPromptEnabled) ?? d.clashPromptEnabled
         useEventColors = try c.decodeIfPresent(Bool.self, forKey: .useEventColors) ?? d.useEventColors
+        mcpEnabled = try c.decodeIfPresent(Bool.self, forKey: .mcpEnabled) ?? d.mcpEnabled
+        mcpAutoApprove = try c.decodeIfPresent(Set<String>.self, forKey: .mcpAutoApprove) ?? d.mcpAutoApprove
+        workStart = try c.decodeIfPresent(Int.self, forKey: .workStart) ?? d.workStart
+        workEnd = try c.decodeIfPresent(Int.self, forKey: .workEnd) ?? d.workEnd
         inviteHorizon = (try? c.decodeIfPresent(InviteHorizon.self, forKey: .inviteHorizon)) ?? d.inviteHorizon
         inviteReviewDaily = try c.decodeIfPresent(Bool.self, forKey: .inviteReviewDaily) ?? d.inviteReviewDaily
         newInviteAlert = (try? c.decodeIfPresent(InviteAlertStyle.self, forKey: .newInviteAlert)) ?? d.newInviteAlert
@@ -143,5 +159,6 @@ extension Preferences {
         panelHiddenSeries = try c.decodeIfPresent(Set<String>.self, forKey: .panelHiddenSeries) ?? d.panelHiddenSeries
         companionEnabled = try c.decodeIfPresent(Bool.self, forKey: .companionEnabled) ?? d.companionEnabled
         companionTakeover = (try? c.decodeIfPresent(CompanionTakeoverMode.self, forKey: .companionTakeover)) ?? d.companionTakeover
+        profileRules = (try? c.decodeIfPresent(ProfileRules.self, forKey: .profileRules)) ?? d.profileRules
     }
 }

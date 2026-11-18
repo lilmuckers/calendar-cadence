@@ -18,9 +18,15 @@ final class AppState {
             if prefs.inviteHorizon != oldValue.inviteHorizon || prefs.filters.disabledCalendarIDs != oldValue.filters.disabledCalendarIDs {
                 Task { await refreshInvites() }
             }
+            if prefs.profileRules.firefoxContainers != oldValue.profileRules.firefoxContainers {
+                browsers.refresh(containers: prefs.profileRules.firefoxContainers)
+            }
             onPrefsChanged?()
         }
     }
+
+    /// The default browser and its profiles, for opening meeting links in the right one.
+    @ObservationIgnored let browsers = BrowserProfileStore()
 
     private(set) var calendars: [CalendarInfo] = []
     private(set) var allMeetings: [Meeting] = []
@@ -40,6 +46,12 @@ final class AppState {
     @ObservationIgnored var onReminder: ((Reminder) -> Void)?
     /// Invites to show: `.daily` review, `.new` arrivals, or `.manual` from the menu or Settings.
     @ObservationIgnored var onInvites: (([Meeting], InvitePromptReason) -> Void)?
+    /// Events for connected AI assistants (MCP).
+    @ObservationIgnored var onEvent: ((MCPEvent) -> Void)?
+    @ObservationIgnored private var sentEvents: Set<String> = []
+    @ObservationIgnored private var announcedClashes: Set<String>?
+    /// Clashes found while sources are still loading after launch are taken as already known.
+    @ObservationIgnored private let launchedAt = Date()
     /// A newly found clash the user hasn't decided on yet.
     @ObservationIgnored var onClash: ((Clash) -> Void)?
 
@@ -78,6 +90,7 @@ final class AppState {
 
     init() {
         prefs = Preferences.load()
+        browsers.refresh(containers: prefs.profileRules.firefoxContainers)
     }
 
     // MARK: - Lifecycle
@@ -145,9 +158,11 @@ final class AppState {
     }
 
     private func recompute() {
+        let previous = meetings
         meetings = visibleMeetings()
         companion.pushSnapshot()
         clashes = ClashDetector.clashes(in: meetings, after: Date())
+        emitChanges(from: previous)
         let live = Set(clashes.map(\.key))
         clashChoices = clashChoices.filter { live.contains($0.key) }
         UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
@@ -155,6 +170,58 @@ final class AppState {
            let fresh = clashes.first(where: { clashChoices[$0.key] == nil && !promptedClashes.contains($0.key) }) {
             promptedClashes.insert(fresh.key)
             onClash?(fresh)
+        }
+    }
+
+    static let agendaURIs = ["cadence://agenda/today", "cadence://agenda/tomorrow", "cadence://next", "cadence://clashes"]
+
+    /// Tell assistants about moved/cancelled meetings and new clashes, and refresh their resources.
+    private func emitChanges(from previous: [Meeting]) {
+        guard let onEvent else { return }
+        let now = Date()
+        if previous != meetings {
+            onEvent(MCPEvent(type: "agenda.updated", message: "Agenda updated", uris: Self.agendaURIs, log: false))
+        }
+        if !previous.isEmpty {
+            for change in MeetingChangeDetector.changes(old: previous, new: meetings, now: now) {
+                switch change {
+                case .moved(let from, let to):
+                    onEvent(MCPEvent(type: "meeting.changed", message: "\(to.title) moved to \(Theme.dayTime(to.start))",
+                                     data: ["meeting": dto(to), "previous_start": .string(MeetingDTO.format(from.start)),
+                                            "previous_end": .string(MeetingDTO.format(from.end))],
+                                     uris: Self.agendaURIs))
+                case .canceled(let m):
+                    onEvent(MCPEvent(type: "meeting.canceled", message: "\(m.title) was cancelled", data: ["meeting": dto(m)],
+                                     uris: Self.agendaURIs, level: "notice"))
+                }
+            }
+        }
+        let keys = Set(clashes.map(\.key))
+        if let announced = announcedClashes, Date().timeIntervalSince(launchedAt) > 60 {
+            for clash in clashes where !announced.contains(clash.key) {
+                onEvent(MCPEvent(type: "clash.new", message: "Double-booked: " + clash.meetings.map(\.title).joined(separator: " / "),
+                                 data: ["meetings": .array(clash.meetings.map(dto))], uris: ["cadence://clashes"], level: "warning"))
+            }
+        }
+        announcedClashes = (announcedClashes ?? []).union(keys)
+    }
+
+    /// Meeting as JSON for assistants, with Cadence's own flags.
+    func dto(_ m: Meeting) -> JSONValue {
+        let inClash = clashes.contains { $0.meetings.contains { $0.id == m.id } }
+        let value = MeetingDTO(m, now: Date(), inClash: inClash, mutedByClash: suppressedByClash.contains(m.id),
+                               hiddenFromPanel: isHiddenFromPanel(m))
+        return (try? JSONValue(encoding: value)) ?? .null
+    }
+
+    private func checkTimelineEvents() {
+        guard let onEvent else { return }
+        let due = MCPEventPlanner.due(meetings, now: now, sent: sentEvents,
+                                      leadMinutes: max(1, prefs.headsUpMinutes), wrapMinutes: prefs.wrapUpMinutes)
+        for d in due {
+            sentEvents.insert(d.key)
+            onEvent(MCPEvent(type: d.type, message: MCPEventPlanner.message(d, now: now), data: ["meeting": dto(d.meeting)],
+                             uris: ["cadence://next", "cadence://agenda/today", "cadence://status"]))
         }
     }
 
@@ -192,6 +259,13 @@ final class AppState {
         invites = InvitePlanner.pending(merged, now: Date(), horizon: prefs.inviteHorizon)
 
         let fresh = InvitePlanner.newInvites(invites, known: knownInvites)
+        if let onEvent {
+            for m in fresh {
+                onEvent(MCPEvent(type: "invite.new", message: "New invite: \(m.title), \(Theme.dayTime(m.start))",
+                                 data: ["meeting": dto(m)], uris: ["cadence://invites"]))
+            }
+            onEvent(MCPEvent(type: "invites.updated", message: "Invites updated", uris: ["cadence://invites"], log: false))
+        }
         knownInvites = (knownInvites ?? []).union(invites.map(\.seriesID))
         UserDefaults.standard.set(Array(knownInvites ?? []), forKey: "Cadence.knownInvites")
         if announce, !fresh.isEmpty, prefs.newInviteAlert != .off { onInvites?(fresh, .new) }
@@ -264,6 +338,30 @@ final class AppState {
         guard let choice else { return }
         clashChoices[clash.key] = choice
         UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
+    }
+
+    /// Clashes `meeting` is part of.
+    func clashes(involving meeting: Meeting) -> [Clash] {
+        clashes.filter { $0.meetings.contains { $0.id == meeting.id } }
+    }
+
+    /// The saved choice for a clash: a meeting id, "all", or nil (not decided).
+    func clashChoice(_ clash: Clash) -> String? { clashChoices[clash.key] }
+
+    /// Forgets the choice and shows the clash prompt again now.
+    func askAgain(_ clash: Clash) {
+        clashChoices[clash.key] = nil
+        UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
+        promptedClashes.insert(clash.key)
+        onClash?(clash)
+    }
+
+    /// Forgets every clash choice; the prompt asks again for each current clash.
+    func resetClashChoices() {
+        clashChoices = [:]
+        UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
+        promptedClashes = []
+        recompute()
     }
 
     /// Meetings the user chose not to be alerted for because of a clash.
@@ -469,6 +567,7 @@ final class AppState {
         checkAlert()
         if Int(now.timeIntervalSince1970) % 5 == 0 {
             checkReminders()
+            checkTimelineEvents()
             checkDailyReview()
         }
     }
@@ -541,15 +640,75 @@ final class AppState {
         onAlert?(sample, style)
     }
 
+    /// A full-screen alert for a made-up meeting that started `lateBy` seconds ago, to show the panic ramp.
+    /// Always uses demo data, so Join can never open a real meeting.
+    func previewLateAlert(lateBy: TimeInterval = 60) {
+        let start = Date().addingTimeInterval(-lateBy)
+        let sample = Meeting(
+            id: "preview-late",
+            title: "Design Review",
+            start: start,
+            end: start.addingTimeInterval(1800),
+            calendar: CalendarInfo(id: "preview", title: "Work", sourceTitle: "Preview",
+                                   color: RGBAColor(red: 0.35, green: 0.45, blue: 1)),
+            attendeeCount: 6,
+            joinLink: MeetingLink(service: .zoom, url: URL(string: "https://example.com/cadence-preview")!)
+        )
+        onAlert?(sample, .fullScreen)
+    }
+
     // MARK: - Actions
 
+    /// The profile `meeting` would open in, if any rule applies to the default browser's profiles.
+    func profileChoice(for meeting: Meeting) -> ProfileChoice? {
+        ProfileResolver.resolve(meeting, rules: prefs.profileRules, profiles: browsers.profiles)
+    }
+
+    /// Where Join would send `meeting` right now.
+    func joinRoute(for meeting: Meeting) -> JoinRoute? {
+        guard let link = meeting.joinLink else { return nil }
+        return ProfileResolver.route(for: link, choice: profileChoice(for: meeting), rules: prefs.profileRules,
+                                     preferNative: prefs.preferNativeApps,
+                                     nativeAvailable: { NSWorkspace.shared.urlForApplication(toOpen: $0) != nil })
+    }
+
     func join(_ meeting: Meeting) {
+        browsers.refresh()
+        guard let route = joinRoute(for: meeting) else { return }
+        switch route {
+        case .native(let url), .defaultBrowser(let url): NSWorkspace.shared.open(url)
+        case .profile(let profile, let url): BrowserLauncher.open(url, in: profile)
+        }
+    }
+
+    enum ProfileMemory { case once, series }
+
+    /// "Join in ▸ <profile>": opens in that profile now, optionally remembering it for this meeting or series.
+    /// A nil profile means the default browser without a profile.
+    func join(_ meeting: Meeting, in profile: BrowserProfile?, remember: ProfileMemory?) {
         guard let link = meeting.joinLink else { return }
-        let ws = NSWorkspace.shared
-        if prefs.preferNativeApps, let native = link.nativeURL, ws.urlForApplication(toOpen: native) != nil {
-            ws.open(native)
-        } else {
-            ws.open(link.url)
+        if let remember, let profile {
+            switch remember {
+            case .once: prefs.profileRules.meetings[meeting.id] = profile.id
+            case .series: prefs.profileRules.series[meeting.seriesID] = profile.id
+            }
+        }
+        if let profile { BrowserLauncher.open(link.url, in: profile) } else { NSWorkspace.shared.open(link.url) }
+    }
+
+    /// Drops any per-meeting or per-series choice for `meeting`.
+    func forgetProfileChoice(_ meeting: Meeting) {
+        prefs.profileRules.meetings[meeting.id] = nil
+        prefs.profileRules.series[meeting.seriesID] = nil
+    }
+
+    /// "Opens in Client A (Chrome)" for tooltips, or nil when nothing special happens.
+    func joinHint(for meeting: Meeting) -> String? {
+        guard let route = joinRoute(for: meeting) else { return nil }
+        switch route {
+        case .profile(let p, _): return "Opens in \(p.title) (\(p.browser.displayName))"
+        case .native: return profileChoice(for: meeting).map { "Opens in the app (\($0.profile.title) is set for the browser)" }
+        case .defaultBrowser: return nil
         }
     }
 

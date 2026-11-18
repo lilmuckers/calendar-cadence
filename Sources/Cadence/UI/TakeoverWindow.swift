@@ -86,9 +86,14 @@ final class TakeoverController {
         }
         if state.prefs.takeoverSound { NSSound(named: "Glass")?.play() }
 
-        // Get out of the way two minutes after start if ignored.
+        // If ignored, close the chosen number of minutes after the start (or when the meeting ends,
+        // if sooner). "Never" leaves it up until the user acts.
         autoClose?.invalidate()
-        let closeAt = max(meeting.start.addingTimeInterval(120), Date().addingTimeInterval(30))
+        autoClose = nil
+        let minutes = state.prefs.takeoverAutoDismissMinutes
+        guard minutes > 0 else { return }
+        let giveUp = min(meeting.start.addingTimeInterval(TimeInterval(minutes * 60)), meeting.end)
+        let closeAt = max(giveUp, Date().addingTimeInterval(30))
         autoClose = Timer.scheduledTimer(withTimeInterval: closeAt.timeIntervalSinceNow, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated { self?.dismiss() }
         }
@@ -126,29 +131,68 @@ struct TakeoverView: View {
     let isPrimary: Bool
     let actions: TakeoverActions
     @State private var appeared = false
+    @State private var clock = PulseClock()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var remaining: TimeInterval { meeting.start.timeIntervalSince(state.now) }
+    /// Grows from calm to full panic over the first few minutes the user is late.
+    private var urgency: TakeoverUrgency { TakeoverUrgency(secondsLate: -remaining) }
+    /// The meeting's colour, turning red as panic sets in.
+    private var mood: Color { Color(urgency.color(from: meeting.displayColor)) }
 
     var body: some View {
+        TimelineView(.animation) { context in
+            let u = urgency
+            let phase = clock.advance(to: context.date, period: reduceMotion ? 2 : u.period)
+            let pulse = (1 - cos(phase * 2 * .pi)) / 2
+            content(urgency: u, phase: phase, pulse: reduceMotion ? 0.5 : pulse)
+        }
+        .ignoresSafeArea()
+        .onAppear { withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { appeared = true } }
+    }
+
+    @ViewBuilder private func content(urgency u: TakeoverUrgency, phase: Double, pulse: Double) -> some View {
+        let shake = reduceMotion ? 0 : u.shake
         ZStack {
             VisualEffect(material: .fullScreenUI)
             Color.black.opacity(0.45)
-            RadialGradient(colors: [meeting.tint.opacity(0.55), .clear], center: .center, startRadius: 20, endRadius: 700)
-                .scaleEffect(appeared ? 1 : 0.6)
-                .opacity(remaining <= 10 && remaining > 0 ? 1 : 0.8)
-                .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: appeared)
+            // A red wash that throbs with the pulse once the user is properly late.
+            Color.red.opacity(0.22 * u.alarm * pulse)
+            // The glow is a circle of its own, sized to the screen's diagonal and drawn in an overlay, so it never
+            // gets cut by the screen's edges: scaling the screen-sized rectangle used to shrink those hard
+            // top and bottom cut-offs into view as it pulsed.
+            GeometryReader { geo in
+                let radius = hypot(geo.size.width, geo.size.height) / 2
+                Color.clear.overlay {
+                    Circle()
+                        .fill(RadialGradient(colors: [mood.opacity(0.55 + 0.2 * u.level), .clear], center: .center,
+                                             startRadius: 20, endRadius: radius * 0.75))
+                        .frame(width: radius * 2, height: radius * 2)
+                        .scaleEffect(u.scaleRange.lowerBound + (u.scaleRange.upperBound - u.scaleRange.lowerBound) * pulse)
+                        .opacity(remaining <= 10 && remaining > 0 ? 1 : u.glowOpacity)
+                }
+            }
+            .allowsHitTesting(false)
+            // Red edges flash in time with the pulse at full panic.
+            Rectangle()
+                .strokeBorder(Color.red, lineWidth: 70)
+                .blur(radius: 45)
+                .opacity(u.alarm * pulse)
+                .allowsHitTesting(false)
 
             VStack(spacing: 28) {
-                Text(remaining > 0 ? "STARTING IN" : "STARTED")
-                    .font(.system(size: 15, weight: .bold))
+                Text(TakeoverUrgency.headline(remaining: remaining))
+                    .font(.system(size: 15 + 5 * u.level, weight: .heavy))
                     .tracking(4)
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(u.level > 0 ? AnyShapeStyle(mood) : AnyShapeStyle(.white.opacity(0.6)))
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut, value: TakeoverUrgency.headline(remaining: remaining))
 
                 ZStack {
                     Circle().stroke(.white.opacity(0.1), lineWidth: 6)
                     Circle()
                         .trim(from: 0, to: ringProgress)
-                        .stroke(meeting.tint.gradient, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                        .stroke(mood.gradient, style: StrokeStyle(lineWidth: 6 + 4 * u.level, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                         .animation(.linear(duration: 1), value: state.now)
                     Text(remaining > 0 ? CountdownFormatter.clock(remaining) : "-" + CountdownFormatter.clock(-remaining))
@@ -205,9 +249,8 @@ struct TakeoverView: View {
             .padding(40)
             .scaleEffect(appeared ? 1 : 0.94)
             .opacity(appeared ? 1 : 0)
+            .offset(x: shake * sin(phase * 2 * .pi * 2.3), y: shake * 0.4 * cos(phase * 2 * .pi * 3.1))
         }
-        .ignoresSafeArea()
-        .onAppear { withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { appeared = true } }
     }
 
     private var ringProgress: CGFloat {
@@ -234,5 +277,18 @@ private struct GhostButton: View {
         }
         .buttonStyle(PressableStyle())
         .onHover { hovering = $0 }
+    }
+}
+
+/// Keeps the pulse's phase continuous while its speed changes, so speeding up never makes the glow jump.
+private final class PulseClock {
+    private var phase = 0.0
+    private var last: Date?
+
+    func advance(to date: Date, period: Double) -> Double {
+        if let last { phase += min(0.1, max(0, date.timeIntervalSince(last))) / max(period, 0.05) }
+        last = date
+        if phase > 10_000 { phase = phase.truncatingRemainder(dividingBy: 1) }
+        return phase
     }
 }

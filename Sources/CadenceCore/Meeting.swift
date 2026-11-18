@@ -105,6 +105,8 @@ public struct Meeting: Identifiable, Hashable, Codable, Sendable {
     public var notes: String?
     public var url: URL?
     public var organizer: String?
+    /// The organizer's email address, when the source gives one (used for browser-profile rules).
+    public var organizerEmail: String?
     public var attendeeCount: Int
     public var participation: Participation
     public var availability: Availability
@@ -128,6 +130,7 @@ public struct Meeting: Identifiable, Hashable, Codable, Sendable {
         notes: String? = nil,
         url: URL? = nil,
         organizer: String? = nil,
+        organizerEmail: String? = nil,
         attendeeCount: Int = 0,
         participation: Participation = .unknown,
         availability: Availability = .busy,
@@ -147,6 +150,7 @@ public struct Meeting: Identifiable, Hashable, Codable, Sendable {
         self.notes = notes
         self.url = url
         self.organizer = organizer
+        self.organizerEmail = organizerEmail
         self.attendeeCount = attendeeCount
         self.participation = participation
         self.availability = availability

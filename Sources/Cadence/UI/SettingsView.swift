@@ -10,6 +10,8 @@ struct SettingsView: View {
             FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }
             AlertsTab().tabItem { Label("Alerts", systemImage: "bell.badge") }
             PhoneTab().tabItem { Label("iPhone", systemImage: "iphone") }
+            BrowserTab().tabItem { Label("Browser", systemImage: "globe") }
+            AssistantsTab().tabItem { Label("Assistants", systemImage: "sparkles") }
             GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
         }
         .frame(width: 580, height: 520)
@@ -44,6 +46,9 @@ private struct CalendarsTab: View {
             }
             ForEach(grouped, id: \.0) { source, calendars in
                 Section {
+                    if state.browsers.supportsProfiles {
+                        accountProfileRow(source)
+                    }
                     ForEach(calendars) { cal in
                         Toggle(isOn: Binding(get: { state.isCalendarEnabled(cal.id) },
                                              set: { state.setCalendar(cal.id, enabled: $0) })) {
@@ -60,6 +65,9 @@ private struct CalendarsTab: View {
                                 }
                                 .buttonStyle(.plain)
                                 .help(asks ? "Invites on this calendar ask for a colour" : "Ask for a colour when reviewing invites on this calendar")
+                                if state.browsers.supportsProfiles {
+                                    calendarProfileMenu(cal.id)
+                                }
                             }
                         }
                     }
@@ -69,6 +77,57 @@ private struct CalendarsTab: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { state.browsers.refresh() }
+    }
+
+    /// A small globe menu per calendar: filled and tinted when the calendar has its own profile.
+    @ViewBuilder private func calendarProfileMenu(_ id: String) -> some View {
+        let store = state.browsers
+        let current = state.prefs.profileRules.calendars[id]
+        let profile = store.profile(id: current)
+        Menu {
+            Button {
+                state.prefs.profileRules.calendars[id] = nil
+            } label: {
+                if current == nil { Label("Same as Account", systemImage: "checkmark") } else { Text("Same as Account") }
+            }
+            Divider()
+            ForEach(store.profiles) { p in
+                Button {
+                    state.prefs.profileRules.calendars[id] = p.id
+                } label: {
+                    if current == p.id { Label(p.title, systemImage: "checkmark") } else { Text(p.title) }
+                }
+            }
+        } label: {
+            Image(systemName: current == nil ? "globe" : "globe.badge.chevron.backward")
+                .foregroundStyle(current == nil ? Color.secondary : Color.accentColor)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(profile.map { "Meeting links open in \($0.title)" } ?? "Meeting links use the account's browser profile")
+    }
+
+    @ViewBuilder private func accountProfileRow(_ source: String) -> some View {
+        let current = state.prefs.profileRules.accounts[source]
+        let suggestion = current == nil ? ProfileResolver.suggest(accountTitle: source, profiles: state.browsers.profiles) : nil
+        LabeledContent {
+            HStack(spacing: 8) {
+                if let suggestion {
+                    Button("Use \(suggestion.title)") { state.prefs.profileRules.accounts[source] = suggestion.id }
+                        .help("This \(state.browsers.defaultBrowserName) profile is signed in as the same account")
+                }
+                Picker("", selection: Binding(get: { state.prefs.profileRules.accounts[source] },
+                                              set: { state.prefs.profileRules.accounts[source] = $0 })) {
+                    ProfilePickerOptions(store: state.browsers, noneLabel: "Default", current: current)
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+        } label: {
+            Label("Open meeting links in", systemImage: "globe")
+        }
     }
 }
 
@@ -150,6 +209,17 @@ private struct AlertsTab: View {
                 Toggle("Cover all displays", isOn: $state.prefs.takeoverAllScreens)
                 Toggle("Only for meetings with a join link", isOn: $state.prefs.takeoverOnlyWithLink)
                 Toggle("Play sound", isOn: $state.prefs.takeoverSound)
+                Picker(selection: $state.prefs.takeoverAutoDismissMinutes) {
+                    Text("1 minute").tag(1)
+                    Text("2 minutes").tag(2)
+                    Text("5 minutes").tag(5)
+                    Text("10 minutes").tag(10)
+                    Text("Never — stay until I act").tag(0)
+                } label: {
+                    Text("If ignored, close after the start by")
+                    Text("It gets redder and more frantic for the first 3 minutes you're late.")
+                }
+                .disabled(!state.prefs.takeoverEnabled)
             }
             Section {
                 Picker("While presenting or sharing", selection: $state.prefs.whilePresenting) {
@@ -177,6 +247,16 @@ private struct AlertsTab: View {
                 OffsetsField(offsets: $state.prefs.leaveOffsets)
                     .disabled(!state.prefs.leaveEnabled)
                 Toggle("Ask which meeting to alert for when two clash", isOn: $state.prefs.clashPromptEnabled)
+                LabeledContent("Clash choices") {
+                    HStack {
+                        Text(state.clashChoices.isEmpty ? "None — right-click a clashing event to choose" : "\(state.clashChoices.count) saved")
+                            .foregroundStyle(.secondary)
+                        if !state.clashChoices.isEmpty {
+                            Button("Reset") { state.resetClashChoices() }
+                                .help("Alert for every clashing meeting and ask again")
+                        }
+                    }
+                }
                 Toggle(isOn: $state.prefs.wrapUpEnabled) {
                     Text("Wrap-up nudge before meetings end")
                     Text("Names the next meeting when one starts straight after.")
@@ -222,6 +302,8 @@ private struct AlertsTab: View {
             Section {
                 HStack {
                     Button("Preview Alert") { state.previewAlert() }
+                    Button("Preview Late Alert") { state.previewLateAlert() }
+                        .help("A demo meeting that started a minute ago: watch it get redder, faster and angrier")
                     Button("Preview Banner") { state.previewAlert(style: .banner) }
                     Button("Preview Notification") { state.previewAlert(style: .notification) }
                 }

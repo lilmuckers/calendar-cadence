@@ -177,6 +177,7 @@ struct GoogleMapperTests {
         #expect(m.participation == .tentative)
         #expect(m.attendeeCount == 2)
         #expect(m.organizer == "Boss")
+        #expect(m.organizerEmail == "boss@x.com")
         #expect(m.duration == 1800)
         #expect(abs(gcal.color.blue - 252.0 / 255) < 0.001)
         #expect(m.eventColor == nil)
