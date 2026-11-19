@@ -53,7 +53,7 @@ private struct AssistantSetupView: View {
                         } else if bridge.clients.isEmpty {
                             Text(bridge.running ? "Ready — no assistants connected" : "Starting…").foregroundStyle(.secondary)
                         } else {
-                            Text(bridge.clients.map(\.name).joined(separator: ", ") + " connected")
+                            Text(MCPClientNames.summary(bridge.clients.map(\.name)) + " connected")
                                 .foregroundStyle(.green)
                         }
                     }
