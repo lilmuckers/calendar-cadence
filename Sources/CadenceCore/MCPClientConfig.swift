@@ -64,4 +64,16 @@ public enum MCPClientNames {
         if n.hasPrefix("windsurf") { return "Windsurf" }
         return raw
     }
+
+    /// One entry per assistant, with a count when several sessions of it are connected
+    /// (e.g. "Claude Code ×12, Claude"). Order follows first connection.
+    public static func summary(_ names: [String]) -> String {
+        var order: [String] = []
+        var counts: [String: Int] = [:]
+        for name in names {
+            if counts[name] == nil { order.append(name) }
+            counts[name, default: 0] += 1
+        }
+        return order.map { n in counts[n]! > 1 ? "\(n) ×\(counts[n]!)" : n }.joined(separator: ", ")
+    }
 }

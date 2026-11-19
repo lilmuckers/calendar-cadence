@@ -242,4 +242,10 @@ struct MCPActivityTests {
         #expect(MCPClientNames.display("cursor-vscode") == "Cursor")
         #expect(MCPClientNames.display("my-agent") == "my-agent")
     }
+
+    @Test func clientSummaryGroupsSessions() {
+        #expect(MCPClientNames.summary([]) == "")
+        #expect(MCPClientNames.summary(["Claude"]) == "Claude")
+        #expect(MCPClientNames.summary(["Claude Code", "Claude", "Claude Code", "Claude Code"]) == "Claude Code ×3, Claude")
+    }
 }
