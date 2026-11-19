@@ -9,6 +9,7 @@ struct SettingsScreen: View {
     @State private var authError: String?
     @State private var newFeedURL = ""
     @State private var macNickname = ""
+    @State private var deviceName = ""
 
     var body: some View {
         @Bindable var state = state
@@ -165,6 +166,14 @@ struct SettingsScreen: View {
                 }
                 .onAppear { macNickname = mac.nickname ?? "" }
                 .onChange(of: macNickname) { state.link.rename(macNickname) }
+                LabeledContent("This iPhone") {
+                    TextField(state.link.defaultDeviceName, text: $deviceName)
+                        .multilineTextAlignment(.trailing)
+                        .submitLabel(.done)
+                        .onSubmit { state.link.renameDevice(deviceName) }
+                }
+                .onAppear { deviceName = state.link.deviceName }
+                .onChange(of: deviceName) { state.link.renameDevice(deviceName) }
                 Button("Unpair", role: .destructive) { confirmUnpair = true }
             } else {
                 Button("Pair with Cadence on your Mac") { showPairing = true }
@@ -172,7 +181,7 @@ struct SettingsScreen: View {
         } header: { Text("Mac") } footer: {
             Text(state.link.mac == nil
                  ? "Paired and on the same Wi-Fi (or nearby), the phone shows the Mac's meetings and Join opens the meeting on the Mac."
-                 : "Shown on Join buttons and in the Dynamic Island, e.g. \"Join on Work laptop\". Leave blank to use the Mac's own name. The phone keeps a copy of the Mac's agenda, so it carries on without the Mac.")
+                 : "Name: shown on Join buttons and in the Dynamic Island, e.g. \"Join on Work laptop\". This iPhone: what the Mac calls this phone. Leave either blank for the device's own name. The phone remembers the Mac's address on each network it pairs or connects on, for a week after it last worked, and keeps a copy of the Mac's agenda so it carries on without the Mac.")
         }
     }
 

@@ -15,16 +15,25 @@ public enum CompanionService {
 public struct CompanionHello: Codable, Equatable, Sendable {
     public var protocolVersion: Int
     public var deviceID: String
+    /// The name the user gave this phone in Cadence, else what iOS reports (usually just "iPhone").
     public var deviceName: String
+    /// Hardware model identifier ("iPhone17,1"), so the Mac can say "iPhone 16 Pro" when the name is
+    /// generic. Nil from older phones.
+    public var deviceModel: String?
     /// The phone is in the foreground, in desk mode: the Mac should go quiet.
     public var displaying: Bool
 
-    public init(protocolVersion: Int = CompanionService.protocolVersion, deviceID: String, deviceName: String, displaying: Bool) {
+    public init(protocolVersion: Int = CompanionService.protocolVersion, deviceID: String, deviceName: String,
+                deviceModel: String? = nil, displaying: Bool) {
         self.protocolVersion = protocolVersion
         self.deviceID = deviceID
         self.deviceName = deviceName
+        self.deviceModel = deviceModel
         self.displaying = displaying
     }
+
+    /// What the Mac shows for this phone.
+    public var label: String { CompanionDeviceName.label(name: deviceName, model: deviceModel) }
 }
 
 /// Everything the phone needs to mirror the Mac: its filtered, merged meetings and alert settings.
