@@ -1,0 +1,5 @@
+# Git-ignored local config copied from the main checkout into each new Claude Code worktree,
+# so builds made there keep the signing team, bundle ID and client IDs (e.g. Spotify).
+# Worktrees that already exist keep the copy they were made with.
+iOS/Config/Local.xcconfig
+Support/Secrets.env
