@@ -42,6 +42,7 @@ final class PhoneState {
     let link = CompanionClient()
     let desk = DeskMode()
     let nowPlaying = NowPlaying()
+    let spotify = SpotifyRemote()
     /// What the Mac is playing (Music or Spotify there), while connected.
     private(set) var macMedia: CompanionMedia?
     private(set) var macArtwork: UIImage?
@@ -194,10 +195,12 @@ final class PhoneState {
         guard active != isActive else { return }
         isActive = active
         if active {
+            spotify.resume()
             link.start()
             refresh()
             if let last = lastRemoteRefresh, Date().timeIntervalSince(last) > 300 { Task { await refreshRemote() } }
         } else {
+            spotify.suspend()
             link.stop()
             scheduleBackgroundWork()
             // Last chance to start a Live Activity until the app is opened again.
@@ -329,23 +332,42 @@ final class PhoneState {
             self.alerting = nil
         }
         if Int(now.timeIntervalSince1970) % 30 == 0 { updateLiveActivity() }
-        if isActive && (displaying || link.isConnected) { nowPlaying.poll() }
+        if isActive && (displaying || link.isConnected) {
+            nowPlaying.poll()
+            // Something's playing that isn't Music: if it's Spotify, pick up its track quietly.
+            if nowPlaying.otherPlaying && prefs.mediaApp == .spotify { spotify.connectIfPossible() }
+        }
         syncMediaToMac()
     }
 
     /// Tells the Mac when what's playing here changes, so its media keys and Now Playing follow.
     private func syncMediaToMac() {
         guard link.isConnected else { sentMedia = nil; return }
-        let current = nowPlaying.companionMedia(preferred: prefs.mediaApp, includeArtwork: false)
+        let current = phoneMedia(includeArtwork: false)
         guard current != sentMedia else { return }
         let newTrack = current?.trackID != sentMedia?.trackID
         sentMedia = current
-        link.send(.media(newTrack ? nowPlaying.companionMedia(preferred: prefs.mediaApp, includeArtwork: true) : current))
+        link.send(.media(newTrack ? phoneMedia(includeArtwork: true) : current))
+    }
+
+    private func phoneMedia(includeArtwork: Bool) -> CompanionMedia? {
+        if !nowPlaying.musicPlaying, let s = spotify.companionMedia(includeArtwork: includeArtwork) { return s }
+        return nowPlaying.companionMedia(preferred: prefs.mediaApp, includeArtwork: includeArtwork)
     }
 
     /// Mac media keys / Control Center (via the Mac), aimed at what's playing on this phone.
     private func applyMediaCommand(_ command: MediaCommand) {
         let np = nowPlaying
+        if spotify.connected && !np.musicPlaying && (spotify.isPlaying || !np.hasTrack) {
+            switch command {
+            case .play: spotify.play()
+            case .pause: spotify.pause()
+            case .togglePlayPause: spotify.togglePlay()
+            case .next: spotify.next()
+            case .previous: spotify.previous()
+            }
+            return
+        }
         switch command {
         case .play: if np.hasTrack { np.resumeMusic() }
         case .pause: pauseMedia()
@@ -390,7 +412,7 @@ final class PhoneState {
         // Music through this phone: fade it, say what's on, and free the headphones for the Mac.
         // The voice stands in for the chime then. Audio can only be taken while Cadence is on screen.
         if isActive && prefs.pauseMediaForAlerts && audioHandoff.otherAudioPlaying {
-            audioHandoff.run(for: meeting, now: now, nowPlaying: nowPlaying, announce: prefs.announceAlerts)
+            audioHandoff.run(for: meeting, now: now, nowPlaying: nowPlaying, spotify: spotify, announce: prefs.announceAlerts)
         } else if prefs.alertSound {
             AlertSound.play()
         }
@@ -402,7 +424,7 @@ final class PhoneState {
             id: "preview-audio", title: "Design Review",
             start: Date().addingTimeInterval(60), end: Date().addingTimeInterval(1860),
             calendar: CalendarInfo(id: "preview", title: "Work", sourceTitle: "Preview", color: RGBAColor(red: 0.35, green: 0.45, blue: 1)))
-        audioHandoff.run(for: m, now: Date(), nowPlaying: nowPlaying, announce: true, force: true)
+        audioHandoff.run(for: m, now: Date(), nowPlaying: nowPlaying, spotify: spotify, announce: true, force: true)
     }
 
     /// Desk media button: open the preferred player.
@@ -410,10 +432,15 @@ final class PhoneState {
         UIApplication.shared.open(prefs.mediaApp.url)
     }
 
-    /// Pause from the desk controls: Music directly, anything else by taking the audio.
+    /// Pause from the desk controls: Music or Spotify directly, anything else by taking the audio.
     func pauseMedia() {
-        if nowPlaying.musicPlaying { nowPlaying.pauseMusic() } else { audioHandoff.interruptOthers() }
+        if nowPlaying.musicPlaying { nowPlaying.pauseMusic() }
+        else if spotify.connected && spotify.isPlaying { spotify.pause() }
+        else { audioHandoff.interruptOthers() }
     }
+
+    /// Spotify connected and the one playing (or just paused): it gets the controls.
+    var spotifyActive: Bool { spotify.showsControls(now: now) && !nowPlaying.musicPlaying }
 
     private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {
         UINotificationFeedbackGenerator().notificationOccurred(type)
@@ -646,6 +673,7 @@ final class PhoneState {
     /// cadence-pair://… (scanned QR or pasted link) and cadence-companion://join?id=… (Live Activity).
     @discardableResult
     func open(_ url: URL) -> Bool {
+        if spotify.handle(url) { return true }
         if let invite = PairingInvite(url: url) {
             // A different Mac: its agenda replaces the old one's when it connects; don't show the old one meanwhile.
             if invite.macID != link.mac?.id {

@@ -15,6 +15,9 @@ CADENCE_ENTITLEMENTS = Config/Cadence.entitlements
 GOOGLE_IOS_CLIENT_PREFIX =
 // Microsoft app registration (same one the Mac uses; add the iOS redirect).
 MICROSOFT_CLIENT_ID =
+// Spotify developer app (iOS SDK) for track details and controls on the desk display.
+// Redirect URI to register: cadence-companion://spotify-callback
+SPOTIFY_CLIENT_ID =
 DEVELOPMENT_TEAM =
 
 #include? "Local.xcconfig"

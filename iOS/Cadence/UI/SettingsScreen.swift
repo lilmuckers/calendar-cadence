@@ -91,12 +91,20 @@ struct SettingsScreen: View {
                             Label { Text(app.name) } icon: { MediaLogo(app: app, size: 22) }.tag(app)
                         }
                     }
+                    if state.prefs.mediaApp == .spotify && state.spotify.isAvailable {
+                        if state.spotify.needsAuthorization {
+                            Button("Connect Spotify") { state.spotify.authorize() }
+                        } else {
+                            LabeledContent("Spotify", value: state.spotify.connected ? "Connected" : "Connects when playing")
+                            Button("Disconnect Spotify", role: .destructive) { state.spotify.signOut() }
+                        }
+                    }
                     Toggle("Fade out for meetings", isOn: $state.prefs.pauseMediaForAlerts)
                     Toggle("Announce the meeting", isOn: $state.prefs.announceAlerts)
                         .disabled(!state.prefs.pauseMediaForAlerts)
                     Button("Test the hand-off") { state.testAudioHandoff() }
                 } header: { Text("Media") } footer: {
-                    Text("Landscape desk mode shows what's playing in the corner, or a button for your media app. Track details and skip work for Apple Music; other apps show that they're playing and can be paused. When connected, it shows and controls the Mac's Music or Spotify too, and the Mac's media keys control this iPhone's music.\n\nWhen an alert comes up with music playing here, Cadence fades it out, says which meeting it is, then lets go of the audio so your headphones can switch to the Mac. Siri's own voice isn't available to apps: for a better voice, download an Enhanced or Premium one in Settings → Accessibility → Spoken Content → Voices.")
+                    Text("Landscape desk mode shows what's playing in the corner, or a button for your media app. Track details and skip work for Apple Music and, once connected, Spotify (connecting opens Spotify for a moment to approve); other apps show that they're playing and can be paused. When connected, it shows and controls the Mac's Music or Spotify too, and the Mac's media keys control this iPhone's music.\n\nWhen an alert comes up with music playing here, Cadence fades it out, says which meeting it is, then lets go of the audio so your headphones can switch to the Mac. Siri's own voice isn't available to apps: for a better voice, download an Enhanced or Premium one in Settings → Accessibility → Spoken Content → Voices.")
                 }
                 Section {
                     Toggle("Live Activity", isOn: $state.prefs.liveActivityEnabled)

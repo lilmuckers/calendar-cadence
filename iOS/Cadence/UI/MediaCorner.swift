@@ -49,13 +49,20 @@ struct MediaCorner: View {
 
     /// This phone's audio wins (it's what's in your ears from here); then the Mac's.
     private var mode: Mode {
-        if state.nowPlaying.showsControls(now: state.now) { return .phone }
+        if state.nowPlaying.showsControls(now: state.now) || state.spotifyActive { return .phone }
         if let mac = state.macMedia { return .mac(mac) }
         return .launcher
     }
 
     private var phoneModel: MediaCardModel {
         let np = state.nowPlaying
+        if state.spotifyActive {
+            let sp = state.spotify
+            return MediaCardModel(
+                app: .spotify, title: sp.title ?? "Spotify", subtitle: sp.artist ?? "Spotify", artwork: sp.artwork,
+                isPlaying: sp.isPlaying, canSkip: sp.canSkip,
+                playPause: { sp.togglePlay() }, next: { sp.next() }, previous: { sp.previous() }, open: nil)
+        }
         // Apple Music's look when it's the Music app (we know the track), else the preferred app.
         let music = np.musicPlaying || (np.hasTrack && !np.otherPlaying)
         let app = music ? .appleMusic : state.prefs.mediaApp
@@ -66,12 +73,17 @@ struct MediaCorner: View {
                 playPause: { np.musicPlaying ? np.pauseMusic() : np.resumeMusic() },
                 next: { np.next() }, previous: { np.previous() }, open: nil)
         }
-        // Other apps can be stopped from here but only started again in the app itself.
+        // Other apps can be stopped from here but only started again in the app itself. Spotify
+        // that isn't hooked up yet offers to connect (a quick hop to Spotify to approve).
+        let connect = app == .spotify && state.spotify.isAvailable && state.spotify.needsAuthorization
         return MediaCardModel(
-            app: app, title: np.otherPlaying ? "Playing on this iPhone" : "Paused", subtitle: app.name, artwork: nil,
+            app: app, title: np.otherPlaying ? "Playing on this iPhone" : "Paused",
+            subtitle: connect ? "Tap link to show the track" : app.name, artwork: nil,
             isPlaying: np.otherPlaying, canSkip: false,
             playPause: np.otherPlaying ? { state.pauseMedia() } : nil,
-            next: nil, previous: nil, open: { state.openMediaApp() })
+            next: nil, previous: nil,
+            open: connect ? { state.spotify.authorize() } : { state.openMediaApp() },
+            openSymbol: connect ? "link" : nil)
     }
 
     private func macModel(_ media: CompanionMedia) -> MediaCardModel {
@@ -97,6 +109,8 @@ struct MediaCardModel {
     var next: (() -> Void)?
     var previous: (() -> Void)?
     var open: (() -> Void)?
+    /// Replaces the open-app icon (e.g. "link" for Connect Spotify).
+    var openSymbol: String? = nil
     /// SF Symbol shown by the title when the player is on another device.
     var badge: String?
 }
@@ -124,7 +138,10 @@ private struct MediaCard: View {
                     control(model.isPlaying ? "pause.fill" : "play.fill", model.isPlaying ? "Pause" : "Play", big: true, action: playPause)
                 }
                 if model.canSkip, let next = model.next { control("forward.fill", "Next", action: next) }
-                if let open = model.open { control("arrow.up.forward.app.fill", "Open \(app.name)", action: open) }
+                if let open = model.open {
+                    control(model.openSymbol ?? "arrow.up.forward.app.fill",
+                            model.openSymbol == nil ? "Open \(app.name)" : "Connect \(app.name)", action: open)
+                }
             }
         }
         .foregroundStyle(theme.foreground)

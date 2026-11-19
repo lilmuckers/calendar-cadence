@@ -154,7 +154,7 @@ final class MeetingAudioHandoff: NSObject, AVSpeechSynthesizerDelegate {
 
     /// Fades out whatever's playing, announces `meeting`, then releases the audio session.
     /// `force` runs it even with nothing playing (the Settings test button).
-    func run(for meeting: Meeting, now: Date, nowPlaying: NowPlaying, announce: Bool, force: Bool = false) {
+    func run(for meeting: Meeting, now: Date, nowPlaying: NowPlaying, spotify: SpotifyRemote, announce: Bool, force: Bool = false) {
         guard !running, force || session.isOtherAudioPlaying else { return }
         running = true
         do {
@@ -170,6 +170,7 @@ final class MeetingAudioHandoff: NSObject, AVSpeechSynthesizerDelegate {
             // 2. Stop it. Music is paused directly; anything else (Spotify, podcasts) is interrupted
             // by switching to audio that doesn't mix, and isn't told to resume when we let go.
             _ = nowPlaying.pauseForMeeting()
+            _ = spotify.pauseForMeeting()
             try? self.session.setCategory(.playback, mode: .spokenAudio, options: [])
             try? self.session.setActive(true)
             // 3. Say what it is, then 4. let go.

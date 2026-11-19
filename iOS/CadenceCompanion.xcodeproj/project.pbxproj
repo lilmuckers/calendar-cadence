@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CA0000000000000000000SP3 /* SpotifyiOS in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000SP2 /* SpotifyiOS */; };
 		CA0000000000000000000B01 /* libCadenceCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CA0000000000000000000P01 /* libCadenceCore.a */; };
 		CA0000000000000000000B02 /* CadenceWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CA0000000000000000000P03 /* CadenceWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -112,6 +113,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CA0000000000000000000B01 /* libCadenceCore.a in Frameworks */,
+				CA0000000000000000000SP3 /* SpotifyiOS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -210,6 +212,9 @@
 				CA0000000000000000000S04 /* Shared */,
 			);
 			name = Cadence;
+			packageProductDependencies = (
+				CA0000000000000000000SP2 /* SpotifyiOS */,
+			);
 			productName = Cadence;
 			productReference = CA0000000000000000000P02 /* Cadence.app */;
 			productType = "com.apple.product-type.application";
@@ -281,6 +286,9 @@
 			);
 			mainGroup = CA0000000000000000000G01;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CA0000000000000000000SP1 /* XCRemoteSwiftPackageReference "ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CA0000000000000000000G02 /* Products */;
 			projectDirPath = "";
@@ -655,6 +663,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		CA0000000000000000000SP1 /* XCRemoteSwiftPackageReference "ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/spotify/ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.0.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CA0000000000000000000SP2 /* SpotifyiOS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CA0000000000000000000SP1 /* XCRemoteSwiftPackageReference "ios-sdk" */;
+			productName = SpotifyiOS;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CA0000000000000000000R01 /* Project object */;
 }
