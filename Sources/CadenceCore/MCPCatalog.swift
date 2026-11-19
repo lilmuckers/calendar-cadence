@@ -8,12 +8,23 @@ public struct MCPTool: Sendable {
     public var inputSchema: JSONValue
     /// Changes something, so the user must approve it in Cadence (unless auto-approved).
     public var isAction: Bool
+    /// Changes Cadence's own data without asking (enrichments): not read-only, but no approval card.
+    public var writes: Bool
+
+    public init(name: String, title: String, description: String, inputSchema: JSONValue, isAction: Bool, writes: Bool = false) {
+        self.name = name
+        self.title = title
+        self.description = description
+        self.inputSchema = inputSchema
+        self.isAction = isAction
+        self.writes = writes
+    }
 
     public var definition: JSONValue {
         [
             "name": .string(name), "title": .string(title), "description": .string(description),
             "inputSchema": inputSchema,
-            "annotations": ["readOnlyHint": .bool(!isAction), "destructiveHint": false, "openWorldHint": .bool(isAction)],
+            "annotations": ["readOnlyHint": .bool(!isAction && !writes), "destructiveHint": false, "openWorldHint": .bool(isAction)],
         ]
     }
 }
@@ -26,7 +37,9 @@ public enum MCPCatalog {
     static let meetingID: JSONValue = ["type": "string", "description": "A meeting id from get_agenda, get_next_meeting or list_invites."]
     static let date: JSONValue = ["type": "string", "description": "ISO 8601 date (2026-11-18) or date-time."]
 
-    public static let tools: [MCPTool] = [
+    public static let tools: [MCPTool] = baseTools + EnrichmentTools.tools
+
+    static let baseTools: [MCPTool] = [
         MCPTool(name: "get_agenda", title: "Get agenda",
                 description: "Meetings across all of the user's calendars (merged, filtered and de-duplicated, as shown in Cadence). Defaults to today. Cadence fetches roughly today and tomorrow; further ahead, use list_invites.",
                 inputSchema: schema([
@@ -106,6 +119,7 @@ public enum MCPCatalog {
         ("daily_briefing", "A short briefing on today's meetings, clashes and invites.", []),
         ("prepare_for_meeting", "Help the user prepare for a meeting.", [("meeting_id", "Meeting id (defaults to the next meeting)", false)]),
         ("triage_invites", "Go through unanswered invites and suggest replies.", []),
+        ("enrich_meeting", "Attach prep notes, links, an agenda and a bingo card to a meeting.", [("meeting_id", "Meeting id (defaults to the next meeting)", false)]),
     ]
 
     public static func promptText(_ name: String, arguments: [String: String]) -> String? {
@@ -117,6 +131,9 @@ public enum MCPCatalog {
             return "Help me prepare for \(which): who's attending, the organiser, where or how to join, how long until it starts, what's straight before and after it, and anything in the notes worth knowing. Suggest a 3-point prep checklist."
         case "triage_invites":
             return "Call list_invites and get_agenda. For each invite, check for clashes with what I've already accepted and suggest Accept, Maybe or Decline with a one-line reason. Don't reply to anything until I confirm; then use respond_to_invite."
+        case "enrich_meeting":
+            let which = arguments["meeting_id"].map { "the meeting with id \($0)" } ?? "my next meeting (get_next_meeting)"
+            return "Get ready for \(which) and attach what will help me during it with add_enrichment: a markdown summary of what it's about and what I should know (from its notes and any linked documents you can read), a links list of the documents, a short timed agenda if one is implied, briefs for attendees I may not know, and a fun buzzword bingo card fitting the meeting. Check get_enrichments first and update rather than duplicate."
         default:
             return nil
         }
@@ -151,6 +168,8 @@ public struct MeetingDTO: Codable, Equatable, Sendable {
     /// On an "agenda only" calendar: shown, but never alerts, clashes or counts as current/next.
     public var agenda_only: Bool
     public var notes: String?
+    /// Things assistants attached (notes, links, checklists…); see get_enrichments. Nil when none.
+    public var enrichment_count: Int?
 
     static let iso: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
@@ -162,7 +181,7 @@ public struct MeetingDTO: Codable, Equatable, Sendable {
     public static func format(_ d: Date) -> String { iso.string(from: d) }
 
     public init(_ m: Meeting, now: Date, inClash: Bool = false, mutedByClash: Bool = false,
-                hiddenFromPanel: Bool = false, agendaOnly: Bool = false, includeNotes: Bool = false) {
+                hiddenFromPanel: Bool = false, agendaOnly: Bool = false, includeNotes: Bool = false, enrichmentCount: Int = 0) {
         id = m.id
         title = m.title
         start = Self.format(m.start)
@@ -187,6 +206,7 @@ public struct MeetingDTO: Codable, Equatable, Sendable {
         muted_by_clash = mutedByClash
         hidden_from_panel = hiddenFromPanel
         agenda_only = agendaOnly
+        enrichment_count = enrichmentCount > 0 ? enrichmentCount : nil
         if includeNotes, let n = m.notes {
             let text = MeetingLinkDetector.plainText(n)
             notes = text.count > 2000 ? String(text.prefix(2000)) + "…" : (text.isEmpty ? nil : text)

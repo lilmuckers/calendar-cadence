@@ -399,6 +399,14 @@ private struct GeneralTab: View {
                     }
                 }
             }
+            Section("Meeting notes drawer") {
+                Toggle(isOn: $state.prefs.showEnrichmentDrawer) {
+                    Text("Show a Notes button during meetings")
+                    Text("When an assistant has attached notes, links, a checklist or bingo card, a button at the bottom of the screen slides up into a drawer.")
+                }
+                Toggle("Open it when the meeting starts", isOn: $state.prefs.enrichmentDrawerAutoOpen)
+                    .disabled(!state.prefs.showEnrichmentDrawer)
+            }
             Section("Menu bar") {
                 Picker("Show", selection: $state.prefs.menuBarStyle) {
                     ForEach(MenuBarStyle.allCases) { Text($0.label).tag($0) }

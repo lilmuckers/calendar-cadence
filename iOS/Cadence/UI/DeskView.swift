@@ -7,6 +7,7 @@ struct DeskView: View {
     @Environment(PhoneState.self) private var state
     @Environment(\.verticalSizeClass) private var vSize
     var exit: () -> Void
+    @State private var notesOpen = false
 
     var body: some View {
         GeometryReader { geo in
@@ -27,13 +28,18 @@ struct DeskView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             // Pop-ups sit under the agenda, so the countdown keeps the whole left side.
                             VStack(alignment: .leading, spacing: 12) {
-                                AgendaColumn(limit: prompting ? 2 : (state.prefs.deskMediaControls ? 6 : 8))
-                                Spacer(minLength: 0)
+                                if let m = notesMeeting {
+                                    DeskNotes(meeting: m) { close() }
+                                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                                } else {
+                                    AgendaColumn(limit: prompting ? 2 : (state.prefs.deskMediaControls ? 6 : 8))
+                                    Spacer(minLength: 0)
+                                }
                                 PromptStrip(style: .panel)
                                 // Room for the media corner, drawn above the dimming below.
                                 if state.prefs.deskMediaControls { Color.clear.frame(height: MediaCorner.height) }
                             }
-                            .frame(width: min(360, geo.size.width * 0.42))
+                            .frame(width: notesMeeting != nil ? min(460, geo.size.width * 0.5) : min(360, geo.size.width * 0.42))
                         }
                         .padding(.horizontal, 28).padding(.vertical, 20)
                     } else {
@@ -49,10 +55,21 @@ struct DeskView: View {
                             // The lower third: full width along the bottom edge.
                             PromptStrip(style: .strip)
                         }
+                        .overlay(alignment: .bottom) {
+                            // Portrait: the notes slide up over the lower part, under any pop-up.
+                            if let m = notesMeeting {
+                                DeskNotes(meeting: m) { close() }
+                                    .frame(height: geo.size.height * (prompting ? 0.45 : 0.68))
+                                    .padding(.horizontal, 10)
+                                    .padding(.bottom, prompting ? 150 : 10)
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                            }
+                        }
                     }
                 }
                 // A pop-up wakes it: nothing dims while one is up.
-                .opacity(dimmed && !prompting ? 0.55 : 1)
+                .opacity(dimmed && !prompting && notesMeeting == nil ? 0.55 : 1)
+                .animation(Theme.spring, value: notesMeeting?.id)
                 // Bottom right, landscape only; dims with the rest of the desk.
                 if landscape && state.prefs.deskMediaControls {
                     MediaCorner()
@@ -65,12 +82,29 @@ struct DeskView: View {
             .foregroundStyle(.white)
             .contentShape(Rectangle())
         }
+        .onChange(of: autoOpenKey, initial: true) { _, key in
+            if key != nil { notesOpen = true }
+        }
+        .onChange(of: state.deskEnrichmentMeeting?.id) { _, id in
+            if id == nil { notesOpen = false }
+        }
         .preferredColorScheme(.dark)
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
     }
 
     private var prompting: Bool { state.currentPrompt != nil }
+
+    /// The meeting whose notes are showing.
+    private var notesMeeting: Meeting? { notesOpen ? state.deskEnrichmentMeeting : nil }
+
+    /// Changes when a meeting with notes goes live, to open them by themselves (if set to).
+    private var autoOpenKey: String? {
+        guard state.prefs.deskEnrichmentsAutoOpen, let m = state.deskEnrichmentMeeting, m.isInProgress(at: state.now) else { return nil }
+        return m.id
+    }
+
+    private func close() { withAnimation(Theme.spring) { notesOpen = false } }
 
     /// Between meetings with nothing close, fade back so it's not a bright slab on the desk.
     private var dimmed: Bool {
@@ -97,6 +131,9 @@ struct DeskView: View {
             Text(state.now.formatted(.dateTime.weekday(.wide).day().month()))
                 .font(.subheadline).foregroundStyle(.white.opacity(0.55))
             Spacer()
+            if let m = state.deskEnrichmentMeeting, !notesOpen {
+                NotesPill(meeting: m) { withAnimation(Theme.spring) { notesOpen = true } }
+            }
             ConnectionPill()
             Button(action: exit) {
                 Image(systemName: "xmark").font(.caption.weight(.bold))
@@ -182,5 +219,65 @@ private struct AgendaColumn: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// "Notes · 3" in the header: opens what an assistant attached to the meeting.
+private struct NotesPill: View {
+    @Environment(PhoneState.self) private var state
+    let meeting: Meeting
+    let open: () -> Void
+
+    var body: some View {
+        let list = state.enrichments(for: meeting)
+        Button(action: open) {
+            HStack(spacing: 6) {
+                Image(systemName: "paperclip").font(.caption.weight(.bold))
+                Text(list.count == 1 ? list[0].title : "Notes · \(list.count)").lineLimit(1)
+            }
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(meeting.tint.gradient.opacity(0.85), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Show meeting notes")
+    }
+}
+
+/// The desk's notes card: tabs for everything attached to the meeting.
+private struct DeskNotes: View {
+    @Environment(PhoneState.self) private var state
+    let meeting: Meeting
+    let close: () -> Void
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(state.canEditEnrichments ? "ATTACHED" : "ATTACHED · CONNECT TO YOUR MAC TO TICK")
+                        .font(.caption2.weight(.heavy)).kerning(1.2).foregroundStyle(meeting.tint)
+                    Text(meeting.title).font(.headline).lineLimit(1)
+                }
+                Spacer()
+                Button(action: close) {
+                    Image(systemName: "chevron.down").font(.caption.weight(.bold))
+                        .frame(width: 28, height: 28).background(.white.opacity(0.1), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Hide notes")
+            }
+            EnrichmentPanel(meeting: meeting, enrichments: state.enrichments(for: meeting),
+                            state: { state.enrichmentState($0, meeting) }, now: state.now,
+                            interactive: state.canEditEnrichments) { action in
+                state.applyEnrichment(action, meetingID: meeting.id)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(shape.fill(Color(white: 0.08)))
+        .background(shape.fill(LinearGradient(colors: [meeting.tint.opacity(0.3), .clear], startPoint: .top, endPoint: .center)))
+        .overlay(shape.strokeBorder(.white.opacity(0.12)))
+        .clipShape(shape)
     }
 }

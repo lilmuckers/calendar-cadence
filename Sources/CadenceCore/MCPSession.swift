@@ -53,7 +53,10 @@ public actor MCPSession {
     (macOS Calendar, Google, Microsoft 365, ICS feeds), applies their filters and removes duplicates, so \
     its answers match what the user sees. Times are in the user's local time zone. Read tools are free to \
     call. Action tools (respond_to_invite, set_event_color, join_meeting, hide_from_panel, snooze_alert) \
-    show the user a confirmation card in Cadence and fail if they decline. Use wait_for_event to be told \
+    show the user a confirmation card in Cadence and fail if they decline. Enrichment tools (add_enrichment, \
+    update_enrichment, get_enrichments…) attach notes, links, checklists, agendas, attendee briefs, a decisions log, \
+    key numbers or a buzzword bingo card to a meeting without asking; the user sees them during the meeting and \
+    what they tick or log comes back in get_enrichments and as enrichment.* events. Use wait_for_event to be told \
     about meetings starting or ending, new invites, changes, clashes and presenting/call status.
     """
 

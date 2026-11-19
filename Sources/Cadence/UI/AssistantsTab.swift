@@ -119,6 +119,27 @@ private struct AssistantSetupView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
 
+            Section {
+                Toggle(isOn: $state.prefs.mcpEnrichments) {
+                    Text("Let assistants attach things to meetings")
+                    Text("Notes, links, checklists, timed agendas, attendee briefs, a decisions log, key numbers and buzzword bingo. Shown during the meeting; what you tick or log, assistants can read back.")
+                }
+                let count = state.enrichments.book.items.count
+                LabeledContent("Attached now") {
+                    HStack {
+                        Text(count == 0 ? "Nothing" : "\(count)").foregroundStyle(.secondary)
+                        if count > 0 {
+                            Button("Remove All") { state.enrichments.mutate { $0 = EnrichmentBook() } }
+                        }
+                    }
+                }
+            } header: {
+                Text("Meeting attachments")
+            } footer: {
+                Text("These only change what Cadence shows, so they don't ask first. One-off attachments are kept for two weeks after the meeting.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
             Section("Working hours (for finding free time)") {
                 DatePicker("Start", selection: minutes($state.prefs.workStart), displayedComponents: .hourAndMinute)
                 DatePicker("End", selection: minutes($state.prefs.workEnd), displayedComponents: .hourAndMinute)

@@ -317,6 +317,15 @@ final class PhoneState {
 
     private static let snapshotKey = "Cadence.companion.snapshot"
 
+    /// Optimistic change to the mirrored enrichments (the Mac's next snapshot replaces it).
+    func updateSnapshotEnrichments(_ body: (inout EnrichmentBook) -> Void) {
+        guard var snap = snapshot else { return }
+        var book = snap.enrichments ?? EnrichmentBook()
+        body(&book)
+        snap.enrichments = book
+        snapshot = snap
+    }
+
     private static func loadSnapshot() -> CompanionSnapshot? {
         guard let data = UserDefaults.standard.data(forKey: snapshotKey) else { return nil }
         return try? JSONDecoder().decode(CompanionSnapshot.self, from: data)

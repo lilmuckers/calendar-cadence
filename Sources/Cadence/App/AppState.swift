@@ -58,6 +58,8 @@ final class AppState {
     @ObservationIgnored var onInvites: (([Meeting], InvitePromptReason) -> Void)?
     /// Events for connected AI assistants (MCP).
     @ObservationIgnored var onEvent: ((MCPEvent) -> Void)?
+    /// Open the enrichment drawer for a meeting (menu bar, countdown panel).
+    @ObservationIgnored var onShowEnrichments: ((Meeting) -> Void)?
     @ObservationIgnored private var sentEvents: Set<String> = []
     @ObservationIgnored private var announcedClashes: Set<String>?
     /// Clashes found while sources are still loading after launch are taken as already known.
@@ -97,6 +99,8 @@ final class AppState {
 
     /// Link to a paired iPhone. Observable on its own, so views can watch `companion.phoneDisplaying`.
     @ObservationIgnored let companion = CompanionHub()
+    /// What assistants attached to meetings. Observable on its own, like `companion`.
+    @ObservationIgnored let enrichments = EnrichmentStore()
     @ObservationIgnored private let eventKit = EventKitProvider()
     @ObservationIgnored let googleAuth = GoogleAuth()
     @ObservationIgnored let microsoftAuth = MicrosoftAuth()
@@ -182,6 +186,7 @@ final class AppState {
             .flatMap { $0.meetings(from: from, to: to) }
             .sorted { ($0.start, $0.end, $0.title) < ($1.start, $1.end, $1.title) }
         planner.prune(keeping: allMeetings)
+        enrichments.prune()
         lastRefresh = Date()
         recompute()
     }
@@ -239,7 +244,8 @@ final class AppState {
     func dto(_ m: Meeting) -> JSONValue {
         let inClash = clashes.contains { $0.meetings.contains { $0.id == m.id } }
         let value = MeetingDTO(m, now: Date(), inClash: inClash, mutedByClash: suppressedByClash.contains(m.id),
-                               hiddenFromPanel: isHiddenFromPanel(m), agendaOnly: isAgendaOnly(m))
+                               hiddenFromPanel: isHiddenFromPanel(m), agendaOnly: isAgendaOnly(m),
+                               enrichmentCount: enrichments.enrichments(for: m).count)
         return (try? JSONValue(encoding: value)) ?? .null
     }
 
@@ -947,7 +953,8 @@ final class AppState {
                                  suppressedIDs: suppressedByClash.union(agendaOnlyIDs),
                                  agendaOnlyIDs: agendaOnlyIDs, takeoverEnabled: prefs.takeoverEnabled,
                                  takeoverLeadSeconds: prefs.takeoverLeadSeconds,
-                                 takeoverAutoDismissMinutes: prefs.takeoverAutoDismissMinutes)
+                                 takeoverAutoDismissMinutes: prefs.takeoverAutoDismissMinutes,
+                                 enrichments: enrichments.book.slice(for: mirrored))
     }
 
     /// A meeting by id, for actions coming from the phone.

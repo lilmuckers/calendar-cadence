@@ -53,6 +53,15 @@ struct EventRow: View {
                                       ? "Clash — you chose not to be alerted for this one. Right-click → Clash Alerts to change."
                                       : "Overlaps another meeting. Right-click → Clash Alerts to choose which one alerts.")
                         }
+                        if case let attached = state.enrichments(for: meeting), !attached.isEmpty {
+                            Button { state.onShowEnrichments?(meeting) } label: {
+                                Label("\(attached.count)", systemImage: "paperclip")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(meeting.tint)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Attached by an assistant: " + attached.map(\.title).joined(separator: ", "))
+                        }
                         if state.isAgendaOnly(meeting) {
                             Image(systemName: "bell.slash")
                                 .font(.system(size: 10))
@@ -136,6 +145,9 @@ struct EventRow: View {
                 }
             }
             Button("Show in Calendar") { state.openInCalendar(meeting) }
+            if !state.enrichments(for: meeting).isEmpty {
+                Button("Show Attached Notes…") { state.onShowEnrichments?(meeting) }
+            }
             if !meeting.isAllDay {
                 Divider()
                 RunningLateMenu(meeting: meeting)

@@ -40,9 +40,12 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
     public var takeoverLeadSeconds: Double
     /// Minutes after the start an ignored alert closes by itself; 0 = never. Nil from older Macs.
     public var takeoverAutoDismissMinutes: Int?
+    /// What assistants attached to these meetings, with the user's ticks. Nil from older Macs.
+    public var enrichments: EnrichmentBook?
 
     public init(macName: String, generatedAt: Date, meetings: [Meeting], suppressedIDs: Set<String> = [],
-                agendaOnlyIDs: Set<String>? = nil, takeoverEnabled: Bool = true, takeoverLeadSeconds: Double = 30, takeoverAutoDismissMinutes: Int? = nil) {
+                agendaOnlyIDs: Set<String>? = nil, takeoverEnabled: Bool = true, takeoverLeadSeconds: Double = 30, takeoverAutoDismissMinutes: Int? = nil,
+                enrichments: EnrichmentBook? = nil) {
         self.macName = macName
         self.generatedAt = generatedAt
         self.meetings = meetings
@@ -51,6 +54,7 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
         self.takeoverEnabled = takeoverEnabled
         self.takeoverLeadSeconds = takeoverLeadSeconds
         self.takeoverAutoDismissMinutes = takeoverAutoDismissMinutes
+        self.enrichments = enrichments
     }
 }
 
@@ -178,6 +182,8 @@ public enum CompanionMessage: Codable, Equatable, Sendable {
     case inviteLater(meetingID: String)
     /// Settle a clash: a meeting id, "all", or nil for "decide later".
     case resolveClash(key: String, choice: String?)
+    /// Tick an item, mark a bingo square or log an entry on an enrichment. Older Macs skip it.
+    case enrichmentAction(meetingID: String, action: EnrichmentAction)
     // Mac → Phone
     case welcome(macID: String, macName: String)
     /// Where the phone can dial the Mac directly right now, sent after `welcome` so a phone whose

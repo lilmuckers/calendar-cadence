@@ -28,6 +28,10 @@ struct PhonePrefs: Codable, Equatable {
     var deskDimWhenIdle = true
     /// Media controls in the corner of the landscape desk display.
     var deskMediaControls = true
+    /// A "Notes" button on the desk display when an assistant attached things to the meeting.
+    var deskEnrichments = true
+    /// Open those notes on their own when the meeting starts.
+    var deskEnrichmentsAutoOpen = false
     /// Opened by the desk's media button, and the look of the controls.
     var mediaApp: MediaApp = .appleMusic
     /// A meeting alert fades out music playing on this phone and hands the headphones over.
@@ -72,6 +76,8 @@ extension PhonePrefs {
         deskWhenCharging = v(.deskWhenCharging, d.deskWhenCharging)
         deskDimWhenIdle = v(.deskDimWhenIdle, d.deskDimWhenIdle)
         deskMediaControls = v(.deskMediaControls, d.deskMediaControls)
+        deskEnrichments = v(.deskEnrichments, d.deskEnrichments)
+        deskEnrichmentsAutoOpen = v(.deskEnrichmentsAutoOpen, d.deskEnrichmentsAutoOpen)
         mediaApp = v(.mediaApp, d.mediaApp)
         pauseMediaForAlerts = v(.pauseMediaForAlerts, d.pauseMediaForAlerts)
         announceAlerts = v(.announceAlerts, d.announceAlerts)
