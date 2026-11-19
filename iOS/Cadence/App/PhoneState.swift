@@ -50,7 +50,6 @@ final class PhoneState {
     private(set) var macArtwork: UIImage?
     @ObservationIgnored private var sentMedia: CompanionMedia?
     @ObservationIgnored private var sentVolume: (level: Double, muted: Bool)?
-    @ObservationIgnored private var lastPing = Date.distantPast
     @ObservationIgnored let audioHandoff = MeetingAudioHandoff()
     @ObservationIgnored let notifier = PhoneNotifier()
     @ObservationIgnored let liveActivity = LiveActivityController()
@@ -348,8 +347,6 @@ final class PhoneState {
         }
         syncMediaToMac()
         if link.isConnected {
-            // A heartbeat, so the Mac only hands us its media keys while we're surely here.
-            if now.timeIntervalSince(lastPing) >= 4 { lastPing = now; link.send(.ping) }
             if displaying { volume.poll() }
             syncVolumeToMac()
         }

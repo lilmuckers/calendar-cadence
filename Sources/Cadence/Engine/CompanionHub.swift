@@ -51,8 +51,11 @@ final class CompanionHub {
     @ObservationIgnored var onPhoneMedia: ((CompanionMedia?) -> Void)?
     /// The phone's media volume changed (level 0...1, muted by Cadence).
     @ObservationIgnored var onPhoneVolume: ((Double, Bool) -> Void)?
-    /// When a phone that has said hello last sent anything (it pings every few seconds).
-    @ObservationIgnored private(set) var lastHeard: Date?
+    /// When a phone that has said hello last sent anything. Channels ping every few seconds, and
+    /// pings never reach `handle`, so this asks the channels themselves.
+    var lastHeard: Date? {
+        channels.values.filter { $0.phoneID != nil }.map(\.channel.lastHeard).max()
+    }
     /// The phone's controls, aimed at the Mac's player.
     @ObservationIgnored var onMediaCommand: ((MediaCommand) -> Void)?
     /// A phone said hello (so it's ready for prompts).
@@ -203,7 +206,6 @@ final class CompanionHub {
             if let phoneID, !self.channels.values.contains(where: { $0.phoneID == phoneID }) {
                 self.phones.removeAll { $0.id == phoneID }
                 if self.phones.isEmpty {
-                    self.lastHeard = nil
                     self.onPhoneMedia?(nil)
                     self.onPhonesGone?()
                 }
@@ -214,7 +216,6 @@ final class CompanionHub {
 
     private func handle(_ message: CompanionMessage, from id: ObjectIdentifier) {
         guard let entry = channels[id] else { return }
-        if entry.phoneID != nil || message.isHello { lastHeard = Date() }
         switch message {
         case .hello(let hello):
             guard hello.protocolVersion == CompanionService.protocolVersion else {
@@ -282,8 +283,4 @@ final class CompanionHub {
         guard isConnected, let snapshot = snapshot?() else { return }
         broadcast(.snapshot(snapshot))
     }
-}
-
-private extension CompanionMessage {
-    var isHello: Bool { if case .hello = self { true } else { false } }
 }
