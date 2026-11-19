@@ -174,11 +174,29 @@ final class SpotifyRemote: NSObject {
         lastError = nil
         guard let player = remote?.playerAPI else { return }
         player.delegate = self
-        player.subscribe(toPlayerState: { [weak self] result, _ in
+        player.subscribe(toPlayerState: { [weak self] result, error in
             Task { @MainActor in
+                if let error { NSLog("Cadence: Spotify subscribe failed: \(error.localizedDescription)") }
                 if let state = result as? SPTAppRemotePlayerState { self?.apply(state) }
             }
         })
+        // Subscribing only reports changes, so ask for what's playing now.
+        refreshState()
+    }
+
+    @ObservationIgnored private var lastRefresh: Date?
+
+    /// Asks Spotify what's playing (on connect, and while connected with nothing known yet).
+    func refreshState() {
+        guard connected, let player = remote?.playerAPI else { return }
+        if let lastRefresh, Date().timeIntervalSince(lastRefresh) < 3 { return }
+        lastRefresh = Date()
+        player.getPlayerState { [weak self] result, error in
+            Task { @MainActor in
+                if let error { NSLog("Cadence: Spotify player state failed: \(error.localizedDescription)") }
+                if let state = result as? SPTAppRemotePlayerState { self?.apply(state) }
+            }
+        }
     }
 
     private func apply(_ state: SPTAppRemotePlayerState) {

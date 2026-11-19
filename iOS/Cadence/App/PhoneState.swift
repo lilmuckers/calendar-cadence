@@ -335,7 +335,11 @@ final class PhoneState {
         if isActive && (displaying || link.isConnected) {
             nowPlaying.poll()
             // Something's playing that isn't Music: if it's Spotify, pick up its track quietly.
-            if nowPlaying.otherPlaying && prefs.mediaApp == .spotify { spotify.connectIfPossible() }
+            if nowPlaying.otherPlaying && prefs.mediaApp == .spotify {
+                spotify.connectIfPossible()
+                // Connected but no track yet (state can lag a reconnect): ask again.
+                if spotify.connected && (spotify.trackURI == nil || !spotify.isPlaying) { spotify.refreshState() }
+            }
         }
         syncMediaToMac()
     }
@@ -450,7 +454,10 @@ final class PhoneState {
     }
 
     /// Spotify connected and the one playing (or just paused): it gets the controls.
-    var spotifyActive: Bool { spotify.showsControls(now: now) && !nowPlaying.musicPlaying }
+    var spotifyActive: Bool {
+        guard spotify.connected, !nowPlaying.musicPlaying else { return false }
+        return spotify.showsControls(now: now) || (nowPlaying.otherPlaying && prefs.mediaApp == .spotify)
+    }
 
     private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {
         UINotificationFeedbackGenerator().notificationOccurred(type)
