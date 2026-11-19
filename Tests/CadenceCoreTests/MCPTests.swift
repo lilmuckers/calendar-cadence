@@ -3,16 +3,21 @@ import Testing
 @testable import CadenceCore
 
 private final class FakeBackend: MCPBackend, @unchecked Sendable {
-    var calls: [(String, [String: JSONValue], String)] = []
+    // The session records activity from unstructured tasks, so these are written concurrently.
+    private let lock = NSLock()
+    private var _calls: [(String, [String: JSONValue], String)] = []
+    private var _records: [MCPActivityEntry] = []
+    var calls: [(String, [String: JSONValue], String)] { lock.withLock { _calls } }
+    var records: [MCPActivityEntry] { lock.withLock { _records } }
+
     func callTool(_ name: String, arguments: [String: JSONValue], client: String) async throws -> JSONValue {
-        calls.append((name, arguments, client))
+        lock.withLock { _calls.append((name, arguments, client)) }
         if name == "respond_to_invite" { throw MCPToolError("The user declined this in Cadence.", kind: .denied, note: "Accept · Sync") }
         if name == "snooze_alert" { return ["done": true, "action": "Snooze its alert for 1 min", "approved_by": "auto", "meeting": ["title": "Sync"]] }
         return ["meetings": [["title": "Standup"]]]
     }
     func readResource(_ uri: String) async throws -> JSONValue { ["uri": .string(uri)] }
-    var records: [MCPActivityEntry] = []
-    func record(_ entry: MCPActivityEntry) async { records.append(entry) }
+    func record(_ entry: MCPActivityEntry) async { lock.withLock { _records.append(entry) } }
 }
 
 private func j(_ v: JSONValue) -> JSONValue { v }
@@ -163,7 +168,11 @@ struct MCPActivityTests {
         _ = await send(s, ["jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": ["name": "get_agenda", "arguments": ["date": "today"]]])
         _ = await send(s, ["jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": ["name": "respond_to_invite", "arguments": [:]]])
         _ = await send(s, ["jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": ["name": "snooze_alert", "arguments": [:]]])
-        for _ in 0..<100 where backend.records.count < 3 { try await Task.sleep(for: .milliseconds(5)) }
+        // Recorded in the background: wait (up to 5 s, for slow CI runners) for all three.
+        let tools: Set<String> = ["get_agenda", "respond_to_invite", "snooze_alert"]
+        for _ in 0..<500 where !tools.isSubset(of: Set(backend.records.compactMap(\.tool))) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         let byTool = Dictionary(backend.records.map { ($0.tool ?? "", $0) }, uniquingKeysWith: { a, _ in a })
         #expect(byTool["get_agenda"]?.outcome == .ok)
         #expect(byTool["get_agenda"]?.summary == "today · 1 meeting")
