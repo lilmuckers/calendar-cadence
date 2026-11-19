@@ -92,10 +92,15 @@ struct SettingsScreen: View {
                         }
                     }
                     if state.prefs.mediaApp == .spotify && state.spotify.isAvailable {
-                        if state.spotify.needsAuthorization {
-                            Button("Connect Spotify") { state.spotify.authorize() }
+                        if state.spotify.connected {
+                            LabeledContent("Spotify", value: "Connected")
                         } else {
-                            LabeledContent("Spotify", value: state.spotify.connected ? "Connected" : "Connects when playing")
+                            Button(state.spotify.needsAuthorization ? "Connect Spotify" : "Reconnect Spotify") { state.spotify.authorize() }
+                        }
+                        if let error = state.spotify.lastError {
+                            Text(error).font(.footnote).foregroundStyle(.red)
+                        }
+                        if !state.spotify.needsAuthorization {
                             Button("Disconnect Spotify", role: .destructive) { state.spotify.signOut() }
                         }
                     }
@@ -104,7 +109,7 @@ struct SettingsScreen: View {
                         .disabled(!state.prefs.pauseMediaForAlerts)
                     Button("Test the hand-off") { state.testAudioHandoff() }
                 } header: { Text("Media") } footer: {
-                    Text("Landscape desk mode shows what's playing in the corner, or a button for your media app. Track details and skip work for Apple Music and, once connected, Spotify (connecting opens Spotify for a moment to approve); other apps show that they're playing and can be paused. When connected, it shows and controls the Mac's Music or Spotify too, and the Mac's media keys control this iPhone's music.\n\nWhen an alert comes up with music playing here, Cadence fades it out, says which meeting it is, then lets go of the audio so your headphones can switch to the Mac. Siri's own voice isn't available to apps: for a better voice, download an Enhanced or Premium one in Settings → Accessibility → Spoken Content → Voices.")
+                    Text("Landscape desk mode shows what's playing in the corner, or a button for your media app. Track details and skip work for Apple Music and, once connected, Spotify (connecting opens Spotify for a moment to approve); other apps show that they're playing and can be paused. When connected, it shows and controls the Mac's Music or Spotify too (and, if you turn it on in Cadence on the Mac, the Mac's media keys control this iPhone's music).\n\nWhen an alert comes up with music playing here, Cadence fades it out, says which meeting it is, then lets go of the audio so your headphones can switch to the Mac. Siri's own voice isn't available to apps: for a better voice, download an Enhanced or Premium one in Settings → Accessibility → Spoken Content → Voices.")
                 }
                 Section {
                     Toggle("Live Activity", isOn: $state.prefs.liveActivityEnabled)

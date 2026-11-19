@@ -20,7 +20,7 @@ struct MediaCorner: View {
             case .mac(let media):
                 MediaCard(model: macModel(media)).transition(.move(edge: .trailing).combined(with: .opacity))
             case .launcher:
-                Button { state.openMediaApp() } label: {
+                Button { state.launchMedia() } label: {
                     MediaLogo(app: app, size: 44)
                         .shadow(color: app.theme.accent.opacity(0.35), radius: 8)
                 }
@@ -75,10 +75,10 @@ struct MediaCorner: View {
         }
         // Other apps can be stopped from here but only started again in the app itself. Spotify
         // that isn't hooked up yet offers to connect (a quick hop to Spotify to approve).
-        let connect = app == .spotify && state.spotify.isAvailable && state.spotify.needsAuthorization
+        let connect = app == .spotify && state.spotify.isAvailable && !state.spotify.connected
         return MediaCardModel(
             app: app, title: np.otherPlaying ? "Playing on this iPhone" : "Paused",
-            subtitle: connect ? "Tap link to show the track" : app.name, artwork: nil,
+            subtitle: connect ? (state.spotify.lastError ?? "Tap the link to show the track") : app.name, artwork: nil,
             isPlaying: np.otherPlaying, canSkip: false,
             playPause: np.otherPlaying ? { state.pauseMedia() } : nil,
             next: nil, previous: nil,

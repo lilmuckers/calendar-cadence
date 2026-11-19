@@ -237,9 +237,14 @@ private struct AlertsTab: View {
                 Toggle("Say which meeting it is", isOn: $state.prefs.announceAlerts)
                     .disabled(!state.prefs.fadeMediaForAlerts)
                 Toggle("Share music with your iPhone", isOn: $state.prefs.shareMediaWithPhone)
+                Toggle(isOn: $state.prefs.phoneMediaKeys) {
+                    Text("Media keys control iPhone music")
+                    Text("macOS then counts the Mac as playing, which can keep AirPods on the Mac.")
+                }
+                .disabled(!state.prefs.shareMediaWithPhone)
                 Button("Test") { state.onTestMediaFade?() }
             } header: { Text("Music") } footer: {
-                Text("Works with Music and Spotify (macOS asks once to let Cadence control them). The voice is your Spoken Content system voice. Sharing shows this Mac's music on the iPhone's desk display with play, pause and skip, and while the iPhone plays, your media keys and Control Center control it.")
+                Text("Works with Music and Spotify (macOS asks once to let Cadence control them). The voice is your Spoken Content system voice. Sharing shows this Mac's music on the iPhone's desk display with play, pause and skip.")
             }
             Section {
                 Picker("While presenting or sharing", selection: $state.prefs.whilePresenting) {

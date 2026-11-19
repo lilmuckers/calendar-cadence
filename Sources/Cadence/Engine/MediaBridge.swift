@@ -20,6 +20,8 @@ final class MediaBridge {
     private var stoppedAt: Date?
     private var sent: CompanionMedia?
     private var fading = false
+    /// The phone's latest report, so turning the media-keys setting on picks it up straight away.
+    private var phoneMedia: CompanionMedia?
 
     init(state: AppState, hub: CompanionHub) {
         self.state = state
@@ -42,6 +44,7 @@ final class MediaBridge {
 
     /// Only asks the players while there's someone to tell (AppleScript isn't free).
     private func poll() {
+        applyPhoneNowPlaying()
         guard sharing, hub.isConnected, !fading else {
             if !hub.isConnected { sent = nil; last = nil }
             return
@@ -70,8 +73,14 @@ final class MediaBridge {
     // MARK: Phone → Mac
 
     private func phoneMediaChanged(_ media: CompanionMedia?) {
-        guard sharing else { return phoneNowPlaying.update(nil) }
-        phoneNowPlaying.update(media)
+        phoneMedia = media
+        applyPhoneNowPlaying()
+    }
+
+    /// Only with the setting on: claiming Now Playing makes macOS treat the Mac as the one
+    /// playing, and AirPods' automatic switching follows that.
+    private func applyPhoneNowPlaying() {
+        phoneNowPlaying.update(sharing && state.prefs.phoneMediaKeys ? phoneMedia : nil)
     }
 
     // MARK: Meeting alerts
@@ -252,7 +261,12 @@ final class PhoneNowPlaying {
     private var artwork: NSImage?
     private var trackID: String?
 
+    private var last: CompanionMedia?
+
     func update(_ media: CompanionMedia?) {
+        // Called on every poll: only touch Now Playing when something actually changed.
+        guard media != last else { return }
+        last = media
         let center = MPNowPlayingInfoCenter.default()
         guard let media else {
             if !targets.isEmpty {
