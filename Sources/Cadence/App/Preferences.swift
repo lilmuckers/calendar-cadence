@@ -99,6 +99,9 @@ struct Preferences: Codable, Equatable {
     /// Music/Spotify here show on the phone's desk display, and the phone's music takes over the
     /// Mac's Now Playing (media keys) while it plays.
     var shareMediaWithPhone = true
+    /// While the phone plays, stand in as the Mac's Now Playing app so the media keys control it.
+    /// Off by default: macOS then counts the Mac as playing, which can keep AirPods on the Mac.
+    var phoneMediaKeys = false
     /// A meeting alert fades out Music or Spotify on this Mac...
     var fadeMediaForAlerts = false
     /// ...and says which meeting it is.
@@ -174,6 +177,7 @@ extension Preferences {
         companionEscalation = (try? c.decodeIfPresent(CompanionEscalation.self, forKey: .companionEscalation)) ?? d.companionEscalation
         profileRules = (try? c.decodeIfPresent(ProfileRules.self, forKey: .profileRules)) ?? d.profileRules
         shareMediaWithPhone = try c.decodeIfPresent(Bool.self, forKey: .shareMediaWithPhone) ?? d.shareMediaWithPhone
+        phoneMediaKeys = try c.decodeIfPresent(Bool.self, forKey: .phoneMediaKeys) ?? d.phoneMediaKeys
         fadeMediaForAlerts = try c.decodeIfPresent(Bool.self, forKey: .fadeMediaForAlerts) ?? d.fadeMediaForAlerts
         announceAlerts = try c.decodeIfPresent(Bool.self, forKey: .announceAlerts) ?? d.announceAlerts
     }
