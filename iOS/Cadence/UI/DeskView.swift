@@ -51,13 +51,13 @@ struct DeskView: View {
                 }
                 // A pop-up wakes it: nothing dims while one is up.
                 .opacity(dimmed && !prompting ? 0.55 : 1)
-                // Bottom right, landscape only; full brightness while something's playing.
+                // Bottom right, landscape only; dims with the rest of the desk.
                 if landscape && state.prefs.deskMediaControls {
                     MediaCorner()
                         .frame(width: min(360, geo.size.width * 0.42))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .padding(.horizontal, 28).padding(.vertical, 20)
-                        .opacity(dimmed && !prompting && !state.nowPlaying.isPlaying && state.macMedia == nil ? 0.55 : 1)
+                        .opacity(dimmed && !prompting ? 0.55 : 1)
                 }
             }
             .foregroundStyle(.white)
