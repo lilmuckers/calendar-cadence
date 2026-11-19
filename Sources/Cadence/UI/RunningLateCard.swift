@@ -29,7 +29,9 @@ struct RunningLateCard: View {
     }
 
     var body: some View {
-        Group {
+        // A real container, not a Group: modifiers on a Group go to its children, so while there's no draft
+        // yet (no children) its onAppear never ran, the draft was never built and the card stayed blank.
+        VStack(spacing: 0) {
             if let notice = state.lateNotices[meeting.id] {
                 sent(notice)
             } else if !state.lateMessenger.isSetUp {
@@ -41,6 +43,8 @@ struct RunningLateCard: View {
                 .foregroundStyle(.white.opacity(0.55))
             } else if let draft {
                 compose(draft)
+            } else {
+                ProgressView().controlSize(.small)
             }
         }
         .frame(maxWidth: 640)
