@@ -400,7 +400,15 @@ private struct GeneralTab: View {
                 }
             }
             Section("Menu bar") {
-                Toggle("Show next meeting title and countdown", isOn: $state.prefs.showMenuBarTitle)
+                Picker("Show", selection: $state.prefs.menuBarStyle) {
+                    ForEach(MenuBarStyle.allCases) { Text($0.label).tag($0) }
+                }
+                Picker("Longest title", selection: $state.prefs.menuBarTitleLength) {
+                    ForEach([12, 16, 22, 30, 40], id: \.self) { Text("\($0) characters").tag($0) }
+                }
+                .disabled(state.prefs.menuBarStyle != .full)
+                Text("macOS hides menu bar items that don't fit, starting with the leftmost, and apps can't ask to be kept. A narrower style helps; so does ⌘-dragging the Cadence icon to the right, nearer the clock — macOS remembers where you put it.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Show tomorrow's meetings in the evening", isOn: $state.prefs.tomorrowPreview)
                 Picker("From", selection: $state.prefs.tomorrowFromHour) {
                     ForEach([12, 15, 16, 17, 18, 19, 20, 21], id: \.self) { h in

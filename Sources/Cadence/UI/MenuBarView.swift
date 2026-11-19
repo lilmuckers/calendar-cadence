@@ -9,7 +9,7 @@ struct MenuBarLabel: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(nsImage: MenuBarIcon.image(mood, phone: phone))
-            if state.prefs.showMenuBarTitle, let text {
+            if let text {
                 Text(text).monospacedDigit()
             }
         }
@@ -32,17 +32,23 @@ struct MenuBarLabel: View {
     }
 
     private var text: String? {
+        let style = state.prefs.menuBarStyle
+        guard style != .icon else { return nil }
+        let withTitle = style == .full
         if let next = state.next, next.start.timeIntervalSince(state.now) <= 3600 {
-            return "\(CountdownFormatter.short(next.start.timeIntervalSince(state.now))) · \(truncate(next.title))"
+            let countdown = CountdownFormatter.short(next.start.timeIntervalSince(state.now))
+            return withTitle ? "\(countdown) · \(truncate(next.title))" : countdown
         }
         if let cur = state.current.first {
-            return "\(truncate(cur.title)) · \(CountdownFormatter.short(cur.end.timeIntervalSince(state.now))) left"
+            let left = "\(CountdownFormatter.short(cur.end.timeIntervalSince(state.now))) left"
+            return withTitle ? "\(truncate(cur.title)) · \(left)" : left
         }
         return nil
     }
 
-    private func truncate(_ s: String, to n: Int = 22) -> String {
-        s.count > n ? String(s.prefix(n - 1)) + "…" : s
+    private func truncate(_ s: String) -> String {
+        let n = max(4, state.prefs.menuBarTitleLength)
+        return s.count > n ? String(s.prefix(n - 1)) + "…" : s
     }
 }
 
