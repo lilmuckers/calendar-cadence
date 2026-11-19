@@ -237,15 +237,11 @@ private struct AlertsTab: View {
                 Toggle("Say which meeting it is", isOn: $state.prefs.announceAlerts)
                     .disabled(!state.prefs.fadeMediaForAlerts)
                 Toggle("Share music with your iPhone", isOn: $state.prefs.shareMediaWithPhone)
-                Toggle(isOn: $state.prefs.phoneMediaKeys) {
-                    Text("Media keys control iPhone music")
-                    Text("macOS then counts the Mac as playing, which can keep AirPods on the Mac.")
-                }
-                .disabled(!state.prefs.shareMediaWithPhone)
                 Button("Test") { state.onTestMediaFade?() }
             } header: { Text("Music") } footer: {
                 Text("Works with Music and Spotify (macOS asks once to let Cadence control them). The voice is your Spoken Content system voice. Sharing shows this Mac's music on the iPhone's desk display with play, pause and skip.")
             }
+            MediaRemoteSection()
             Section {
                 Picker("While presenting or sharing", selection: $state.prefs.whilePresenting) {
                     ForEach(BusyAlertStyle.allCases, id: \.self) { Text($0.label).tag($0) }
@@ -457,5 +453,69 @@ private struct OffsetsField: View {
                     .filter { (0...240).contains($0) }
                 offsets = Array(Set(parsed)).sorted(by: >)
             }
+    }
+}
+
+/// Settings → Alerts → Media remote control: the Mac's media keys drive the phone in desk mode.
+private struct MediaRemoteSection: View {
+    @Environment(AppState.self) private var state
+    @State private var trusted = MediaKeyTap.isTrusted
+    @State private var conflicts: [String] = []
+
+    var body: some View {
+        @Bindable var state = state
+        let on = state.prefs.mediaRemoteControl
+        Section {
+            Toggle(isOn: Binding(get: { on }, set: { new in
+                state.prefs.mediaRemoteControl = new
+                if new && !MediaKeyTap.isTrusted { MediaKeyTap.requestAccess() }
+            })) {
+                Text("Media remote control")
+                Text("While your iPhone shows its desk display, the volume, mute, play/pause and skip keys control the iPhone instead. Never during a call.")
+            }
+            if on && !trusted {
+                HStack {
+                    Label("Needs Accessibility access to catch the media keys. Until then they work as normal on the Mac.", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Spacer()
+                    Button("Open Settings") { MediaKeyTap.openAccessibilitySettings() }
+                }
+            }
+            Toggle(isOn: $state.prefs.mediaRemotePauseLimitEnabled) {
+                Text("Hand the keys back when the iPhone is paused")
+                Text("Off: they go to the iPhone for as long as its desk display is up.")
+            }
+            .disabled(!on)
+            if state.prefs.mediaRemotePauseLimitEnabled {
+                Stepper(value: $state.prefs.mediaRemotePauseLimitSeconds, in: 5...600, step: 5) {
+                    LabeledContent("After paused for") {
+                        TextField("", value: $state.prefs.mediaRemotePauseLimitSeconds, format: .number)
+                            .frame(width: 48).multilineTextAlignment(.trailing)
+                        Text("seconds")
+                    }
+                }
+                .disabled(!on)
+            }
+            Picker("Mini-player", selection: $state.prefs.mediaHUD) {
+                ForEach(MediaHUDMode.allCases, id: \.self) { Text($0.label).tag($0) }
+            }
+            .disabled(!on)
+            if on && !conflicts.isEmpty {
+                Label("Also catching media keys: \(conflicts.joined(separator: ", ")). Whichever app sees a key first wins, so some keys may not reach the iPhone (or the Mac).",
+                      systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                    .font(.callout)
+            }
+        } header: { Text("Media remote control") } footer: {
+            Text("Track, artwork and skip work with Spotify and Apple Music on the iPhone; other apps get play/pause and volume. The mini-player hides while you present, share your screen or are on a call.")
+        }
+        .task(id: on) {
+            // Access and other apps can change while Settings is open.
+            while !Task.isCancelled {
+                trusted = MediaKeyTap.isTrusted
+                conflicts = on ? MediaKeyTap.conflicts() : []
+                try? await Task.sleep(for: .seconds(3))
+            }
+        }
     }
 }

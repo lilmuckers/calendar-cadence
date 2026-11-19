@@ -43,10 +43,14 @@ final class PhoneState {
     let desk = DeskMode()
     let nowPlaying = NowPlaying()
     let spotify = SpotifyRemote()
+    /// The system media volume, for the Mac's volume keys.
+    let volume = PhoneVolume()
     /// What the Mac is playing (Music or Spotify there), while connected.
     private(set) var macMedia: CompanionMedia?
     private(set) var macArtwork: UIImage?
     @ObservationIgnored private var sentMedia: CompanionMedia?
+    @ObservationIgnored private var sentVolume: (level: Double, muted: Bool)?
+    @ObservationIgnored private var lastPing = Date.distantPast
     @ObservationIgnored let audioHandoff = MeetingAudioHandoff()
     @ObservationIgnored let notifier = PhoneNotifier()
     @ObservationIgnored let liveActivity = LiveActivityController()
@@ -158,6 +162,7 @@ final class PhoneState {
         link.onDisconnected = { [weak self] in
             self?.macMedia = nil
             self?.sentMedia = nil
+            self?.sentVolume = nil
             self?.invitePrompts = []
             self?.clashPrompts = []
         }
@@ -335,9 +340,28 @@ final class PhoneState {
         if isActive && (displaying || link.isConnected) {
             nowPlaying.poll()
             // Something's playing that isn't Music: if it's Spotify, pick up its track quietly.
-            if nowPlaying.otherPlaying && prefs.mediaApp == .spotify { spotify.connectIfPossible() }
+            if nowPlaying.otherPlaying && prefs.mediaApp == .spotify {
+                spotify.connectIfPossible()
+                // Connected but no track yet (state can lag a reconnect): ask again.
+                if spotify.connected && (spotify.trackURI == nil || !spotify.isPlaying) { spotify.refreshState() }
+            }
         }
         syncMediaToMac()
+        if link.isConnected {
+            // A heartbeat, so the Mac only hands us its media keys while we're surely here.
+            if now.timeIntervalSince(lastPing) >= 4 { lastPing = now; link.send(.ping) }
+            if displaying { volume.poll() }
+            syncVolumeToMac()
+        }
+    }
+
+    /// The Mac's mini-player shows the phone's volume.
+    private func syncVolumeToMac() {
+        guard link.isConnected else { sentVolume = nil; return }
+        let current = (level: volume.level, muted: volume.muted)
+        if let sent = sentVolume, abs(sent.level - current.level) < 0.001, sent.muted == current.muted { return }
+        sentVolume = current
+        link.send(.volume(level: current.level, muted: current.muted))
     }
 
     /// Tells the Mac when what's playing here changes, so its media keys and Now Playing follow.
@@ -357,6 +381,13 @@ final class PhoneState {
 
     /// Mac media keys / Control Center (via the Mac), aimed at what's playing on this phone.
     private func applyMediaCommand(_ command: MediaCommand) {
+        if command.isVolume {
+            // Only from the desk display: the volume view only works while it's on screen.
+            guard displaying else { return }
+            volume.apply(command)
+            syncVolumeToMac()
+            return
+        }
         let np = nowPlaying
         if spotify.connected && !np.musicPlaying && (spotify.isPlaying || !np.hasTrack) {
             switch command {
@@ -365,16 +396,20 @@ final class PhoneState {
             case .togglePlayPause: spotify.togglePlay()
             case .next: spotify.next()
             case .previous: spotify.previous()
+            case .volumeUp, .volumeDown, .toggleMute: break
             }
             return
         }
+        // Nothing known to resume: Music can still pick up its last queue if it's the chosen app.
+        let canResume = np.hasTrack || (prefs.mediaApp == .appleMusic && np.authorized)
         switch command {
-        case .play: if np.hasTrack { np.resumeMusic() }
+        case .play: if canResume { np.resumeMusic() }
         case .pause: pauseMedia()
         case .togglePlayPause:
-            if np.isPlaying { pauseMedia() } else if np.hasTrack { np.resumeMusic() }
+            if np.isPlaying { pauseMedia() } else if canResume { np.resumeMusic() }
         case .next: np.next()
         case .previous: np.previous()
+        case .volumeUp, .volumeDown, .toggleMute: break
         }
     }
 
@@ -450,7 +485,10 @@ final class PhoneState {
     }
 
     /// Spotify connected and the one playing (or just paused): it gets the controls.
-    var spotifyActive: Bool { spotify.showsControls(now: now) && !nowPlaying.musicPlaying }
+    var spotifyActive: Bool {
+        guard spotify.connected, !nowPlaying.musicPlaying else { return false }
+        return spotify.showsControls(now: now) || (nowPlaying.otherPlaying && prefs.mediaApp == .spotify)
+    }
 
     private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {
         UINotificationFeedbackGenerator().notificationOccurred(type)

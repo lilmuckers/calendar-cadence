@@ -100,6 +100,11 @@ public struct CompanionInvite: Codable, Equatable, Sendable {
 }
 
 /// A media player Cadence knows how to show (and, where it can, open or control).
+///
+/// Adding a player: the Mac's media remote control (media keys → phone) and mini-player only get
+/// a track, artwork and skip for players each side can read and drive — today Music and Spotify.
+/// A new player needs reading/controlling on the phone (`PhoneState.applyMediaCommand`,
+/// `phoneMedia`) and on the Mac (`MacPlayers`), plus a logo and colours in `MediaLook.swift`.
 public enum MediaApp: String, Codable, CaseIterable, Identifiable, Sendable {
     case appleMusic, spotify, youTubeMusic, podcasts
 
@@ -153,6 +158,11 @@ public struct CompanionMedia: Codable, Equatable, Sendable {
 
 public enum MediaCommand: String, Codable, Sendable {
     case play, pause, togglePlayPause, next, previous
+    /// The phone's system volume, one step (of 16) at a time, from the Mac's volume keys.
+    /// Older phones skip these; the Mac ignores them (its own keys already do it).
+    case volumeUp, volumeDown, toggleMute
+
+    public var isVolume: Bool { self == .volumeUp || self == .volumeDown || self == .toggleMute }
 }
 
 public enum CompanionMessage: Codable, Equatable, Sendable {
@@ -192,6 +202,11 @@ public enum CompanionMessage: Codable, Equatable, Sendable {
     case media(CompanionMedia?)
     /// Control the receiver's media (from its controls on the other device, or the Mac's media keys).
     case mediaCommand(MediaCommand)
+    /// Phone → Mac: the phone's media volume (0...1) and whether Cadence muted it, for the Mac's
+    /// mini-player. Sent when it changes. Older Macs skip it.
+    case volume(level: Double, muted: Bool)
+    /// Phone → Mac every few seconds while connected, so the Mac knows the phone's still there
+    /// before it hands it a key press.
     case ping
     case bye(reason: String)
 }
