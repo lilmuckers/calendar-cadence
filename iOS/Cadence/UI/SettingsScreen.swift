@@ -81,6 +81,9 @@ struct SettingsScreen: View {
                 Section {
                     Toggle("Turn on while charging", isOn: $state.prefs.deskWhenCharging)
                     Toggle("Dim when nothing's close", isOn: $state.prefs.deskDimWhenIdle)
+                    Toggle("Meeting notes button", isOn: $state.prefs.deskEnrichments)
+                    Toggle("Open notes when a meeting starts", isOn: $state.prefs.deskEnrichmentsAutoOpen)
+                        .disabled(!state.prefs.deskEnrichments)
                 } header: { Text("Desk mode") } footer: {
                     Text("Put your iPhone on a MagSafe stand or charger and Cadence becomes a desk clock for your meetings. While it's showing and connected, your Mac stays quiet.")
                 }

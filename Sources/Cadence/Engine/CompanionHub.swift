@@ -45,6 +45,7 @@ final class CompanionHub {
     @ObservationIgnored var onRSVP: ((String, RSVP?) -> Void)?
     @ObservationIgnored var onInviteLater: ((String) -> Void)?
     @ObservationIgnored var onResolveClash: ((String, String?) -> Void)?
+    @ObservationIgnored var onEnrichmentAction: ((String, EnrichmentAction) -> Void)?
     /// What's playing on the Mac, sent to a phone when it says hello.
     @ObservationIgnored var macMedia: (() -> CompanionMedia?)?
     /// What's playing on the phone changed (nil = nothing, or the phone went away).
@@ -257,6 +258,8 @@ final class CompanionHub {
             onInviteLater?(meetingID)
         case .resolveClash(let key, let choice):
             onResolveClash?(key, choice)
+        case .enrichmentAction(let meetingID, let action):
+            onEnrichmentAction?(meetingID, action)
         case .media(let media):
             onPhoneMedia?(media)
         case .mediaCommand(let command):

@@ -74,6 +74,12 @@ struct Preferences: Codable, Equatable {
     var mcpEnabled = true
     /// Assistant actions (tool names) that run without asking.
     var mcpAutoApprove: Set<String> = []
+    /// Let assistants attach notes, links, checklists, bingo cards… to meetings (no confirmation).
+    var mcpEnrichments = true
+    /// The little "Notes" button at the bottom of the screen during meetings with enrichments.
+    var showEnrichmentDrawer = true
+    /// Slide the drawer open by itself when such a meeting starts.
+    var enrichmentDrawerAutoOpen = false
     /// Working hours for find_free_time, minutes after midnight.
     var workStart = 9 * 60
     var workEnd = 17 * 60 + 30
@@ -190,6 +196,9 @@ extension Preferences {
         useEventColors = try c.decodeIfPresent(Bool.self, forKey: .useEventColors) ?? d.useEventColors
         mcpEnabled = try c.decodeIfPresent(Bool.self, forKey: .mcpEnabled) ?? d.mcpEnabled
         mcpAutoApprove = try c.decodeIfPresent(Set<String>.self, forKey: .mcpAutoApprove) ?? d.mcpAutoApprove
+        mcpEnrichments = try c.decodeIfPresent(Bool.self, forKey: .mcpEnrichments) ?? d.mcpEnrichments
+        showEnrichmentDrawer = try c.decodeIfPresent(Bool.self, forKey: .showEnrichmentDrawer) ?? d.showEnrichmentDrawer
+        enrichmentDrawerAutoOpen = try c.decodeIfPresent(Bool.self, forKey: .enrichmentDrawerAutoOpen) ?? d.enrichmentDrawerAutoOpen
         workStart = try c.decodeIfPresent(Int.self, forKey: .workStart) ?? d.workStart
         workEnd = try c.decodeIfPresent(Int.self, forKey: .workEnd) ?? d.workEnd
         inviteHorizon = (try? c.decodeIfPresent(InviteHorizon.self, forKey: .inviteHorizon)) ?? d.inviteHorizon

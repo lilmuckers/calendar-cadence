@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var phonePrompts: PhonePrompts?
     private var approvals: ApprovalController?
     private var bridge: MCPBridge?
+    private var drawer: EnrichmentDrawerController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let i = CommandLine.arguments.firstIndex(of: "--screenshots") {
@@ -95,6 +96,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Re-evaluate panel visibility whenever the observed state it depends on changes.
         observePanel()
+
+        let drawer = EnrichmentDrawerController(state: state)
+        self.drawer = drawer
+        state.onShowEnrichments = { meeting in drawer.show(meeting) }
+        observeDrawer()
     }
 
     private func startCompanion(router: AlertRouter) {
@@ -110,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             router.closeAlert(for: id)
         }
         hub.onDismiss = { id in router.closeAlert(for: id) }
+        hub.onEnrichmentAction = { [weak self] id, action in self?.state.applyEnrichment(action, meetingID: id) }
         if state.prefs.companionEnabled { hub.start() }
         var enabled = state.prefs.companionEnabled
         let previous = state.onPrefsChanged
@@ -119,6 +126,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             enabled = self.state.prefs.companionEnabled
             if enabled { hub.start() } else { hub.stop() }
         }
+    }
+
+    /// The enrichment drawer follows the clock (meetings start and end), the attachments and its settings.
+    private func observeDrawer() {
+        withObservationTracking {
+            _ = state.enrichments.book
+            _ = state.prefs.showEnrichmentDrawer
+            _ = state.prefs.enrichmentDrawerAutoOpen
+            _ = state.enrichmentFocus()?.id
+            _ = state.now
+        } onChange: { [weak self] in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    self?.drawer?.update()
+                    self?.observeDrawer()
+                }
+            }
+        }
+        drawer?.update()
     }
 
     private func observePanel() {

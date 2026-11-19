@@ -145,14 +145,30 @@ claude mcp add --scope user cadence -- "/Applications/Cadence.app/Contents/MacOS
 |---|---|
 | **Read** | `get_agenda` · `get_next_meeting` · `get_current_meeting` · `list_invites` · `list_clashes` · `find_free_time` · `list_calendars` · `get_status` (presenting / on a call) |
 | **Act** | `respond_to_invite` · `set_event_color` · `join_meeting` · `hide_from_panel` · `snooze_alert` |
+| **Attach** | `add_enrichment` · `update_enrichment` · `remove_enrichment` · `clear_enrichments` · `get_enrichments` |
 | **Resources** | `cadence://agenda/today` · `agenda/tomorrow` · `next` · `invites` · `clashes` · `status` (subscribable) |
-| **Prompts** | `daily_briefing` · `prepare_for_meeting` · `triage_invites` |
+| **Prompts** | `daily_briefing` · `prepare_for_meeting` · `triage_invites` · `enrich_meeting` |
 
 **You stay in charge.** Every action pops a card in Cadence naming the assistant and what it wants to do: **Allow**, **Deny** or **Always allow**. Unanswered requests are denied after a minute. Per-action auto-approval lives in *Settings → Assistants*.
 
 **See what they did.** *Settings → Assistants → Activity* shows calls today and over the last week, actions done and denied, a chart per tool and per day, and a list of recent calls with their outcome. It can be filtered by assistant. The history stays on this Mac for 30 days and can be cleared.
 
-**Events.** Cadence pushes `meeting.starting_soon`, `meeting.started`, `meeting.ending_soon`, `meeting.ended`, `invite.new`, `meeting.changed`, `meeting.canceled`, `clash.new`, `status.presenting` and `status.on_call`. They arrive as MCP log notifications and as `resources/updated` for subscribed resources. Clients differ in what they do with unsolicited notifications, so there's also `wait_for_event`: a long-poll tool (up to 5 minutes) that returns everything since the last call. An agent can loop on it to react to your calendar.
+**Attach things to meetings.** Assistants can put what you'll need *during* a meeting right on it:
+
+| Kind | What you see |
+|---|---|
+| `markdown` | Notes with headings, lists, quotes, code and links |
+| `links` | The docs, decks and tickets, one tap to open |
+| `checklist` | Things to cover or bring, ticked off as you go |
+| `bingo` | A 3×3 to 5×5 buzzword bingo card (free centre, sampled per meeting) that celebrates a line |
+| `agenda` | A timed agenda that follows the clock from the start and goes red when an item runs over |
+| `people` | Short briefs on who's in the room |
+| `log` | Decisions, action items and notes you capture in the meeting |
+| `stats` | Key numbers as tiles with trend arrows |
+
+On the Mac a small **Notes** button sits at the bottom of the screen during the meeting (and five minutes before) and slides up into a drawer; on the iPhone, desk mode shows a **Notes** pill that opens them beside the countdown. Both are optional (*Settings → General* on the Mac, *Settings → Desk mode* on the phone), and either can open by itself when the meeting starts. Ticks, bingo squares and log entries go back to the assistant through `get_enrichments` and as `enrichment.changed` / `enrichment.bingo` events, so an automation can, say, file your action items when `meeting.ended` arrives. Attachments only change what Cadence shows, so they don't ask first; switch them off in *Settings → Assistants*. Anything for a recurring meeting can apply to every occurrence (`all_occurrences`), with ticks kept per occurrence. A Cowork task like *"Before each meeting, attach a summary of the linked docs, the links themselves and a bingo card"* is all it takes.
+
+**Events.** Cadence pushes `meeting.starting_soon`, `meeting.started`, `meeting.ending_soon`, `meeting.ended`, `invite.new`, `meeting.changed`, `meeting.canceled`, `clash.new`, `status.presenting`, `status.on_call`, `enrichment.changed` and `enrichment.bingo`. They arrive as MCP log notifications and as `resources/updated` for subscribed resources. Clients differ in what they do with unsolicited notifications, so there's also `wait_for_event`: a long-poll tool (up to 5 minutes) that returns everything since the last call. An agent can loop on it to react to your calendar.
 
 ## ✨ Everything else
 

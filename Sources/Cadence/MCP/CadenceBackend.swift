@@ -39,6 +39,8 @@ final class CadenceBackend: MCPBackend {
                  "type": .string(c.kind.rawValue), "enabled": .bool(state.isCalendarEnabled(c.id))]
             })]
         case "get_status": return status()
+        case _ where EnrichmentTools.names.contains(name):
+            return try state.enrichmentTool(name, a, client: client)
         case "respond_to_invite", "set_event_color", "join_meeting", "hide_from_panel", "snooze_alert":
             return try await action(name, a, client: client)
         default:
@@ -50,7 +52,7 @@ final class CadenceBackend: MCPBackend {
         let inClash = state.clashes.contains { $0.meetings.contains { $0.id == m.id } }
         let dto = MeetingDTO(m, now: Date(), inClash: inClash, mutedByClash: state.suppressedByClash.contains(m.id),
                              hiddenFromPanel: state.isHiddenFromPanel(m), agendaOnly: state.isAgendaOnly(m),
-                             includeNotes: true)
+                             includeNotes: true, enrichmentCount: state.enrichments(for: m).count)
         return (try? JSONValue(encoding: dto)) ?? .null
     }
 

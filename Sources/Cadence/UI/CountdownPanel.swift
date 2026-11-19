@@ -228,6 +228,9 @@ struct CountdownPanelView: View {
                 Button("Join \(m.title)") { state.join(m) }
                 JoinInMenu(meeting: m)
             }
+            if !state.enrichments(for: m).isEmpty {
+                Button("Show Attached Notes…") { state.onShowEnrichments?(m) }
+            }
             RunningLateMenu(meeting: m)
             ClashAlertsMenu(meeting: m)
             PanelVisibilityMenu(meeting: m)
