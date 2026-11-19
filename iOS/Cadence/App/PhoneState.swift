@@ -623,13 +623,16 @@ final class PhoneState {
                 return WidgetMeeting(id: m.id, title: m.title, start: m.start, end: m.end,
                                      red: c.red, green: c.green, blue: c.blue, hasLink: m.joinLink != nil)
             }
-        guard upcoming != lastWidgetMeetings else { return }
+        let tomorrowFromHour = prefs.widgetShowsTomorrow ? prefs.widgetTomorrowHour : nil
+        guard upcoming != lastWidgetMeetings || tomorrowFromHour != lastWidgetTomorrowHour else { return }
         lastWidgetMeetings = upcoming
-        WidgetSchedule(meetings: upcoming, generatedAt: Date()).save()
+        lastWidgetTomorrowHour = tomorrowFromHour
+        WidgetSchedule(meetings: upcoming, generatedAt: Date(), tomorrowFromHour: tomorrowFromHour).save()
         WidgetCenter.shared.reloadAllTimelines()
     }
 
     @ObservationIgnored private var lastWidgetMeetings: [WidgetMeeting]?
+    @ObservationIgnored private var lastWidgetTomorrowHour: Int??
 
     /// Live Activity (Lock Screen, StandBy, Dynamic Island): a countdown once the next meeting is within
     /// `liveActivityLeadMinutes`. iOS only lets an app start one while it's open, so when leaving

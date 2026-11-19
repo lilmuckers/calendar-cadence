@@ -39,6 +39,11 @@ struct PhonePrefs: Codable, Equatable {
     var liveActivityEnabled = true
     var liveActivityLeadMinutes = 30
 
+    // Home Screen / Lock Screen widgets.
+    /// With nothing left today, show tomorrow's first meeting from `widgetTomorrowHour` on.
+    var widgetShowsTomorrow = true
+    var widgetTomorrowHour = 20
+
     private static let key = "Cadence.phone.preferences.v1"
 
     static func load() -> PhonePrefs {
@@ -77,5 +82,7 @@ extension PhonePrefs {
         announceAlerts = v(.announceAlerts, d.announceAlerts)
         liveActivityEnabled = v(.liveActivityEnabled, d.liveActivityEnabled)
         liveActivityLeadMinutes = v(.liveActivityLeadMinutes, d.liveActivityLeadMinutes)
+        widgetShowsTomorrow = v(.widgetShowsTomorrow, d.widgetShowsTomorrow)
+        widgetTomorrowHour = v(.widgetTomorrowHour, d.widgetTomorrowHour)
     }
 }

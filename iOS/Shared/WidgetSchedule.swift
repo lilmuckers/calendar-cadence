@@ -21,6 +21,10 @@ struct WidgetMeeting: Codable, Hashable {
 struct WidgetSchedule: Codable, Equatable {
     var meetings: [WidgetMeeting]
     var generatedAt: Date
+    /// Hour of the day (0–23) from which, with nothing left today, the widgets show tomorrow's
+    /// first meeting instead of "No more meetings today!". nil = never. Optional so schedules saved
+    /// before this existed still decode.
+    var tomorrowFromHour: Int? = nil
 
     /// Same stages as the Mac's menu bar icon (`IconMood` in CadenceCore).
     static let nervousLead: TimeInterval = 15 * 60
@@ -38,6 +42,21 @@ struct WidgetSchedule: Codable, Equatable {
             .min { ($0.start, $0.title) < ($1.start, $1.title) }
     }
 
+    /// Tomorrow's first meeting, once it's `tomorrowFromHour` or later and nothing is left today.
+    func tomorrowFirst(after now: Date, calendar: Calendar = .current) -> WidgetMeeting? {
+        guard let from = tomorrowStart(on: now, calendar: calendar), now >= from,
+              next(after: now, calendar: calendar) == nil,
+              let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) else { return nil }
+        return meetings.filter { $0.start > now && calendar.isDate($0.start, inSameDayAs: tomorrow) }
+            .min { ($0.start, $0.title) < ($1.start, $1.title) }
+    }
+
+    /// When today the widgets start looking at tomorrow, nil if they don't.
+    private func tomorrowStart(on day: Date, calendar: Calendar) -> Date? {
+        guard let hour = tomorrowFromHour, (0...23).contains(hour) else { return nil }
+        return calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day)
+    }
+
     func mood(at now: Date, calendar: Calendar = .current) -> ActivityMood {
         guard let next = next(after: now, calendar: calendar) else { return .calm }
         let remaining = next.start.timeIntervalSince(now)
@@ -47,11 +66,12 @@ struct WidgetSchedule: Codable, Equatable {
     }
 
     /// When the widget has to redraw: now, every meeting start (the next one changes), the icon's
-    /// mood switches, and the next midnight (a new day's "next"). The countdown itself is a system
-    /// timer, so it ticks between entries on its own. Sorted, unique, none before `now`.
+    /// mood switches, the evening switch to tomorrow's first meeting, and the next midnight (a new
+    /// day's "next"). The countdown itself is a system timer, so it ticks between entries on its own. Sorted, unique, none before `now`.
     func entryDates(from now: Date, calendar: Calendar = .current) -> [Date] {
         let midnight = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now.addingTimeInterval(86_400)
         var dates: Set<Date> = [now, midnight]
+        if let from = tomorrowStart(on: now, calendar: calendar), from > now { dates.insert(from) }
         for m in meetings where m.start > now && m.start <= midnight {
             dates.insert(m.start)
             for lead in [Self.nervousLead, Self.panicLead] {
