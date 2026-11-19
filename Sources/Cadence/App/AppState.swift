@@ -385,9 +385,11 @@ final class AppState {
     }
 
     /// The colours offered for `meeting`, named as its calendar names them (Google colour labels).
-    func colorChoices(for meeting: Meeting) -> [EventColorChoice] {
+    /// `all` ignores the "named colours only" preference (assistants can still use any colour).
+    func colorChoices(for meeting: Meeting, all: Bool = false) -> [EventColorChoice] {
         if let (provider, target) = actionable(meeting, { $0.canSetColor($1) }), let choices = provider.colorChoices(for: target) {
-            return choices
+            guard prefs.namedColorsOnly, !all else { return choices }
+            return EventColorChoice.namedOnly(choices, keeping: currentColor(of: meeting, in: choices)?.id)
         }
         return EventColorChoice.palette
     }

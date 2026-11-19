@@ -102,6 +102,8 @@ struct Preferences: Codable, Equatable {
     var tomorrowFromHour = 17
     /// Use colours set on individual events (Google, ICS) instead of the calendar colour.
     var useEventColors = true
+    /// Offer only the colours a Google calendar has named, hiding stock and unnamed custom ones.
+    var namedColorsOnly = false
     /// Step up to a bigger style 15 and 5 minutes before the meeting.
     var panelGrow = false
     /// 0 = always show the next meeting; otherwise only when one starts within this many minutes.
@@ -194,6 +196,7 @@ extension Preferences {
         leaveOffsets = try c.decodeIfPresent([Int].self, forKey: .leaveOffsets) ?? d.leaveOffsets
         clashPromptEnabled = try c.decodeIfPresent(Bool.self, forKey: .clashPromptEnabled) ?? d.clashPromptEnabled
         useEventColors = try c.decodeIfPresent(Bool.self, forKey: .useEventColors) ?? d.useEventColors
+        namedColorsOnly = try c.decodeIfPresent(Bool.self, forKey: .namedColorsOnly) ?? d.namedColorsOnly
         mcpEnabled = try c.decodeIfPresent(Bool.self, forKey: .mcpEnabled) ?? d.mcpEnabled
         mcpAutoApprove = try c.decodeIfPresent(Set<String>.self, forKey: .mcpAutoApprove) ?? d.mcpAutoApprove
         mcpEnrichments = try c.decodeIfPresent(Bool.self, forKey: .mcpEnrichments) ?? d.mcpEnrichments
