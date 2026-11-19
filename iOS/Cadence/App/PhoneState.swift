@@ -78,6 +78,9 @@ final class PhoneState {
     /// Connected: the Mac's meetings. Otherwise the Mac's last copy merged with any calendars on this
     /// phone, so the agenda, alerts and notifications carry on without the Mac.
     var meetings: [Meeting] {
+        #if DEBUG
+        if let previewMeetings { return previewMeetings }
+        #endif
         if link.isConnected, let snapshot { return snapshot.meetings }
         return offlineMeetings
     }
@@ -88,6 +91,11 @@ final class PhoneState {
         guard !ownMeetings.isEmpty else { return cached }
         return MeetingDeduplicator.dedupe((cached + ownMeetings).sorted { ($0.start, $0.end, $0.title) < ($1.start, $1.end, $1.title) })
     }
+
+    #if DEBUG
+    /// `-previewDesk done|long`: a canned agenda for checking the desk layout.
+    private var previewMeetings: [Meeting]?
+    #endif
 
     /// The cached Mac meetings, while paired (unpairing drops them).
     private var macCopy: [Meeting]? { link.mac == nil ? nil : snapshot?.meetings }
@@ -143,6 +151,10 @@ final class PhoneState {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-previewPrompts") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.loadPreviewPrompts() }
+        }
+        if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "-previewDesk") {
+            let args = ProcessInfo.processInfo.arguments
+            loadPreviewDesk(args.indices.contains(i + 1) ? args[i + 1] : "long")
         }
         // -previewMedia spotify: pretend the Mac is playing, to see the desk's media card.
         let args = ProcessInfo.processInfo.arguments
@@ -581,6 +593,29 @@ final class PhoneState {
     }
     #endif
 
+    #if DEBUG
+    /// `-previewDesk done`: today's meetings are all over. `-previewDesk long`: a meeting with a very
+    /// long title coming up, with a join link, and a couple more after it.
+    func loadPreviewDesk(_ kind: String) {
+        func m(_ id: String, _ title: String, _ inMin: Double, _ len: Double, link: Bool = false) -> Meeting {
+            let cal = CalendarInfo(id: "preview-desk", title: "Work", sourceTitle: "Preview", color: RGBAColor(red: 0.35, green: 0.45, blue: 1))
+            return Meeting(id: "desk-\(id)", title: title, start: Date().addingTimeInterval(inMin * 60),
+                           end: Date().addingTimeInterval((inMin + len) * 60), calendar: cal,
+                           joinLink: link ? MeetingLink(service: .zoom, url: URL(string: "https://example.com/cadence-preview")!) : nil)
+        }
+        switch kind {
+        case "done":
+            previewMeetings = [m("a", "Standup", -120, 15), m("b", "Design Review", -60, 30)]
+        default:
+            previewMeetings = [
+                m("long", "Quarterly cross-functional planning and roadmap alignment session with the platform, design and partnerships teams", 12, 45, link: true),
+                m("c", "1:1 with Sam", 75, 30), m("d", "Vendor call", 130, 30),
+            ]
+        }
+        desk.set(true)
+    }
+    #endif
+
     func dismissAlert() {
         if let alerting, link.isConnected { link.send(.dismiss(meetingID: alerting.id)) }
         alerting = nil
@@ -632,13 +667,16 @@ final class PhoneState {
                 return WidgetMeeting(id: m.id, title: m.title, start: m.start, end: m.end,
                                      red: c.red, green: c.green, blue: c.blue, hasLink: m.joinLink != nil)
             }
-        guard upcoming != lastWidgetMeetings else { return }
+        let tomorrowFromHour = prefs.widgetShowsTomorrow ? prefs.widgetTomorrowHour : nil
+        guard upcoming != lastWidgetMeetings || tomorrowFromHour != lastWidgetTomorrowHour else { return }
         lastWidgetMeetings = upcoming
-        WidgetSchedule(meetings: upcoming, generatedAt: Date()).save()
+        lastWidgetTomorrowHour = tomorrowFromHour
+        WidgetSchedule(meetings: upcoming, generatedAt: Date(), tomorrowFromHour: tomorrowFromHour).save()
         WidgetCenter.shared.reloadAllTimelines()
     }
 
     @ObservationIgnored private var lastWidgetMeetings: [WidgetMeeting]?
+    @ObservationIgnored private var lastWidgetTomorrowHour: Int??
 
     /// Live Activity (Lock Screen, StandBy, Dynamic Island): a countdown once the next meeting is within
     /// `liveActivityLeadMinutes`. iOS only lets an app start one while it's open, so when leaving

@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 
 /// Home Screen, Today view, StandBy and Lock Screen widget: how long until the next meeting today,
-/// or "No more meetings today!" once there isn't one. Reads the schedule the app saves to the App
+/// or "No more meetings today!" once there isn't one (in the evening, when tomorrow's first meeting is). Reads the schedule the app saves to the App
 /// Group; the countdown is a system timer, so it ticks without timeline reloads.
 struct NextMeetingWidget: Widget {
     var body: some WidgetConfiguration {
@@ -19,6 +19,8 @@ struct NextMeetingEntry: TimelineEntry {
     let date: Date
     let next: WidgetMeeting?
     let following: WidgetMeeting?
+    /// Tomorrow's first meeting, set only in the evening once nothing is left today.
+    let tomorrow: WidgetMeeting?
     let mood: ActivityMood
     /// No schedule saved yet (app not opened since install, or no App Group).
     let unknown: Bool
@@ -28,6 +30,7 @@ struct NextMeetingEntry: TimelineEntry {
         unknown = schedule == nil
         next = schedule?.next(after: date)
         following = next.flatMap { schedule?.following($0) }
+        tomorrow = schedule?.tomorrowFirst(after: date)
         mood = schedule?.mood(at: date) ?? .calm
     }
 
@@ -43,7 +46,9 @@ struct NextMeetingProvider: TimelineProvider {
     func getSnapshot(in context: Context, completion: @escaping (NextMeetingEntry) -> Void) {
         let schedule = WidgetSchedule.load()
         // The gallery shows a sample when there's nothing real to preview.
-        if context.isPreview, schedule?.next(after: Date()) == nil { return completion(.placeholder) }
+        if context.isPreview, schedule?.next(after: Date()) == nil, schedule?.tomorrowFirst(after: Date()) == nil {
+            return completion(.placeholder)
+        }
         completion(NextMeetingEntry(date: Date(), schedule: schedule))
     }
 
@@ -94,7 +99,7 @@ private struct SmallView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                GooglyIcon(mood: entry.mood, height: 18).foregroundStyle(iconTint(entry.next))
+                GooglyIcon(mood: entry.mood, height: 18).foregroundStyle(iconTint(entry.next ?? entry.tomorrow))
                 Spacer(minLength: 0)
                 if let next = entry.next {
                     Text(next.start, style: .time).font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.6))
@@ -108,6 +113,13 @@ private struct SmallView: View {
                     .minimumScaleFactor(0.6).lineLimit(1)
                     .foregroundStyle(.white)
                 Text(next.title).font(.subheadline.weight(.semibold)).foregroundStyle(next.tint).lineLimit(2)
+            } else if let first = entry.tomorrow {
+                Text("FIRST TOMORROW").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.6))
+                Text(first.start, style: .time)
+                    .font(.system(size: 30, weight: .semibold, design: .rounded)).monospacedDigit()
+                    .minimumScaleFactor(0.6).lineLimit(1)
+                    .foregroundStyle(.white)
+                Text(first.title).font(.subheadline.weight(.semibold)).foregroundStyle(first.tint).lineLimit(2)
             } else {
                 DoneText(unknown: entry.unknown).font(.headline).foregroundStyle(.white)
             }
@@ -147,6 +159,24 @@ private struct MediumView: View {
                     }
                 }
             }
+        } else if let first = entry.tomorrow {
+            HStack(alignment: .center, spacing: 14) {
+                RoundedRectangle(cornerRadius: 3).fill(first.tint).frame(width: 6)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        GooglyIcon(mood: .calm, height: 16).foregroundStyle(iconTint(first))
+                        Text("YOUR FIRST MEETING TOMORROW IS AT").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.6))
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                    }
+                    Text(first.start, style: .time)
+                        .font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                        .foregroundStyle(.white)
+                    Text(first.title).font(.headline).foregroundStyle(.white).lineLimit(1)
+                    Text(doneText).font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
         } else {
             HStack(spacing: 14) {
                 GooglyIcon(mood: .calm, height: 40).foregroundStyle(.white)
@@ -178,6 +208,16 @@ private struct RectangularView: View {
                 Text(next.start, style: .time).font(.caption).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        } else if let first = entry.tomorrow {
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    GooglyIcon(mood: .calm, height: 12)
+                    Text("First tomorrow").font(.caption.weight(.semibold))
+                }
+                Text(first.title).font(.headline).lineLimit(1).widgetAccentable()
+                Text(first.start, style: .time).font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             HStack(spacing: 6) {
                 GooglyIcon(mood: .calm, height: 18)
@@ -202,6 +242,15 @@ private struct CircularView: View {
                         .multilineTextAlignment(.center).minimumScaleFactor(0.5).lineLimit(1)
                         .padding(.horizontal, 4)
                 }
+            } else if let first = entry.tomorrow {
+                VStack(spacing: 0) {
+                    Text("TMRW").font(.system(size: 8, weight: .bold))
+                    Text(first.start.formatted(.dateTime.hour(.defaultDigits(amPM: .omitted)).minute()))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .minimumScaleFactor(0.5).lineLimit(1)
+                        .padding(.horizontal, 4)
+                }
+                .accessibilityLabel("First meeting tomorrow at \(first.start.formatted(date: .omitted, time: .shortened))")
             } else {
                 VStack(spacing: 1) {
                     GooglyIcon(mood: .calm, height: 16)
@@ -220,6 +269,8 @@ private struct InlineView: View {
         if let next = entry.next {
             // Inline widgets take one Text; the embedded timer keeps itself current.
             Text("\(next.title) in \(Text(timerInterval: entry.date...max(entry.date, next.start), countsDown: true))")
+        } else if let first = entry.tomorrow {
+            Text("Tomorrow \(first.start.formatted(date: .omitted, time: .shortened)): \(first.title)")
         } else {
             DoneText(unknown: entry.unknown)
         }
