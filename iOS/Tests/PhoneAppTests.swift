@@ -130,6 +130,34 @@ struct WidgetScheduleTests {
         #expect(dates == [morning, m(5), m(10), m(45), m(55), m(60), midnight])
     }
 
+    @Test func tomorrowsFirstShowsFromTheCutoffOnceTodayIsDone() {
+        // morning is 10:00; cutoff 20:00 is +600 min. Tomorrow 09:00 is +1380, 11:00 is +1500.
+        var schedule = WidgetSchedule(meetings: [item("today", inMinutes: 60), item("tomorrowLate", inMinutes: 1500),
+                                                 item("tomorrowEarly", inMinutes: 1380)],
+                                      generatedAt: morning)
+        let evening = morning.addingTimeInterval(600 * 60)
+        #expect(schedule.tomorrowFirst(after: evening, calendar: cal) == nil) // off by default
+        schedule.tomorrowFromHour = 20
+        #expect(schedule.tomorrowFirst(after: morning, calendar: cal) == nil) // "today" still to come
+        #expect(schedule.tomorrowFirst(after: evening.addingTimeInterval(-60), calendar: cal) == nil) // 19:59
+        #expect(schedule.tomorrowFirst(after: evening, calendar: cal)?.id == "tomorrowEarly")
+        #expect(schedule.entryDates(from: morning, calendar: cal).contains(evening))
+    }
+
+    @Test func aLateMeetingTodayStillWinsAfterTheCutoff() {
+        var schedule = WidgetSchedule(meetings: [item("lateToday", inMinutes: 660), item("tomorrow", inMinutes: 1380)],
+                                      generatedAt: morning)
+        schedule.tomorrowFromHour = 20
+        let evening = morning.addingTimeInterval(600 * 60)
+        #expect(schedule.next(after: evening, calendar: cal)?.id == "lateToday")
+        #expect(schedule.tomorrowFirst(after: evening, calendar: cal) == nil)
+    }
+
+    @Test func oldSchedulesWithoutTheCutoffStillDecode() throws {
+        let json = #"{"meetings":[],"generatedAt":0}"#.data(using: .utf8)!
+        #expect(try JSONDecoder().decode(WidgetSchedule.self, from: json).tomorrowFromHour == nil)
+    }
+
     @Test func roundTripsThroughDefaults() throws {
         let defaults = try #require(UserDefaults(suiteName: "WidgetScheduleTests"))
         defer { defaults.removePersistentDomain(forName: "WidgetScheduleTests") }

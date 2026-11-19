@@ -120,6 +120,18 @@ struct SettingsScreen: View {
                 } header: { Text("Dynamic Island, Lock Screen & StandBy") } footer: {
                     Text("A countdown to your next meeting in the Dynamic Island and on the Lock Screen, with a Join button. Before then it shows when the meeting starts.")
                 }
+                Section {
+                    Toggle("Show tomorrow's first meeting", isOn: $state.prefs.widgetShowsTomorrow)
+                    Picker("From", selection: $state.prefs.widgetTomorrowHour) {
+                        ForEach(Array(12...23), id: \.self) { hour in
+                            Text(Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date())!
+                                .formatted(date: .omitted, time: .shortened)).tag(hour)
+                        }
+                    }
+                    .disabled(!state.prefs.widgetShowsTomorrow)
+                } header: { Text("Widgets") } footer: {
+                    Text("Once today's meetings are over, the Home Screen and Lock Screen widgets show when your first meeting tomorrow is, from this time on.")
+                }
                 Section("Filters") {
                     Toggle("Hide all-day events", isOn: $state.prefs.filters.hideAllDay)
                     Toggle("Hide declined", isOn: $state.prefs.filters.hideDeclined)
