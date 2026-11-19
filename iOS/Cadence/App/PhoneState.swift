@@ -432,6 +432,16 @@ final class PhoneState {
         UIApplication.shared.open(prefs.mediaApp.url)
     }
 
+    /// The desk's idle media button. For Spotify it also hooks Cadence up: one tap opens Spotify,
+    /// approves (first time), starts your last track and comes back with the controls showing.
+    func launchMedia() {
+        if prefs.mediaApp == .spotify && spotify.isAvailable {
+            if spotify.connected { spotify.play() } else { spotify.authorize() }
+        } else {
+            openMediaApp()
+        }
+    }
+
     /// Pause from the desk controls: Music or Spotify directly, anything else by taking the audio.
     func pauseMedia() {
         if nowPlaying.musicPlaying { nowPlaying.pauseMusic() }

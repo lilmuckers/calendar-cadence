@@ -25,10 +25,13 @@ final class SpotifyRemote: NSObject {
     private(set) var stoppedAt: Date?
     /// No usable token: the user needs to tap Connect (which opens Spotify briefly).
     private(set) var needsAuthorization: Bool
+    /// Why the last approval or connection didn't work, shown in Settings and on the desk card.
+    private(set) var lastError: String?
 
     @ObservationIgnored private let clientID: String?
     @ObservationIgnored private var lastAttempt: Date?
     @ObservationIgnored private var wantConnected = false
+    @ObservationIgnored private var connecting = false
 
     @ObservationIgnored private lazy var remote: SPTAppRemote? = {
         guard let clientID else { return nil }
@@ -57,11 +60,17 @@ final class SpotifyRemote: NSObject {
 
     /// Quietly connects with the saved token when Spotify looks to be playing. Never opens Spotify.
     func connectIfPossible() {
-        guard isAvailable, !connected, !needsAuthorization, let remote else { return }
+        guard isAvailable, !connected, !needsAuthorization else { return }
         if let lastAttempt, Date().timeIntervalSince(lastAttempt) < 15 { return }
+        connect(token: Keychain.get(Self.tokenAccount))
+    }
+
+    private func connect(token: String?) {
+        guard let remote, !connecting, !remote.isConnected else { return }
         lastAttempt = Date()
         wantConnected = true
-        remote.connectionParameters.accessToken = Keychain.get(Self.tokenAccount)
+        connecting = true
+        remote.connectionParameters.accessToken = token
         remote.connect()
     }
 
@@ -70,9 +79,12 @@ final class SpotifyRemote: NSObject {
     func authorize() {
         guard let remote else { return }
         wantConnected = true
+        lastError = nil
         remote.authorizeAndPlayURI("") { [weak self] ok in
-            if !ok {
-                Task { @MainActor in self?.openStore() }
+            guard !ok else { return }
+            Task { @MainActor in
+                self?.lastError = "Spotify isn't installed on this iPhone."
+                self?.openStore()
             }
         }
     }
@@ -85,10 +97,13 @@ final class SpotifyRemote: NSObject {
             Keychain.set(token, for: Self.tokenAccount)
             Keychain.set(String(Date().timeIntervalSince1970), for: Self.tokenAccount + ".date")
             needsAuthorization = false
-            remote.connectionParameters.accessToken = token
-            remote.connect()
-        } else if let error = params?[SPTAppRemoteErrorDescriptionKey] {
-            NSLog("Cadence: Spotify authorization failed: \(error)")
+            lastError = nil
+            connect(token: token)
+        } else {
+            // Usually the Spotify dashboard: redirect URI or iOS bundle ID not matching this build.
+            let error = params?[SPTAppRemoteErrorDescriptionKey] ?? "Spotify didn't send back access."
+            lastError = "Spotify said: \(error)"
+            NSLog("Cadence: Spotify authorization failed: \(error) (\(url.scheme ?? "")://\(url.host ?? "")\(url.path))")
         }
         return true
     }
@@ -154,7 +169,9 @@ final class SpotifyRemote: NSObject {
 
     private func didConnect() {
         connected = true
+        connecting = false
         needsAuthorization = false
+        lastError = nil
         guard let player = remote?.playerAPI else { return }
         player.delegate = self
         player.subscribe(toPlayerState: { [weak self] result, _ in
@@ -201,6 +218,8 @@ extension SpotifyRemote: SPTAppRemoteDelegate, SPTAppRemotePlayerStateDelegate {
     nonisolated func appRemote(_ appRemote: SPTAppRemote, didFailConnectionAttemptWithError error: Error?) {
         Task { @MainActor in
             self.clear()
+            self.connecting = false
+            self.lastError = error?.localizedDescription ?? "Couldn't connect to Spotify."
             // Spotify not running fails too, so only give up on the token once it's surely expired
             // (they last an hour); the next attempt after that asks for a tap.
             if let error { NSLog("Cadence: Spotify connection failed: \(error.localizedDescription)") }
@@ -212,7 +231,10 @@ extension SpotifyRemote: SPTAppRemoteDelegate, SPTAppRemotePlayerStateDelegate {
     }
 
     nonisolated func appRemote(_ appRemote: SPTAppRemote, didDisconnectWithError error: Error?) {
-        Task { @MainActor in self.clear() }
+        Task { @MainActor in
+            self.clear()
+            self.connecting = false
+        }
     }
 
     nonisolated func playerStateDidChange(_ playerState: SPTAppRemotePlayerState) {

@@ -92,10 +92,15 @@ struct SettingsScreen: View {
                         }
                     }
                     if state.prefs.mediaApp == .spotify && state.spotify.isAvailable {
-                        if state.spotify.needsAuthorization {
-                            Button("Connect Spotify") { state.spotify.authorize() }
+                        if state.spotify.connected {
+                            LabeledContent("Spotify", value: "Connected")
                         } else {
-                            LabeledContent("Spotify", value: state.spotify.connected ? "Connected" : "Connects when playing")
+                            Button(state.spotify.needsAuthorization ? "Connect Spotify" : "Reconnect Spotify") { state.spotify.authorize() }
+                        }
+                        if let error = state.spotify.lastError {
+                            Text(error).font(.footnote).foregroundStyle(.red)
+                        }
+                        if !state.spotify.needsAuthorization {
                             Button("Disconnect Spotify", role: .destructive) { state.spotify.signOut() }
                         }
                     }
