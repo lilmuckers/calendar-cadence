@@ -1,0 +1,264 @@
+import SwiftUI
+import WidgetKit
+
+/// Home Screen, Today view, StandBy and Lock Screen widget: how long until the next meeting today,
+/// or "No more meetings today!" once there isn't one. Reads the schedule the app saves to the App
+/// Group; the countdown is a system timer, so it ticks without timeline reloads.
+struct NextMeetingWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "NextMeeting", provider: NextMeetingProvider()) { entry in
+            NextMeetingView(entry: entry)
+        }
+        .configurationDisplayName("Next Meeting")
+        .description("Time until your next meeting today.")
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryCircular, .accessoryInline])
+    }
+}
+
+struct NextMeetingEntry: TimelineEntry {
+    let date: Date
+    let next: WidgetMeeting?
+    let following: WidgetMeeting?
+    let mood: ActivityMood
+    /// No schedule saved yet (app not opened since install, or no App Group).
+    let unknown: Bool
+
+    init(date: Date, schedule: WidgetSchedule?) {
+        self.date = date
+        unknown = schedule == nil
+        next = schedule?.next(after: date)
+        following = next.flatMap { schedule?.following($0) }
+        mood = schedule?.mood(at: date) ?? .calm
+    }
+
+    static let placeholder = NextMeetingEntry(date: Date(), schedule: WidgetSchedule(meetings: [
+        WidgetMeeting(id: "placeholder", title: "Design Review", start: Date().addingTimeInterval(23 * 60),
+                      end: Date().addingTimeInterval(53 * 60), red: 0.35, green: 0.55, blue: 0.95, hasLink: true),
+    ], generatedAt: Date()))
+}
+
+struct NextMeetingProvider: TimelineProvider {
+    func placeholder(in context: Context) -> NextMeetingEntry { .placeholder }
+
+    func getSnapshot(in context: Context, completion: @escaping (NextMeetingEntry) -> Void) {
+        let schedule = WidgetSchedule.load()
+        // The gallery shows a sample when there's nothing real to preview.
+        if context.isPreview, schedule?.next(after: Date()) == nil { return completion(.placeholder) }
+        completion(NextMeetingEntry(date: Date(), schedule: schedule))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<NextMeetingEntry>) -> Void) {
+        let now = Date()
+        let schedule = WidgetSchedule.load()
+        let dates = schedule?.entryDates(from: now) ?? [now]
+        let entries = dates.map { NextMeetingEntry(date: $0, schedule: schedule) }
+        // The last date is midnight: ask again then for the new day (the app also reloads on changes).
+        completion(Timeline(entries: entries, policy: dates.count > 1 ? .atEnd : .after(now.addingTimeInterval(3600))))
+    }
+}
+
+// MARK: - Views
+
+private let doneText = "No more meetings today!"
+
+struct NextMeetingView: View {
+    let entry: NextMeetingEntry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        content
+            .containerBackground(for: .widget) {
+                if family == .systemSmall || family == .systemMedium {
+                    LinearGradient(colors: [Color(white: 0.13), Color(white: 0.06)], startPoint: .top, endPoint: .bottom)
+                } else {
+                    Color.clear
+                }
+            }
+            .widgetURL(URL(string: "cadence-companion://open"))
+    }
+
+    @ViewBuilder private var content: some View {
+        switch family {
+        case .systemMedium: MediumView(entry: entry)
+        case .accessoryRectangular: RectangularView(entry: entry)
+        case .accessoryCircular: CircularView(entry: entry)
+        case .accessoryInline: InlineView(entry: entry)
+        default: SmallView(entry: entry)
+        }
+    }
+}
+
+private struct SmallView: View {
+    let entry: NextMeetingEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                GooglyIcon(mood: entry.mood, height: 18).foregroundStyle(iconTint(entry.next))
+                Spacer(minLength: 0)
+                if let next = entry.next {
+                    Text(next.start, style: .time).font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.6))
+                }
+            }
+            Spacer(minLength: 0)
+            if let next = entry.next {
+                Text("NEXT IN").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.6))
+                CountdownText(target: next.start)
+                    .font(.system(size: 30, weight: .semibold, design: .rounded)).monospacedDigit()
+                    .minimumScaleFactor(0.6).lineLimit(1)
+                    .foregroundStyle(.white)
+                Text(next.title).font(.subheadline.weight(.semibold)).foregroundStyle(next.tint).lineLimit(2)
+            } else {
+                DoneText(unknown: entry.unknown).font(.headline).foregroundStyle(.white)
+            }
+        }
+    }
+}
+
+private struct MediumView: View {
+    let entry: NextMeetingEntry
+
+    var body: some View {
+        if let next = entry.next {
+            HStack(alignment: .center, spacing: 14) {
+                RoundedRectangle(cornerRadius: 3).fill(next.tint).frame(width: 6)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        GooglyIcon(mood: entry.mood, height: 16).foregroundStyle(iconTint(next))
+                        Text("NEXT IN").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.6))
+                    }
+                    CountdownText(target: next.start)
+                        .font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                        .foregroundStyle(.white)
+                    Text(next.title).font(.headline).foregroundStyle(.white).lineLimit(1)
+                    Text(subtitle(next)).font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if next.hasLink {
+                    Link(destination: next.joinURL) {
+                        VStack(spacing: 2) {
+                            Image(systemName: "video.fill").font(.title3)
+                            Text("Join").font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .background(next.tint, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                }
+            }
+        } else {
+            HStack(spacing: 14) {
+                GooglyIcon(mood: .calm, height: 40).foregroundStyle(.white)
+                DoneText(unknown: entry.unknown).font(.title3.weight(.semibold)).foregroundStyle(.white)
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private func subtitle(_ next: WidgetMeeting) -> String {
+        var parts = [next.start.formatted(date: .omitted, time: .shortened)]
+        if let then = entry.following { parts.append("then \(then.title) \(then.start.formatted(date: .omitted, time: .shortened))") }
+        return parts.joined(separator: " · ")
+    }
+}
+
+private struct RectangularView: View {
+    let entry: NextMeetingEntry
+
+    var body: some View {
+        if let next = entry.next {
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    GooglyIcon(mood: entry.mood, height: 12)
+                    Text("Next in").font(.caption.weight(.semibold))
+                    CountdownText(target: next.start).font(.caption.weight(.semibold)).monospacedDigit()
+                }
+                Text(next.title).font(.headline).lineLimit(1).widgetAccentable()
+                Text(next.start, style: .time).font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            HStack(spacing: 6) {
+                GooglyIcon(mood: .calm, height: 18)
+                DoneText(unknown: entry.unknown).font(.headline).lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct CircularView: View {
+    let entry: NextMeetingEntry
+
+    var body: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            if let next = entry.next {
+                VStack(spacing: 0) {
+                    GooglyIcon(mood: entry.mood, height: 11)
+                    CountdownText(target: next.start, showsHours: false)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .multilineTextAlignment(.center).minimumScaleFactor(0.5).lineLimit(1)
+                        .padding(.horizontal, 4)
+                }
+            } else {
+                VStack(spacing: 1) {
+                    GooglyIcon(mood: .calm, height: 16)
+                    Text("Done").font(.system(size: 10, weight: .semibold))
+                }
+                .accessibilityLabel(doneText)
+            }
+        }
+    }
+}
+
+private struct InlineView: View {
+    let entry: NextMeetingEntry
+
+    var body: some View {
+        if let next = entry.next {
+            // Inline widgets take one Text; the embedded timer keeps itself current.
+            Text("\(next.title) in \(Text(timerInterval: entry.date...max(entry.date, next.start), countsDown: true))")
+        } else {
+            DoneText(unknown: entry.unknown)
+        }
+    }
+}
+
+private struct DoneText: View {
+    let unknown: Bool
+    var body: some View { Text(unknown ? "Open Cadence to see meetings" : doneText) }
+}
+
+/// Counts down to `target` with the system timer; "Now" once it's reached.
+private struct CountdownText: View {
+    let target: Date
+    var showsHours = true
+
+    var body: some View {
+        if target > Date() {
+            Text(timerInterval: Date()...target, countsDown: true, showsHours: showsHours)
+        } else {
+            Text("Now")
+        }
+    }
+}
+
+// MARK: - Colour
+
+private extension WidgetMeeting {
+    var tint: Color { Color(red: red, green: green, blue: blue) }
+}
+
+/// The icon's colour on the dark widget: the next meeting's calendar, lifted when too dark to see.
+private func iconTint(_ m: WidgetMeeting?) -> Color {
+    guard let m else { return .white }
+    var (r, g, b) = (m.red, m.green, m.blue)
+    let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    if luminance < 0.4 {
+        let lift = (0.4 - luminance) / 0.4 * 0.5
+        (r, g, b) = (r + (1 - r) * lift, g + (1 - g) * lift, b + (1 - b) * lift)
+    }
+    return Color(red: r, green: g, blue: b)
+}

@@ -6,6 +6,7 @@ import WidgetKit
 struct CadenceWidgets: WidgetBundle {
     var body: some Widget {
         MeetingLiveActivity()
+        NextMeetingWidget()
     }
 }
 

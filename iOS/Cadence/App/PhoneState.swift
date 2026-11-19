@@ -2,6 +2,7 @@ import CadenceCore
 import Foundation
 import Observation
 import UIKit
+import WidgetKit
 
 /// Root model on the iPhone. Standalone it reads its own calendars (iPhone Calendar, Google,
 /// Microsoft, ICS) and runs its own alerts; connected to the Mac it mirrors the Mac's meetings and
@@ -241,6 +242,7 @@ final class PhoneState {
         ownMeetings = merged
         planner.prune(keeping: meetings)
         updateLiveActivity()
+        updateWidgets()
     }
 
     func refreshRemote() async {
@@ -275,6 +277,7 @@ final class PhoneState {
             Self.saveSnapshot(snap)
             planner.prune(keeping: snap.meetings + ownMeetings)
             updateLiveActivity()
+            updateWidgets()
         case .alert(let meeting):
             // Remembered, so it doesn't fire a second time if the link drops before the meeting starts.
             planner.markFired(meeting)
@@ -335,7 +338,7 @@ final class PhoneState {
         if let alerting, !alerting.id.hasPrefix("preview"), let closeAt = autoDismissDate(for: alerting), now > closeAt {
             self.alerting = nil
         }
-        if Int(now.timeIntervalSince1970) % 30 == 0 { updateLiveActivity() }
+        if Int(now.timeIntervalSince1970) % 30 == 0 { updateLiveActivity(); updateWidgets() }
         if isActive && (displaying || link.isConnected) {
             nowPlaying.poll()
             // Something's playing that isn't Music: if it's Spotify, pick up its track quietly.
@@ -602,7 +605,31 @@ final class PhoneState {
     private func scheduleBackgroundWork() {
         notifier.reschedule(meetings: offlineMeetings.filter { !suppressed.contains($0.id) }, prefs: prefs)
         updateLiveActivity()
+        updateWidgets()
     }
+
+    /// Hands today's and tomorrow's meetings to the Home and Lock Screen widgets (through the App
+    /// Group) and asks them to redraw, only when something they show changed. Uses `meetings`, so
+    /// the widgets follow the Mac while connected and carry on from the saved copy when not.
+    private func updateWidgets() {
+        let cal = Calendar.current
+        let from = cal.startOfDay(for: Date())
+        let to = cal.date(byAdding: .day, value: 2, to: from) ?? from.addingTimeInterval(172_800)
+        let hidden = suppressed
+        let upcoming = meetings
+            .filter { !$0.isAllDay && $0.end > from && $0.start < to && !hidden.contains($0.id) && !isAgendaOnly($0) }
+            .map { m -> WidgetMeeting in
+                let c = m.displayColor
+                return WidgetMeeting(id: m.id, title: m.title, start: m.start, end: m.end,
+                                     red: c.red, green: c.green, blue: c.blue, hasLink: m.joinLink != nil)
+            }
+        guard upcoming != lastWidgetMeetings else { return }
+        lastWidgetMeetings = upcoming
+        WidgetSchedule(meetings: upcoming, generatedAt: Date()).save()
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    @ObservationIgnored private var lastWidgetMeetings: [WidgetMeeting]?
 
     /// Live Activity (Lock Screen, StandBy, Dynamic Island): a countdown once the next meeting is within
     /// `liveActivityLeadMinutes`. iOS only lets an app start one while it's open, so when leaving
