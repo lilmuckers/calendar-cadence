@@ -163,10 +163,33 @@ final class GoogleCalendarProvider: CalendarProvider {
                 pageToken = page.nextPageToken
                 pages += 1
             } while pageToken != nil && pages < 10
-            return invites
+            return await withNextOccurrence(invites, calendarID: primary.entry.id, info: primary.info, token: token)
         } catch {
             return []
         }
+    }
+
+    /// A series comes back with its first occurrence's time, which is often long past. Swap in the
+    /// next upcoming occurrence so the invite says when it actually happens next (replying still answers the series).
+    private func withNextOccurrence(_ invites: [Meeting], calendarID: String, info: CalendarInfo, token: String) async -> [Meeting] {
+        let now = Date()
+        let colors = labelColors(calendarID)
+        var out: [Meeting] = []
+        for var m in invites {
+            if m.recurs, m.end <= now, let ref = refs[m.id],
+               let list: GoogleEventList = try? await get(
+                   "\(eventsPath(calendarID))/\(escape(ref.eventID))/instances",
+                   query: ["timeMin": ISO8601DateFormatter().string(from: now), "maxResults": "5"], token: token),
+               let next = (list.items ?? [])
+                   .filter({ $0.status != "cancelled" })
+                   .compactMap({ GoogleMapper.meeting($0, calendar: info, labels: colors) })
+                   .first(where: { $0.end > now }) {
+                m.start = next.start
+                m.end = next.end
+            }
+            out.append(m)
+        }
+        return out
     }
 
     func canRespond(_ meeting: Meeting) -> Bool {
