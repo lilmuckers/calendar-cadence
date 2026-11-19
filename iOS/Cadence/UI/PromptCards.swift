@@ -212,10 +212,13 @@ private struct InviteStrip: View {
 
     private var subtitle: String {
         let cal = Calendar.current
-        let day = cal.isDateInToday(m.start) ? nil
+        // A series whose next occurrence couldn't be found: its first date would mislead.
+        let over = m.recurs && m.end <= Date()
+        let day = over ? "Repeats"
+            : cal.isDateInToday(m.start) ? "Today"
             : cal.isDateInTomorrow(m.start) ? "Tomorrow"
             : m.start.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
-        return [day, Theme.range(m), m.organizer].compactMap { $0 }.joined(separator: " · ")
+        return [day, Theme.range(m), m.recurs && !over ? "repeats" : nil, m.organizer].compactMap { $0 }.joined(separator: " · ")
     }
 
     /// The first accepted meeting it overlaps, if any.

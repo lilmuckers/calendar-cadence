@@ -252,8 +252,9 @@ struct InviteReviewView: View {
         let day = Calendar.current.isDateInToday(m.start) ? "Today"
             : Calendar.current.isDateInTomorrow(m.start) ? "Tomorrow"
             : m.start.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
-        if m.recurs && m.start < Calendar.current.startOfDay(for: Date()) { return "Repeats · \(Theme.range(m))" }
-        return m.isAllDay ? "\(day) · all day" : "\(day) · \(Theme.range(m))" + (m.recurs ? " · repeats" : "")
+        // Only when the next occurrence couldn't be found: the series' first date would mislead.
+        if m.recurs && m.end <= Date() { return "Repeats · \(Theme.range(m))" }
+        return (m.isAllDay ? "\(day) · all day" : "\(day) · \(Theme.range(m))") + (m.recurs ? " · repeats" : "")
     }
 
     private func symbol(_ r: RSVP) -> String {
