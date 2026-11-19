@@ -13,6 +13,20 @@ enum InviteAlertStyle: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// How much the menu bar item shows. macOS hides items that don't fit (behind the notch or
+/// off the left edge) and offers apps no way to claim priority, so a narrower item survives longer.
+enum MenuBarStyle: String, Codable, CaseIterable, Identifiable {
+    case full, countdown, icon
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .full: "Icon, countdown and title"
+        case .countdown: "Icon and countdown"
+        case .icon: "Icon only"
+        }
+    }
+}
+
 enum TravelMode: String, Codable, CaseIterable, Identifiable {
     case driving, walking, transit
     var id: String { rawValue }
@@ -42,7 +56,9 @@ struct Preferences: Codable, Equatable {
     var whileOnCall: BusyAlertStyle = .banner
     var showPanel = true
     var panelHidesWhenIdle = false
-    var showMenuBarTitle = true
+    var menuBarStyle: MenuBarStyle = .full
+    /// Longest meeting title shown in the menu bar (characters) when the style is `.full`.
+    var menuBarTitleLength = 22
     var preferNativeApps = true
     var travelMode: TravelMode = .driving
     var icsFeeds: [ICSFeed] = []
@@ -133,6 +149,10 @@ struct Preferences: Codable, Equatable {
 }
 
 extension Preferences {
+    private enum LegacyKeys: String, CodingKey {
+        case showMenuBarTitle
+    }
+
     // Tolerate older/partial saved blobs: any missing key falls back to its default.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -149,7 +169,15 @@ extension Preferences {
         whileOnCall = try c.decodeIfPresent(BusyAlertStyle.self, forKey: .whileOnCall) ?? d.whileOnCall
         showPanel = try c.decodeIfPresent(Bool.self, forKey: .showPanel) ?? d.showPanel
         panelHidesWhenIdle = try c.decodeIfPresent(Bool.self, forKey: .panelHidesWhenIdle) ?? d.panelHidesWhenIdle
-        showMenuBarTitle = try c.decodeIfPresent(Bool.self, forKey: .showMenuBarTitle) ?? d.showMenuBarTitle
+        if let style = try? c.decodeIfPresent(MenuBarStyle.self, forKey: .menuBarStyle) {
+            menuBarStyle = style
+        } else {
+            // Older builds stored a plain on/off "show title and countdown" toggle.
+            let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+            let showTitle = try legacy.decodeIfPresent(Bool.self, forKey: .showMenuBarTitle) ?? true
+            menuBarStyle = showTitle ? .full : .icon
+        }
+        menuBarTitleLength = try c.decodeIfPresent(Int.self, forKey: .menuBarTitleLength) ?? d.menuBarTitleLength
         preferNativeApps = try c.decodeIfPresent(Bool.self, forKey: .preferNativeApps) ?? d.preferNativeApps
         travelMode = try c.decodeIfPresent(TravelMode.self, forKey: .travelMode) ?? d.travelMode
         icsFeeds = try c.decodeIfPresent([ICSFeed].self, forKey: .icsFeeds) ?? d.icsFeeds
