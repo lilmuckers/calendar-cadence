@@ -14,7 +14,7 @@
   <meta property="og:description" content="Your calendar, gently panicking on your behalf.">
   <meta property="og:image" content="https://cadence.patrick-mckinley.com/assets/takeover.jpg">
   <meta property="og:url" content="https://cadence.patrick-mckinley.com/">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <header class="site-header">
@@ -23,6 +23,7 @@
       <nav>
         <a class="nav-features" href="#features">Features</a>
         <a class="nav-features" href="#iphone">iPhone</a>
+        <a href="automations.html">Automations</a>
         <a href="privacy.html">Privacy</a>
         <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
       </nav>
@@ -150,7 +151,7 @@
         <div class="media"><img src="assets/invites.jpg" alt="Good morning! RSVP time: three invites with Accept, Maybe and Decline buttons and a colour picker" class="w-400"></div>
         <div>
           <h2>RSVP without opening your calendar</h2>
-          <p>Each morning Cadence gathers every invite still waiting for a reply into one card: <strong>Accept</strong>, <strong>Maybe</strong> or <strong>Decline</strong>, and pick a colour while you're there, under the names you gave your Google Calendar colour labels. The button you press lights up straight away and the row flashes once it's saved. New invites get the same card, or a notification with reply buttons, as soon as they arrive.</p>
+          <p>Each morning Cadence gathers every invite still waiting for a reply into one card: <strong>Accept</strong>, <strong>Maybe</strong> or <strong>Decline</strong>, and pick a colour while you're there, under the names you gave your Google Calendar colour labels. Invites for a recurring meeting say when the next one is. The button you press lights up straight away and the row flashes once it's saved. New invites get the same card, or a notification with reply buttons, as soon as they arrive.</p>
           <p>Replies go straight to your Google and Microsoft 365 accounts, and the organiser hears back as usual.</p>
         </div>
       </div>
@@ -160,10 +161,11 @@
       <div class="wrap">
         <h2 class="section-title">Cadence for iPhone</h2>
         <p class="section-lede">Put your iPhone on a MagSafe stand and it becomes a desk clock for your meetings. While it's showing, your Mac goes quiet.</p>
-        <div class="phones">
+        <div class="phones four">
           <figure><img src="assets/ios-desk.jpg" alt="iPhone desk mode: Up next, Standup in 6:13, Join Zoom, and 1:1 with Priya later today"><figcaption>Desk mode</figcaption></figure>
           <figure><img src="assets/ios-prompts.jpg" alt="iPhone desk mode, Standup in 4:19, with a New invite card: Budget review, clashes with Pricing Workshop, Accept, Maybe or Decline"><figcaption>Invites and clashes, on the phone</figcaption></figure>
           <figure><img src="assets/ios-meltdown.jpg" alt="iPhone full-screen alert, bright red, reading SERIOUSLY. JOIN. NOW., with letters fallen off Design Review and piled at the bottom"><figcaption>The same meltdown</figcaption></figure>
+          <figure><img src="assets/ios-tea.jpg" alt="iPhone desk mode, dimmed: All clear, no more meetings today, time for a nice cup of tea, with the calendar mascot holding a mug"><figcaption>Day done: tea break</figcaption></figure>
         </div>
         <div class="feature iphone-detail">
           <div class="media"><img src="assets/ios-island.jpg" alt="Expanded Dynamic Island: googly calendar icon, Next, Standup, 4:54 and a Join button" class="w-440"></div>
@@ -176,6 +178,18 @@
               <li><strong>Works on its own too.</strong> It reads its own calendars (iPhone Calendar, Google, Microsoft 365, ICS), keeps the Mac's last agenda for when you're away, and runs its own alerts.</li>
             </ul>
             <p class="fine">Pair by scanning a code from <em>Settings → iPhone</em> on the Mac. The two talk directly over an encrypted connection on your Wi-Fi or peer-to-peer. No servers involved.</p>
+          </div>
+        </div>
+
+        <div class="feature iphone-detail flip">
+          <div class="media"><img class="phone-wide" src="assets/ios-media.jpg" alt="iPhone desk mode in landscape: Up next in 11:54, Join Zoom, later today 1:1 with Sam and Vendor call, and a Spotify card playing Midnight Drive"></div>
+          <div>
+            <ul class="ticks">
+              <li><strong>Music on the desk.</strong> In landscape the desk shows what's playing in Apple Music or Spotify, with artwork and controls. When a meeting's due, the music fades out, the phone says which meeting it is, and your headphones are free for the Mac to take the call.</li>
+              <li><strong>Your Mac's media keys drive the phone</strong> (optional). Volume, play/pause and skip control the phone while it shows the desk, with a small mini-player. During calls the keys stay with the Mac.</li>
+              <li><strong>Home and Lock Screen widgets.</strong> <em>Next Meeting</em> counts down to your next meeting, with a nervous googly icon and a Join button. In the evening it shows when tomorrow starts.</li>
+              <li><strong>Notes from your assistant</strong> sit beside the countdown, so the agenda, links and bingo card are a glance away.</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -196,8 +210,30 @@
         </div>
         <div>
           <h2>Ask your assistant about your day</h2>
-          <p>Cadence includes a local <a href="https://modelcontextprotocol.io">MCP</a> server, so Claude, Cursor, Windsurf or any other MCP client on your Mac can read your merged calendar, find free time, reply to invites and hear about meetings as they start and end.</p>
+          <p>Cadence includes a local <a href="https://modelcontextprotocol.io">MCP</a> server, so Claude (including Cowork), Cursor, Windsurf or any other MCP client on your Mac can read your merged calendar, find free time, reply to invites, pin notes to your meetings and hear about meetings as they start and end.</p>
           <p>Set it up in one click from <em>Settings → Assistants</em>. Every action pops a card in Cadence first (<strong>Allow</strong>, <strong>Deny</strong> or <strong>Always allow</strong>), and an activity view shows exactly what each assistant did.</p>
+          <p><a href="automations.html">Browse the automation catalog →</a> Ready-made prompts for morning briefings, prep packs, invite triage, follow-ups and more.</p>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="notes">
+      <div class="wrap feature flip">
+        <div class="media">
+          <div class="drawer-demo" role="img" aria-label="Illustration: the Notes drawer for Launch review, with Prep, Agenda and Bingo tabs; the agenda shows Beta results as the current item, 2 minutes over">
+            <div class="drawer-handle"></div>
+            <div class="drawer-head"><span><b>Launch review</b> · Notes</span><span>11:14</span></div>
+            <div class="drawer-tabs"><span>Prep</span><span class="on">Agenda</span><span>Links</span><span>Bingo</span><span>Actions</span></div>
+            <div class="kmock"><div class="kt">Agenda</div><div class="kag done"><span>Intros</span><b>5m</b></div><div class="kag now"><span>Beta results · Sam</span><b>10m · +2</b></div><div class="kag"><span>Launch date</span><b>15m</b></div><div class="kag"><span>Next steps</span><b>5m</b></div></div>
+            <div class="kmock"><div class="kt">Decisions &amp; actions</div><div class="klog a"><b>Action</b> Fix PAY-412 · Priya · Fri</div></div>
+          </div>
+        </div>
+        <div>
+          <h2>Notes, right in the meeting</h2>
+          <p>Assistants can pin things to a meeting: a prep note, the links that matter, a timed agenda, a who's-who, talking points, key numbers, a decisions-and-actions log, even a buzzword bingo card.</p>
+          <p>When the meeting's close, a small <strong>Notes</strong> button appears at the bottom of your Mac's screen and slides up into a drawer. On the iPhone, desk mode shows them beside the countdown. The agenda highlights where you are and shows when you're running over.</p>
+          <p>Tick things off, mark bingo squares or log an action, and the assistant sees it too. Put one on a recurring meeting and it's there every week. <a href="automations.html#kinds">See every kind →</a></p>
         </div>
       </div>
     </section>
@@ -215,6 +251,9 @@
           <div class="card"><h3>🧭 The right browser profile</h3><p>Opens each meeting in the right Chrome, Edge, Brave, Vivaldi or Firefox profile (or Firefox container), and brings it to the front: per account, per calendar, or by organiser, like <em>@client.com → Client</em>.</p></div>
           <div class="card"><h3>🧹 Filters</h3><p>Hide all-day, declined, tentative or link-less events; include or exclude by keyword. Make a calendar <em>agenda only</em> to keep it on screen but out of alerts.</p></div>
           <div class="card"><h3>😰 An icon with feelings</h3><p>Calm, nervous at 15 minutes, sweating at 5. A little phone appears beside it while your iPhone is paired.</p></div>
+          <div class="card"><h3>📏 A menu bar your way</h3><p>Show the full title, just the countdown or only the icon, and cap how long titles get, so it fits beside everything else up there.</p></div>
+          <div class="card"><h3>🧠 It remembers</h3><p>Which side of a clash you picked and what you hid from the panel both survive a restart.</p></div>
+          <div class="card"><h3>🤖 Automations</h3><p>Ready-made prompts for Claude, Cursor and friends. <a href="automations.html">Browse the catalog</a>.</p></div>
         </div>
       </div>
     </section>
@@ -234,6 +273,7 @@
     <div class="wrap">
       <span>© 2026 Patrick McKinley</span>
       <nav>
+        <a href="automations.html">Automations</a>
         <a href="privacy.html">Privacy Policy</a>
         <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
       </nav>

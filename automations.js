@@ -1,0 +1,500 @@
+// Automation catalog for cadence.patrick-mckinley.com/automations.html
+// Each prompt starts with "Using the Cadence tools" so it works in any MCP client,
+// not just Claude.
+
+const CATEGORIES = [
+  { id: "day", label: "Your day" },
+  { id: "before", label: "Before meetings" },
+  { id: "during", label: "During meetings" },
+  { id: "after", label: "After meetings" },
+  { id: "invites", label: "Invites & clashes" },
+  { id: "fun", label: "Just for fun" },
+];
+
+// trigger: "demand" | "schedule" | "loop"
+const AUTOMATIONS = [
+  {
+    id: "morning-briefing",
+    emoji: "☀️",
+    title: "Morning briefing",
+    category: "day",
+    trigger: "schedule",
+    when: "Weekdays, 08:30",
+    summary: "Your meetings, back-to-backs, invites waiting for a reply, unresolved clashes and the best gaps for focused work, in under 150 words.",
+    tools: ["get_agenda", "list_invites", "list_clashes", "find_free_time"],
+    prompt: `Using the Cadence tools, give me a short briefing for today.
+
+1. Call get_agenda for today. List each meeting with its time, title and whether it has a join link. Flag back-to-backs with no break.
+2. Call list_invites with horizon "today" and list anything still waiting for my reply.
+3. Call list_clashes and point out any overlaps I haven't sorted out.
+4. Call find_free_time with duration_minutes 30 and working_hours true, and tell me my best two gaps for focused work.
+
+Keep it under 150 words, in plain sentences, most important thing first. This is read-only: don't reply to invites or change anything.`,
+  },
+  {
+    id: "prep-pack",
+    emoji: "🎒",
+    title: "Prep pack",
+    category: "before",
+    trigger: "schedule",
+    when: "Every hour in working hours, or before a big meeting",
+    summary: "Reads the invite and the documents it links to, then attaches a prep note, the links and a timed agenda to the meeting.",
+    tools: ["get_next_meeting", "get_enrichments", "add_enrichment", "update_enrichment"],
+    kinds: ["markdown", "links", "agenda"],
+    connectors: true,
+    prompt: `Using the Cadence tools, prepare me for my next meeting.
+
+1. Call get_next_meeting. If it starts more than 2 hours from now, stop and just tell me when it is.
+2. Call get_enrichments for that meeting. If you've already attached a prep note, update it with update_enrichment instead of adding a second one.
+3. Read the meeting's notes and any documents or pages linked in them (use my other connected tools, like Google Drive, Notion or the web, if you have them).
+4. Attach to the meeting with add_enrichment:
+   - kind "markdown", title "Prep": the purpose in one line, 3 to 5 key points from the documents, and open questions I should raise;
+   - kind "links", title "Links": every document, ticket or page mentioned, each with a short note;
+   - if the notes contain an agenda, kind "agenda", title "Agenda": each item's title and minutes.
+5. Tell me in one line what you attached.
+
+Only use what's in the invite and the documents. If something's unclear, say so in the note rather than guessing.`,
+  },
+  {
+    id: "whos-who",
+    emoji: "🪪",
+    title: "Who's who",
+    category: "before",
+    trigger: "demand",
+    summary: "A card of everyone in the meeting: name, role and what they're likely to care about, from your directory, email and chat.",
+    tools: ["get_next_meeting", "add_enrichment"],
+    kinds: ["people"],
+    connectors: true,
+    prompt: `Using the Cadence tools, add a "Who's who" card to my next meeting.
+
+1. Call get_next_meeting. Cadence gives you the organiser and how many people are invited, but not the full guest list, so look the meeting up in my calendar connector (Google Calendar or Outlook) to get the attendees.
+2. For each person, find their role and team from my directory, email or chat tools if you have them. Add one short note on what they're likely to care about in this meeting, based on recent threads with them.
+3. Attach it with add_enrichment: kind "people", title "Who's who", one item per person with name, email, role and notes. Put the organiser first.
+
+Never invent job titles or facts. If you can't find something, leave it out.`,
+  },
+  {
+    id: "timed-agenda",
+    emoji: "⏱️",
+    title: "Timed agenda from the invite",
+    category: "before",
+    trigger: "demand",
+    summary: "Turns the topics in an invite into an agenda that fits the meeting. Cadence highlights the current item and shows when it runs over.",
+    tools: ["get_next_meeting", "add_enrichment"],
+    kinds: ["agenda"],
+    prompt: `Using the Cadence tools, turn my next meeting's invite into a timed agenda.
+
+1. Call get_next_meeting and read its notes and how long it is.
+2. Pull out the topics. If the notes don't list any, ask me for them instead of making some up.
+3. Share the time between them so the total fits the meeting with 5 minutes spare at the end. Keep the order from the invite.
+4. Attach it with add_enrichment: kind "agenda", title "Agenda", one item per topic with title, minutes and owner (when the invite names one).`,
+  },
+  {
+    id: "one-on-one",
+    emoji: "🤝",
+    title: "1:1 running list",
+    category: "before",
+    trigger: "demand",
+    summary: "One talking-points checklist that follows a recurring 1:1 from week to week. Ticked points drop off, the rest carry forward.",
+    tools: ["get_agenda", "get_enrichments", "add_enrichment", "update_enrichment"],
+    kinds: ["checklist"],
+    placeholders: true,
+    prompt: `Using the Cadence tools, keep a running list of talking points for my recurring 1:1 with {name}.
+
+1. Call get_agenda for today and tomorrow and find the next 1:1 with {name}.
+2. Call get_enrichments on it. If there's a "Talking points" checklist, keep it. Otherwise add one with add_enrichment: kind "checklist", title "Talking points", all_occurrences true.
+3. Remove the points that were ticked off last time and carry the rest forward.
+4. Ask me what I want to cover this time, and add the new points with update_enrichment.`,
+  },
+  {
+    id: "key-numbers",
+    emoji: "📈",
+    title: "Key numbers",
+    category: "before",
+    trigger: "schedule",
+    when: "An hour before the meeting",
+    summary: "Puts the latest figures from a spreadsheet or dashboard on the meeting, with change since last time and whether that's good.",
+    tools: ["get_agenda", "get_enrichments", "add_enrichment", "update_enrichment"],
+    kinds: ["stats"],
+    connectors: true,
+    placeholders: true,
+    prompt: `Using the Cadence tools, put the key numbers on my next "{meeting name}" meeting.
+
+1. Find the meeting with get_agenda (today or tomorrow).
+2. Get the latest figures from {where they live, e.g. the "Weekly KPIs" sheet in Google Drive}. Use only real numbers you can see. Never estimate or fill gaps.
+3. Call get_enrichments. If the meeting already has a "Key numbers" card, update it with update_enrichment. Otherwise attach one with add_enrichment: kind "stats", title "Key numbers", up to 6 items with label, value, delta against last time, trend ("up", "down" or "flat") and up_is_good (false for things like cost or churn).
+4. Tell me where each number came from.`,
+  },
+  {
+    id: "interview-kit",
+    emoji: "🧑‍💼",
+    title: "Interview kit",
+    category: "before",
+    trigger: "demand",
+    summary: "Candidate card, questions to tick off as you go, and a scoring guide, attached to the interview.",
+    tools: ["get_agenda", "add_enrichment"],
+    kinds: ["people", "checklist", "markdown"],
+    connectors: true,
+    prompt: `Using the Cadence tools, build an interview kit for my next interview.
+
+1. Call get_agenda and find the next meeting that looks like an interview (the title usually says "interview" or has the candidate's name). Check with me if you're not sure.
+2. Find the candidate's CV and the role description in my connected files or email.
+3. Attach to the meeting with add_enrichment:
+   - kind "people", title "Candidate": their name, the role, and one line of background from the CV;
+   - kind "checklist", title "Questions": 6 to 8 questions for this role, including two that dig into the CV;
+   - kind "markdown", title "Scoring": what a strong, an OK and a weak answer looks like for the main skills.
+
+Keep it to what's relevant to the job.`,
+  },
+  {
+    id: "decisions-log",
+    emoji: "📝",
+    title: "Decisions & actions log",
+    category: "during",
+    trigger: "demand",
+    summary: "A log on the meeting for decisions, actions and notes, which you fill in from the Notes drawer while you talk.",
+    tools: ["get_next_meeting", "get_enrichments", "add_enrichment"],
+    kinds: ["log"],
+    prompt: `Using the Cadence tools, set up a decisions and actions log for my next meeting.
+
+1. Call get_next_meeting, then get_enrichments to see if it already has a log.
+2. If it doesn't, attach one with add_enrichment: kind "log", title "Decisions & actions". Start it with a single item of type "note" stating the meeting's goal, taken from the invite.
+3. Tell me it's there. I'll add decisions and actions during the meeting from Cadence's Notes drawer.
+
+After the meeting, when I ask, call get_enrichments again and list the decisions, then the actions with their owners and due dates.`,
+  },
+  {
+    id: "follow-up",
+    emoji: "📮",
+    title: "Follow-up after every meeting",
+    category: "after",
+    trigger: "loop",
+    summary: "Waits for each meeting to end, reads what was logged and ticked, and drafts a follow-up for you to check. Never sends on its own.",
+    tools: ["wait_for_event", "get_enrichments"],
+    connectors: true,
+    prompt: `Using the Cadence tools, help me follow up after my meetings today.
+
+Repeat until the end of my working day:
+1. Call wait_for_event with types ["meeting.ended"] and timeout_seconds 300. If nothing comes back, go round again.
+2. When a meeting ends, call get_enrichments for it. Look at the log entries, ticked checklist items and anything I typed.
+3. If there are decisions or actions, draft a short follow-up to the attendees: what we decided and who's doing what by when. Save it as a draft with my email or chat connector.
+4. Tell me the draft is ready. Never send anything without asking me first.
+
+If a meeting had nothing logged, skip it quietly.`,
+  },
+  {
+    id: "end-of-day",
+    emoji: "🌇",
+    title: "End-of-day wrap-up",
+    category: "after",
+    trigger: "schedule",
+    when: "Weekdays, 17:30",
+    summary: "Gathers every action from today's meeting notes, mine first, then a heads-up on tomorrow's first meeting.",
+    tools: ["get_agenda", "get_enrichments"],
+    prompt: `Using the Cadence tools, wrap up my day.
+
+1. Call get_agenda for today. For each meeting with notes attached (enrichment_count above 0), call get_enrichments.
+2. Collect every action: log items of type "action" and unticked checklist items, with owner and due date when there is one.
+3. Give me a short list: my actions first, then other people's I should chase.
+4. Call get_agenda for tomorrow and tell me when my first meeting is and anything I should prepare tonight.`,
+  },
+  {
+    id: "invite-triage",
+    emoji: "📬",
+    title: "Invite triage",
+    category: "invites",
+    trigger: "demand",
+    summary: "Suggests accept, maybe or decline for every pending invite, with a reason, then replies to the ones you agree with.",
+    tools: ["list_invites", "list_clashes", "get_agenda", "respond_to_invite"],
+    prompt: `Using the Cadence tools, help me clear my invites.
+
+1. Call list_invites with horizon "week".
+2. Call list_clashes, and get_agenda for today and tomorrow, so you know what each invite would collide with.
+3. For each invite, suggest accept, tentative or decline with a one-line reason (a clash, outside working hours, no agenda, I'm optional, and so on). Show them as a list.
+4. Wait for me. When I say which to go ahead with, call respond_to_invite for each one. Cadence will ask me to approve every reply.`,
+  },
+  {
+    id: "clash-fixer",
+    emoji: "🥊",
+    title: "Clash fixer",
+    category: "invites",
+    trigger: "demand",
+    summary: "Works out which of two overlapping meetings matters more, and suggests what to do with the other.",
+    tools: ["list_clashes", "get_agenda", "find_free_time", "respond_to_invite"],
+    prompt: `Using the Cadence tools, sort out my double bookings.
+
+1. Call list_clashes.
+2. For each clash, look at both meetings (get_agenda for that day) and tell me which looks more important and why: who organised it, how many people are invited, whether it recurs, whether I'm needed.
+3. Suggest what to do with the other one: decline, mark tentative, or ask to move it. If moving makes sense, call find_free_time to suggest a new slot.
+4. Only call respond_to_invite once I agree, and Cadence will ask me to approve each reply. If someone needs asking to move a meeting, draft the message and don't send it.`,
+  },
+  {
+    id: "colour-code",
+    emoji: "🎨",
+    title: "Colour-code my day",
+    category: "day",
+    trigger: "demand",
+    summary: "Sorts today's meetings into focus, 1:1s, team, external and interviews, and colours them to match.",
+    tools: ["list_calendars", "get_agenda", "set_event_color"],
+    prompt: `Using the Cadence tools, colour-code my calendar for today.
+
+1. Call list_calendars and get_agenda for today.
+2. Sort the meetings into: focus time, 1:1s, team meetings, external or client meetings, and interviews.
+3. Suggest a colour for each group from Tomato, Flamingo, Tangerine, Banana, Sage, Basil, Peacock, Blueberry, Lavender, Grape and Graphite (or my own colour label names, if I've set any), and show me the plan.
+4. Once I agree, call set_event_color for each meeting. Cadence asks me to approve each change. Colours only stick on Google calendars, so skip events from other calendars.`,
+  },
+  {
+    id: "focus-time",
+    emoji: "🎧",
+    title: "Protect focus time",
+    category: "day",
+    trigger: "schedule",
+    when: "Weekdays, first thing",
+    summary: "Finds the best 90-minute gaps today and tomorrow and, with your OK, blocks them out in your calendar.",
+    tools: ["find_free_time"],
+    connectors: true,
+    prompt: `Using the Cadence tools, protect some focus time.
+
+1. Call find_free_time with duration_minutes 90 and working_hours true, for today and tomorrow.
+2. Pick up to two slots, preferring mornings and avoiding the last hour of the day.
+3. Show me the slots. Cadence can't create events, so once I agree, add "Focus time" events with my calendar connector (Google Calendar or Outlook), marked as busy.
+4. If you don't have a calendar connector, just give me the times so I can add them.`,
+  },
+  {
+    id: "co-pilot",
+    emoji: "🛰️",
+    title: "Meeting co-pilot",
+    category: "after",
+    trigger: "loop",
+    summary: "Runs all day: preps each meeting as it gets close, drafts follow-ups when it ends, and tells you about new invites.",
+    tools: ["wait_for_event", "get_enrichments", "add_enrichment"],
+    kinds: ["markdown", "links"],
+    connectors: true,
+    prompt: `Using the Cadence tools, be my meeting co-pilot until I say stop.
+
+Keep calling wait_for_event with types ["meeting.starting_soon", "meeting.ended", "invite.new"] and timeout_seconds 300, and for each event:
+- meeting.starting_soon: if get_enrichments shows the meeting has no notes yet, attach a short "Prep" markdown note and a "Links" list, from the invite and the documents it links to.
+- meeting.ended: read the meeting's notes with get_enrichments. If there are actions, draft a follow-up and tell me about it.
+- invite.new: tell me about it in one line, including any clash.
+
+Keep each message short. Never reply to invites, join meetings or send messages without asking me.`,
+  },
+  {
+    id: "bingo",
+    emoji: "🎯",
+    title: "All-hands buzzword bingo",
+    category: "fun",
+    trigger: "demand",
+    summary: "A 5×5 card of good-natured meeting clichés on every all-hands. Tap squares as people say them.",
+    tools: ["get_agenda", "add_enrichment"],
+    kinds: ["bingo"],
+    prompt: `Using the Cadence tools, make a buzzword bingo card for our all-hands.
+
+1. Call get_agenda for today and tomorrow and find the meeting with "all-hands" (or "town hall") in the title. If there's more than one, ask me which.
+2. Write 40 short, good-natured phrases people say in meetings like this, such as "Let's take this offline", "Can everyone see my screen?", "You're on mute", "Circle back" and "Quick shout-out to…". Nothing that singles out a real person.
+3. Attach it with add_enrichment: kind "bingo", title "All-hands bingo", content with all 40 squares, size 5 and free_centre true, and all_occurrences true so it's there every time the series comes round.`,
+  },
+  {
+    id: "bingo-announcer",
+    emoji: "📣",
+    title: "Bingo announcer",
+    category: "fun",
+    trigger: "loop",
+    summary: "Listens for a completed line on any bingo card and celebrates the winning row.",
+    tools: ["wait_for_event", "get_enrichments"],
+    prompt: `Using the Cadence tools, watch for bingo during my meetings.
+
+Repeat until I tell you to stop:
+1. Call wait_for_event with types ["enrichment.bingo"] and timeout_seconds 300. If nothing comes back, go round again.
+2. When a bingo arrives, call get_enrichments for that meeting and see which squares are marked.
+3. Reply with one celebratory line naming the squares that won, like "BINGO! 'Circle back' finished the top row."
+
+Don't post anywhere else unless I've asked you to.`,
+  },
+];
+
+const TRIGGERS = {
+  demand: { label: "On demand", hint: "Run it whenever you like." },
+  schedule: { label: "Scheduled", hint: "Save it as a scheduled task." },
+  loop: { label: "Runs in the background", hint: "Keeps going while the chat or task stays open." },
+};
+
+const ACT_TOOLS = new Set(["respond_to_invite", "set_event_color", "join_meeting", "hide_from_panel", "snooze_alert"]);
+const ATTACH_TOOLS = new Set(["add_enrichment", "update_enrichment", "remove_enrichment", "clear_enrichments"]);
+
+function asMarkdown(a) {
+  const trigger = TRIGGERS[a.trigger].label + (a.when ? ` (${a.when})` : "");
+  return [
+    "---",
+    `title: ${JSON.stringify(a.title)}`,
+    `description: ${JSON.stringify(a.summary)}`,
+    `trigger: ${JSON.stringify(trigger)}`,
+    `tools: [${a.tools.join(", ")}]`,
+    `source: https://cadence.patrick-mckinley.com/automations.html#${a.id}`,
+    "---",
+    "",
+    a.prompt,
+    "",
+  ].join("\n");
+}
+
+function download(filename, text) {
+  const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function copyText(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand("copy"); } catch {}
+    area.remove();
+  }
+  const old = button.textContent;
+  button.textContent = "Copied ✓";
+  button.classList.add("done");
+  setTimeout(() => { button.textContent = old; button.classList.remove("done"); }, 1600);
+}
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === "class") node.className = value;
+    else if (key === "text") node.textContent = value;
+    else node.setAttribute(key, value);
+  }
+  for (const child of children) if (child) node.append(child);
+  return node;
+}
+
+function card(a) {
+  const category = CATEGORIES.find((c) => c.id === a.category);
+  const asks = a.tools.some((t) => ACT_TOOLS.has(t));
+  const attaches = a.tools.some((t) => ATTACH_TOOLS.has(t));
+
+  const badges = el("div", { class: "auto-badges" },
+    el("span", { class: `tbadge t-${a.trigger}`, text: TRIGGERS[a.trigger].label, title: TRIGGERS[a.trigger].hint }),
+    attaches ? el("span", { class: "tbadge t-attach", text: "Attaches notes" }) : null,
+    asks ? el("span", { class: "tbadge t-asks", text: "Asks first in Cadence", title: "Cadence shows an Allow / Deny card before this happens" }) : null,
+    a.connectors ? el("span", { class: "tbadge t-conn", text: "Uses your other connectors", title: "Works best with calendar, files, email or chat connectors in your assistant" }) : null,
+  );
+
+  const tools = el("div", { class: "auto-tools" }, ...a.tools.map((t) => el("code", { text: t })));
+  const pre = el("pre", { class: "prompt", id: `prompt-${a.id}` }, el("code", { text: a.prompt }));
+  const details = el("details", { class: "auto-prompt" }, el("summary", { text: "Show prompt" }), pre);
+
+  const copy = el("button", { type: "button", class: "btn", text: "Copy prompt" });
+  copy.addEventListener("click", () => copyText(a.prompt, copy));
+  const dl = el("button", { type: "button", class: "btn ghost", text: "Download .md" });
+  dl.addEventListener("click", () => download(`cadence-${a.id}.md`, asMarkdown(a)));
+
+  const article = el("article", { class: "auto-card", id: a.id, "data-category": a.category },
+    el("div", { class: "auto-top" },
+      el("span", { class: "auto-emoji", "aria-hidden": "true", text: a.emoji }),
+      el("span", { class: "auto-cat", text: category.label }),
+    ),
+    el("h3", { text: a.title }),
+    el("p", { class: "auto-summary", text: a.summary }),
+    a.when ? el("p", { class: "auto-when", text: `Suggested schedule: ${a.when}` }) : null,
+    a.placeholders ? el("p", { class: "auto-when", text: "Fill in the {…} parts before you run it." }) : null,
+    badges,
+    tools,
+    details,
+    el("div", { class: "auto-actions" }, copy, dl),
+  );
+  article.dataset.search = [a.title, a.summary, a.prompt, category.label, ...a.tools, ...(a.kinds || [])].join(" ").toLowerCase();
+  return article;
+}
+
+function renderCatalog() {
+  const grid = document.getElementById("catalog");
+  const chips = document.getElementById("chips");
+  const search = document.getElementById("search");
+  const count = document.getElementById("count");
+  if (!grid) return;
+
+  const cards = AUTOMATIONS.map(card);
+  grid.replaceChildren(...cards);
+
+  let current = "all";
+  const all = [{ id: "all", label: "All" }, ...CATEGORIES];
+  for (const c of all) {
+    const n = c.id === "all" ? AUTOMATIONS.length : AUTOMATIONS.filter((a) => a.category === c.id).length;
+    const chip = el("button", { type: "button", class: "chip", "aria-pressed": String(c.id === "all") }, c.label, el("span", { text: String(n) }));
+    chip.addEventListener("click", () => {
+      current = c.id;
+      for (const other of chips.children) other.setAttribute("aria-pressed", String(other === chip));
+      apply();
+    });
+    chips.append(chip);
+  }
+
+  function apply() {
+    const q = search.value.trim().toLowerCase();
+    let shown = 0;
+    for (const node of cards) {
+      const ok = (current === "all" || node.dataset.category === current) && (!q || node.dataset.search.includes(q));
+      node.hidden = !ok;
+      if (ok) shown += 1;
+    }
+    count.textContent = shown === AUTOMATIONS.length ? `${shown} automations` : `${shown} of ${AUTOMATIONS.length}`;
+    document.getElementById("empty").hidden = shown !== 0;
+  }
+  search.addEventListener("input", apply);
+  apply();
+
+  document.getElementById("download-all").addEventListener("click", () => {
+    const body = AUTOMATIONS.map((a) => `## ${a.emoji} ${a.title}\n\n${a.summary}\n\nTrigger: ${TRIGGERS[a.trigger].label}${a.when ? ` (${a.when})` : ""}\nTools: ${a.tools.join(", ")}\n\n\`\`\`text\n${a.prompt}\n\`\`\`\n`).join("\n");
+    download("cadence-automations.md", `# Cadence automation prompts\n\nFrom https://cadence.patrick-mckinley.com/automations.html\n\n${body}`);
+  });
+
+  // Open a card linked by #id.
+  if (location.hash) {
+    const target = document.getElementById(location.hash.slice(1));
+    if (target && target.classList.contains("auto-card")) {
+      target.querySelector("details").open = true;
+      target.classList.add("flash");
+      target.scrollIntoView({ block: "start" });
+    }
+  }
+}
+
+function setupTabs() {
+  const tabs = document.querySelectorAll("[role=tab]");
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => {
+      for (const t of tabs) {
+        const on = t === tab;
+        t.setAttribute("aria-selected", String(on));
+        t.tabIndex = on ? 0 : -1;
+        document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+      }
+    });
+    tab.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      const list = [...tabs];
+      const next = list[(list.indexOf(tab) + (e.key === "ArrowRight" ? 1 : list.length - 1)) % list.length];
+      next.click();
+      next.focus();
+    });
+  }
+  for (const button of document.querySelectorAll("[data-copy]")) {
+    button.addEventListener("click", () => copyText(document.getElementById(button.dataset.copy).textContent.trim(), button));
+  }
+}
+
+setupTabs();
+renderCatalog();

@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cadence automations: prompts for Claude and other AI assistants</title>
+  <meta name="description" content="A catalog of ready-made prompts that let Claude Cowork, Claude Code, Cursor, Windsurf and other MCP assistants prep your meetings, attach notes, agendas and bingo cards in Cadence, triage invites and follow up afterwards.">
+  <link rel="canonical" href="https://cadence.patrick-mckinley.com/automations.html">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta property="og:title" content="Cadence automations">
+  <meta property="og:description" content="Copy-and-paste prompts that let your AI assistant prep, run and follow up on your meetings.">
+  <meta property="og:image" content="https://cadence.patrick-mckinley.com/assets/icon-512.png">
+  <meta property="og:url" content="https://cadence.patrick-mckinley.com/automations.html">
+  <link rel="stylesheet" href="style.css?v=6">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="assets/icon-192.png" alt="">Cadence</a>
+      <nav>
+        <a class="nav-features" href="./#features">Features</a>
+        <a href="automations.html" aria-current="page">Automations</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap hero auto-hero">
+      <p class="eyebrow">Automation catalog</p>
+      <h1>Let your assistant run the boring bits</h1>
+      <p class="tagline">Cadence gives AI assistants on your Mac your merged calendar, live meeting events and a place to pin notes right inside the meeting. Here are prompts that put that to work. Copy one, paste it into Claude, and you're done.</p>
+      <div class="badges">
+        <span class="badge">Built for Claude Cowork</span>
+        <span class="badge">Claude Code</span>
+        <span class="badge">Cursor</span>
+        <span class="badge">Windsurf</span>
+        <span class="badge">Any local MCP app</span>
+      </div>
+      <div class="hero-links">
+        <a class="cta" href="#catalog-top">Browse the catalog</a>
+        <a class="cta ghost" href="#setup">Set up your assistant</a>
+      </div>
+    </div>
+
+    <section id="setup">
+      <div class="wrap">
+        <h2 class="section-title">Before you start</h2>
+        <p class="section-lede">Connect your assistant to Cadence once. Pick your app:</p>
+
+        <div class="tabs" role="tablist" aria-label="Assistant app">
+          <button type="button" role="tab" id="tab-cowork" aria-controls="panel-cowork" aria-selected="true">Claude (Cowork)</button>
+          <button type="button" role="tab" id="tab-code" aria-controls="panel-code" aria-selected="false" tabindex="-1">Claude Code</button>
+          <button type="button" role="tab" id="tab-cursor" aria-controls="panel-cursor" aria-selected="false" tabindex="-1">Cursor</button>
+          <button type="button" role="tab" id="tab-windsurf" aria-controls="panel-windsurf" aria-selected="false" tabindex="-1">Windsurf</button>
+          <button type="button" role="tab" id="tab-other" aria-controls="panel-other" aria-selected="false" tabindex="-1">Other apps</button>
+        </div>
+
+        <div class="tab-panel" role="tabpanel" id="panel-cowork" aria-labelledby="tab-cowork">
+          <ol class="steps">
+            <li>In Cadence, open <em>Settings → Assistants</em> and click <strong>Install</strong> next to <strong>Claude</strong>.</li>
+            <li>Quit and reopen the Claude desktop app. <strong>cadence</strong> now shows up in its list of tools.</li>
+            <li>Start a Cowork task and paste a prompt from the catalog below.</li>
+            <li>For prompts marked <strong>Scheduled</strong>, ask Cowork to turn it into a scheduled task, for example <em>"run this every weekday at 08:30"</em>. Scheduled tasks run while your Mac is awake and Claude is open.</li>
+          </ol>
+          <p class="fine">Cowork can mix Cadence with your other connectors (Google Drive, Gmail, Slack, Notion…). That's what the <strong>Uses your other connectors</strong> badge means. Prefer to edit the file yourself? Add this to <code>~/Library/Application Support/Claude/claude_desktop_config.json</code>:</p>
+          <div class="snippet"><pre id="snip-claude"><code>{
+  "mcpServers": {
+    "cadence": {
+      "command": "/Applications/Cadence.app/Contents/MacOS/cadence-mcp",
+      "args": []
+    }
+  }
+}</code></pre><button type="button" class="btn small" data-copy="snip-claude">Copy</button></div>
+        </div>
+
+        <div class="tab-panel" role="tabpanel" id="panel-code" aria-labelledby="tab-code" hidden>
+          <ol class="steps">
+            <li>Click <strong>Install</strong> next to <strong>Claude Code</strong> in Cadence's <em>Settings → Assistants</em>, or run:</li>
+          </ol>
+          <div class="snippet"><pre id="snip-code"><code>claude mcp add --scope user cadence -- "/Applications/Cadence.app/Contents/MacOS/cadence-mcp"</code></pre><button type="button" class="btn small" data-copy="snip-code">Copy</button></div>
+          <ol class="steps" start="2">
+            <li>Paste a prompt into any session. Or save the downloaded <code>.md</code> file in <code>~/.claude/commands/</code> and it becomes a slash command, like <code>/cadence-morning-briefing</code>.</li>
+            <li>For <strong>Runs in the background</strong> prompts, keep the session open while it loops. For <strong>Scheduled</strong> ones, use <code>/loop</code> or your own scheduler.</li>
+          </ol>
+        </div>
+
+        <div class="tab-panel" role="tabpanel" id="panel-cursor" aria-labelledby="tab-cursor" hidden>
+          <ol class="steps">
+            <li>Click <strong>Install</strong> next to <strong>Cursor</strong> in Cadence's <em>Settings → Assistants</em>, or add this to <code>~/.cursor/mcp.json</code>:</li>
+          </ol>
+          <div class="snippet"><pre id="snip-cursor"><code>{
+  "mcpServers": {
+    "cadence": {
+      "command": "/Applications/Cadence.app/Contents/MacOS/cadence-mcp",
+      "args": []
+    }
+  }
+}</code></pre><button type="button" class="btn small" data-copy="snip-cursor">Copy</button></div>
+          <ol class="steps" start="2">
+            <li>Check <strong>cadence</strong> is switched on in Cursor's MCP settings, then paste a prompt into the chat in Agent mode.</li>
+            <li>Cursor has no scheduler, so run <strong>Scheduled</strong> prompts when you want them. Background prompts loop while the chat is running.</li>
+          </ol>
+        </div>
+
+        <div class="tab-panel" role="tabpanel" id="panel-windsurf" aria-labelledby="tab-windsurf" hidden>
+          <ol class="steps">
+            <li>Click <strong>Install</strong> next to <strong>Windsurf</strong> in Cadence's <em>Settings → Assistants</em>, or add this to <code>~/.codeium/windsurf/mcp_config.json</code>:</li>
+          </ol>
+          <div class="snippet"><pre id="snip-windsurf"><code>{
+  "mcpServers": {
+    "cadence": {
+      "command": "/Applications/Cadence.app/Contents/MacOS/cadence-mcp",
+      "args": []
+    }
+  }
+}</code></pre><button type="button" class="btn small" data-copy="snip-windsurf">Copy</button></div>
+          <ol class="steps" start="2">
+            <li>Refresh MCP servers in Windsurf, then paste a prompt into Cascade.</li>
+            <li>Like Cursor, run <strong>Scheduled</strong> prompts by hand. Background prompts loop while Cascade is working.</li>
+          </ol>
+        </div>
+
+        <div class="tab-panel" role="tabpanel" id="panel-other" aria-labelledby="tab-other" hidden>
+          <ol class="steps">
+            <li>Cadence works with any app that can start a <strong>local (stdio) MCP server</strong>. Most use the same JSON as Claude; look for "MCP servers" in your app's settings or docs and add:</li>
+          </ol>
+          <div class="snippet"><pre id="snip-other"><code>{
+  "mcpServers": {
+    "cadence": {
+      "command": "/Applications/Cadence.app/Contents/MacOS/cadence-mcp",
+      "args": []
+    }
+  }
+}</code></pre><button type="button" class="btn small" data-copy="snip-other">Copy</button></div>
+          <ol class="steps" start="2">
+            <li>Every prompt in the catalog starts with <em>"Using the Cadence tools…"</em> and names the tools it needs, so it doesn't depend on Claude.</li>
+          </ol>
+          <p class="fine">Apps that can only connect to <em>remote</em> MCP servers over the internet can't reach Cadence. That's by design: Cadence never opens a network port, and your calendar stays on your Mac.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="kinds">
+      <div class="wrap">
+        <h2 class="section-title">What an assistant can attach</h2>
+        <p class="section-lede">Notes appear in a drawer on your Mac during the meeting, and beside the countdown on your iPhone's desk display. What you tick, mark or type goes back to the assistant.</p>
+        <div class="kinds">
+          <figure class="kind">
+            <div class="kmock"><div class="kt">Prep</div><p><b>Goal:</b> agree the Q1 launch date.</p><ul><li>Beta feedback mostly positive</li><li>Two blockers left in payments</li></ul></div>
+            <figcaption><strong>markdown</strong> A prep note, summary or briefing.<code>{ text }</code></figcaption>
+          </figure>
+          <figure class="kind">
+            <div class="kmock"><div class="kt">Links</div><div class="klink">📄 Launch plan <span>Doc · owner Sam</span></div><div class="klink">🎫 PAY-412 <span>Blocker</span></div><div class="klink">📊 Beta survey <span>Results</span></div></div>
+            <figcaption><strong>links</strong> Documents, tickets and pages, one tap to open.<code>{ items: [{ title, url, note }] }</code></figcaption>
+          </figure>
+          <figure class="kind">
+            <div class="kmock"><div class="kt">Agenda</div><div class="kag done"><span>Intros</span><b>5m</b></div><div class="kag now"><span>Beta results</span><b>10m · +2</b></div><div class="kag"><span>Launch date</span><b>15m</b></div></div>
+            <figcaption><strong>agenda</strong> Timed items. The current one is highlighted, with how far it's over.<code>{ items: [{ title, minutes, owner }] }</code></figcaption>
+          </figure>
+          <figure class="kind">
+            <div class="kmock"><div class="kt">Talking points</div><div class="kchk on">Hiring plan</div><div class="kchk">Holiday cover</div><div class="kchk">Feedback on the demo</div></div>
+            <figcaption><strong>checklist</strong> Things to cover. Ticks are kept for each meeting.<code>{ items: [text] }</code></figcaption>
+          </figure>
+          <figure class="kind">
+            <div class="kmock"><div class="kt">All-hands bingo</div><div class="kbingo"><span class="m">Synergy</span><span>On mute</span><span class="m">Offline</span><span>Circle back</span><span class="m free">★</span><span>Deep dive</span><span>Bandwidth</span><span class="m">Shout-out</span><span>Next slide</span></div></div>
+            <figcaption><strong>bingo</strong> A 3×3 to 5×5 card. A full line sends <code>enrichment.bingo</code>.<code>{ squares, size, free_centre }</code></figcaption>
+          </figure>
+          <figure class="kind">
+            <div class="kmock"><div class="kt">Who's who</div><div class="kperson"><i>PR</i><span><b>Priya Rao</b> Head of Payments<br><em>Wants a firm date</em></span></div><div class="kperson"><i>SL</i><span><b>Sam Lee</b> PM, organiser</span></div></div>
+            <figcaption><strong>people</strong> Who's there and what they care about.<code>{ items: [{ name, email, role, notes }] }</code></figcaption>
+          </figure>
+          <figure class="kind">
+            <div class="kmock"><div class="kt">Decisions &amp; actions</div><div class="klog d"><b>Decision</b> Launch on 3 March</div><div class="klog a"><b>Action</b> Fix PAY-412 · Priya · Fri</div><div class="klog n"><b>Note</b> Revisit pricing in Q2</div></div>
+            <figcaption><strong>log</strong> Decisions, actions and notes, added by you or the assistant.<code>{ items: [{ type, text, owner, due }] }</code></figcaption>
+          </figure>
+          <figure class="kind">
+            <div class="kmock"><div class="kt">Key numbers</div><div class="kstats"><div><span>Sign-ups</span><b>1,284</b><em class="up">▲ 12%</em></div><div><span>Churn</span><b>2.1%</b><em class="good">▼ 0.3</em></div><div><span>NPS</span><b>47</b><em>— flat</em></div></div></div>
+            <figcaption><strong>stats</strong> Figures with change and trend, coloured by whether up is good.<code>{ items: [{ label, value, delta, trend, up_is_good }] }</code></figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="catalog-top">
+      <div class="wrap">
+        <h2 class="section-title">The catalog</h2>
+        <div class="catalog-bar">
+          <div class="chips" id="chips" aria-label="Filter by category"></div>
+          <div class="catalog-tools">
+            <label class="search"><span class="sr-only">Search automations</span><input id="search" type="search" placeholder="Search prompts, tools…" autocomplete="off"></label>
+            <button type="button" class="btn ghost" id="download-all">Download all</button>
+          </div>
+        </div>
+        <p class="catalog-count" id="count" aria-live="polite"></p>
+        <div class="catalog" id="catalog">
+          <noscript><p>The catalog needs JavaScript to show its prompts. The prompts are also in <a href="automations.js">automations.js</a>.</p></noscript>
+        </div>
+        <p class="catalog-empty" id="empty" hidden>Nothing matches that. Try another word, or <a href="#write-your-own">write your own</a>.</p>
+      </div>
+    </section>
+
+    <section id="write-your-own">
+      <div class="wrap">
+        <h2 class="section-title">Write your own</h2>
+        <p class="section-lede">Your assistant sees these tools. Name them in your prompt and it'll know what to do.</p>
+        <div class="toolgroups">
+          <div class="card">
+            <h3>👀 Read <span class="tag">free to call</span></h3>
+            <p><code>get_agenda</code> today or tomorrow · <code>get_next_meeting</code> · <code>get_current_meeting</code> · <code>list_invites</code> · <code>list_clashes</code> · <code>find_free_time</code> · <code>list_calendars</code> · <code>get_status</code> (presenting, on a call)</p>
+          </div>
+          <div class="card">
+            <h3>✋ Act <span class="tag warn">asks you first</span></h3>
+            <p><code>respond_to_invite</code> · <code>set_event_color</code> (Google) · <code>join_meeting</code> · <code>hide_from_panel</code> · <code>snooze_alert</code>. Each pops an Allow / Deny card in Cadence. Unanswered requests are denied after a minute.</p>
+          </div>
+          <div class="card">
+            <h3>📎 Attach <span class="tag">switch off any time</span></h3>
+            <p><code>add_enrichment</code> · <code>update_enrichment</code> · <code>remove_enrichment</code> · <code>clear_enrichments</code> · <code>get_enrichments</code> (with your ticks, marks and entries). Up to 20 per meeting; <code>all_occurrences</code> puts one on every meeting in a series.</p>
+          </div>
+          <div class="card">
+            <h3>📡 Listen</h3>
+            <p><code>wait_for_event</code> waits up to 5 minutes for <code>meeting.starting_soon</code>, <code>meeting.started</code>, <code>meeting.ending_soon</code>, <code>meeting.ended</code>, <code>invite.new</code>, <code>meeting.changed</code>, <code>meeting.canceled</code>, <code>clash.new</code>, <code>status.presenting</code>, <code>status.on_call</code>, <code>enrichment.changed</code> and <code>enrichment.bingo</code>.</p>
+          </div>
+        </div>
+        <p class="fine center">Cadence also ships four ready-made prompts your app may list on its own: <code>daily_briefing</code>, <code>prepare_for_meeting</code>, <code>triage_invites</code> and <code>enrich_meeting</code>. Cadence can't create or delete events. For that, pair it with your calendar connector.</p>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="privacy-callout">
+          <h2>🔒 You stay in charge</h2>
+          <p>Assistants reach Cadence through a private socket on your Mac, with no network port. Anything that changes your calendar or joins a call asks you first, and <em>Settings → Assistants → Activity</em> shows everything they did. What an assistant reads is then handled by that assistant and its provider.</p>
+          <a href="privacy.html#assistants">How assistants use your data →</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Patrick McKinley</span>
+      <nav>
+        <a href="./">Home</a>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+  <script src="automations.js?v=1"></script>
+</body>
+</html>
