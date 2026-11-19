@@ -3,7 +3,7 @@ import Foundation
 /// When the Mac's media keys go to the phone instead (Settings → Music → Media remote control).
 /// Anything that doesn't hold means the key is left alone: the Mac behaves exactly as normal.
 public enum MediaRemoteGate {
-    /// The phone has to have been heard from this recently: it pings every few seconds.
+    /// The phone has to have been heard from this recently: the link pings every 5 s.
     public static let freshness: TimeInterval = 12
 
     public struct Input: Equatable, Sendable {

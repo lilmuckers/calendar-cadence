@@ -205,8 +205,7 @@ public enum CompanionMessage: Codable, Equatable, Sendable {
     /// Phone → Mac: the phone's media volume (0...1) and whether Cadence muted it, for the Mac's
     /// mini-player. Sent when it changes. Older Macs skip it.
     case volume(level: Double, muted: Bool)
-    /// Phone → Mac every few seconds while connected, so the Mac knows the phone's still there
-    /// before it hands it a key press.
+    /// Both ways every `pingInterval` (the channel sends and swallows these itself).
     case ping
     case bye(reason: String)
 }

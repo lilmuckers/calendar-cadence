@@ -38,7 +38,8 @@ final class CompanionChannel {
     var onClose: ((Error?) -> Void)?
 
     private var decoder = CompanionFrameDecoder()
-    private var lastHeard = Date()
+    /// When anything (pings included) last arrived.
+    private(set) var lastHeard = Date()
     private var pinger: Timer?
     private var closed = false
 
