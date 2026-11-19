@@ -6,13 +6,16 @@ import UIKit
 
 /// Spotify on this phone, through Spotify's App Remote SDK: track, artwork and controls for the
 /// desk display. Talks to the Spotify app itself (it has to be installed, and running for a
-/// connection). The first time — and again whenever the access token has lapsed — connecting
-/// hops over to Spotify for a moment to approve, so that only ever happens from a tap.
+/// connection). The first time, connecting hops over to Spotify for a moment to approve (only
+/// ever from a tap). That gives a session with a refresh token (PKCE, no secret or server), so
+/// when the hour-long access token lapses Cadence renews it quietly instead of asking again.
 @MainActor
 @Observable
 final class SpotifyRemote: NSObject {
     static let redirectURL = URL(string: "cadence-companion://spotify-callback")!
-    private static let tokenAccount = "spotify.appRemote.token"
+    private static let sessionAccount = "spotify.session"
+    /// Before sessions: a bare one-hour token. Cleared on launch.
+    private static let legacyTokenAccount = "spotify.appRemote.token"
 
     private(set) var connected = false
     private(set) var title: String?
@@ -32,21 +35,49 @@ final class SpotifyRemote: NSObject {
     @ObservationIgnored private var lastAttempt: Date?
     @ObservationIgnored private var wantConnected = false
     @ObservationIgnored private var connecting = false
+    @ObservationIgnored private var renewing = false
+    @ObservationIgnored private var lastRenew: Date?
 
-    @ObservationIgnored private lazy var remote: SPTAppRemote? = {
+    @ObservationIgnored private lazy var configuration: SPTConfiguration? = {
         guard let clientID else { return nil }
         let config = SPTConfiguration(clientID: clientID, redirectURL: Self.redirectURL)
-        let remote = SPTAppRemote(configuration: config, logLevel: .error)
+        // Approving carries on with whatever was playing (or resumes the last track).
+        config.playURI = ""
+        return config
+    }()
+
+    @ObservationIgnored private lazy var remote: SPTAppRemote? = {
+        guard let configuration else { return nil }
+        let remote = SPTAppRemote(configuration: configuration, logLevel: .error)
         remote.delegate = self
         return remote
+    }()
+
+    @ObservationIgnored private lazy var sessions: SPTSessionManager? = {
+        guard let configuration else { return nil }
+        let manager = SPTSessionManager(configuration: configuration, delegate: self)
+        manager.session = Self.storedSession()
+        return manager
     }()
 
     override init() {
         let id = (Bundle.main.object(forInfoDictionaryKey: "CadenceSpotifyClientID") as? String)?
             .trimmingCharacters(in: .whitespaces)
         clientID = (id?.isEmpty ?? true) ? nil : id
-        needsAuthorization = Keychain.get(Self.tokenAccount) == nil
+        Keychain.set(nil, for: Self.legacyTokenAccount)
+        Keychain.set(nil, for: Self.legacyTokenAccount + ".date")
+        needsAuthorization = Self.storedSession() == nil
         super.init()
+    }
+
+    private static func storedSession() -> SPTSession? {
+        guard let text = Keychain.get(sessionAccount), let data = Data(base64Encoded: text) else { return nil }
+        return try? NSKeyedUnarchiver.unarchivedObject(ofClass: SPTSession.self, from: data)
+    }
+
+    private func save(_ session: SPTSession?) {
+        let data = session.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) }
+        Keychain.set(data?.base64EncodedString(), for: Self.sessionAccount)
     }
 
     /// Built with a Spotify client ID (Local.xcconfig → SPOTIFY_CLIENT_ID).
@@ -58,11 +89,22 @@ final class SpotifyRemote: NSObject {
 
     // MARK: Connection
 
-    /// Quietly connects with the saved token when Spotify looks to be playing. Never opens Spotify.
+    /// Quietly connects with the saved session when Spotify looks to be playing, renewing its
+    /// token first if it has lapsed. Never opens Spotify.
     func connectIfPossible() {
-        guard isAvailable, !connected, !needsAuthorization else { return }
+        guard isAvailable, !connected, !needsAuthorization, let session = sessions?.session else { return }
+        if session.isExpired || session.expirationDate.timeIntervalSinceNow < 60 { renew(); return }
         if let lastAttempt, Date().timeIntervalSince(lastAttempt) < 15 { return }
-        connect(token: Keychain.get(Self.tokenAccount))
+        connect(token: session.accessToken)
+    }
+
+    /// A fresh access token from the refresh token (network, no app switch).
+    private func renew() {
+        guard let sessions, sessions.session != nil, !renewing else { return }
+        if let lastRenew, Date().timeIntervalSince(lastRenew) < 30 { return }
+        lastRenew = Date()
+        renewing = true
+        sessions.renewSession()
     }
 
     private func connect(token: String?) {
@@ -77,33 +119,24 @@ final class SpotifyRemote: NSObject {
     /// From a tap: hop to Spotify to approve (it carries on with whatever was playing, or resumes
     /// the last track), then come back here connected.
     func authorize() {
-        guard let remote else { return }
+        guard let sessions else { return }
         wantConnected = true
         lastError = nil
-        remote.authorizeAndPlayURI("") { [weak self] ok in
-            guard !ok else { return }
-            Task { @MainActor in
-                self?.lastError = "Spotify isn't installed on this iPhone."
-                self?.openStore()
-            }
+        guard sessions.isSpotifyAppInstalled else {
+            lastError = "Spotify isn't installed on this iPhone."
+            openStore()
+            return
         }
+        sessions.initiateSession(with: .appRemoteControl, options: .clientOnly, campaign: nil)
     }
 
-    /// Spotify's redirect back to Cadence. True if it was ours.
+    /// Spotify's redirect back to Cadence. True if it was ours (the session manager takes it from
+    /// there: exchanging the code for tokens and telling the delegate).
     func handle(_ url: URL) -> Bool {
-        guard url.scheme == Self.redirectURL.scheme, url.host == Self.redirectURL.host, let remote else { return false }
-        let params = remote.authorizationParameters(from: url)
-        if let token = params?[SPTAppRemoteAccessTokenKey] {
-            Keychain.set(token, for: Self.tokenAccount)
-            Keychain.set(String(Date().timeIntervalSince1970), for: Self.tokenAccount + ".date")
-            needsAuthorization = false
-            lastError = nil
-            connect(token: token)
-        } else {
-            // Usually the Spotify dashboard: redirect URI or iOS bundle ID not matching this build.
-            let error = params?[SPTAppRemoteErrorDescriptionKey] ?? "Spotify didn't send back access."
-            lastError = "Spotify said: \(error)"
-            NSLog("Cadence: Spotify authorization failed: \(error) (\(url.scheme ?? "")://\(url.host ?? "")\(url.path))")
+        guard url.scheme == Self.redirectURL.scheme, url.host == Self.redirectURL.host, let sessions else { return false }
+        if !sessions.application(UIApplication.shared, open: url, options: [:]) {
+            lastError = "Spotify didn't send back access."
+            NSLog("Cadence: Spotify redirect not understood: \(url.scheme ?? "")://\(url.host ?? "")\(url.path)")
         }
         return true
     }
@@ -120,8 +153,8 @@ final class SpotifyRemote: NSObject {
     }
 
     func signOut() {
-        Keychain.set(nil, for: Self.tokenAccount)
-        Keychain.set(nil, for: Self.tokenAccount + ".date")
+        save(nil)
+        sessions?.session = nil
         needsAuthorization = true
         wantConnected = false
         remote?.disconnect()
@@ -228,6 +261,40 @@ final class SpotifyRemote: NSObject {
     }
 }
 
+extension SpotifyRemote: SPTSessionManagerDelegate {
+    nonisolated func sessionManager(manager: SPTSessionManager, didInitiate session: SPTSession) {
+        Task { @MainActor in self.gotSession(session) }
+    }
+
+    nonisolated func sessionManager(manager: SPTSessionManager, didRenew session: SPTSession) {
+        Task { @MainActor in self.gotSession(session) }
+    }
+
+    nonisolated func sessionManager(manager: SPTSessionManager, didFailWith error: Error) {
+        let message = error.localizedDescription
+        let offline = (error as NSError).domain == NSURLErrorDomain
+        Task { @MainActor in
+            NSLog("Cadence: Spotify session failed: \(message)")
+            self.lastError = offline ? "Couldn't reach Spotify to renew access." : "Spotify said: \(message)"
+            // A refresh that Spotify turned down (revoked, or the app's settings changed) needs a tap;
+            // being offline just waits for the next try.
+            if self.renewing && !offline { self.needsAuthorization = true }
+            self.renewing = false
+        }
+    }
+}
+
+extension SpotifyRemote {
+    fileprivate func gotSession(_ session: SPTSession) {
+        renewing = false
+        save(session)
+        needsAuthorization = false
+        lastError = nil
+        lastAttempt = nil
+        connect(token: session.accessToken)
+    }
+}
+
 extension SpotifyRemote: SPTAppRemoteDelegate, SPTAppRemotePlayerStateDelegate {
     nonisolated func appRemoteDidEstablishConnection(_ appRemote: SPTAppRemote) {
         Task { @MainActor in self.didConnect() }
@@ -238,12 +305,11 @@ extension SpotifyRemote: SPTAppRemoteDelegate, SPTAppRemotePlayerStateDelegate {
             self.clear()
             self.connecting = false
             self.lastError = error?.localizedDescription ?? "Couldn't connect to Spotify."
-            // Spotify not running fails too, so only give up on the token once it's surely expired
-            // (they last an hour); the next attempt after that asks for a tap.
+            // Spotify not running fails too, so don't give up on the session: if its token has
+            // lapsed, renew it (quietly) and the next attempt uses the new one.
             if let error { NSLog("Cadence: Spotify connection failed: \(error.localizedDescription)") }
-            if let saved = Keychain.get(Self.tokenAccount + ".date").flatMap(Double.init),
-               Date().timeIntervalSince1970 - saved > 55 * 60 {
-                self.needsAuthorization = true
+            if let session = self.sessions?.session, session.isExpired || session.expirationDate.timeIntervalSinceNow < 60 {
+                self.renew()
             }
         }
     }
