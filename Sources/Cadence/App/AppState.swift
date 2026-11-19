@@ -77,7 +77,17 @@ final class AppState {
     @ObservationIgnored private var rawInvites: [Meeting] = []
     /// Replies sent this session, so a stale fetch doesn't resurrect them.
     @ObservationIgnored private var answered: Set<String> = []
-    @ObservationIgnored private var promptedClashes: Set<String> = []
+    /// Clashes already put to the user (answered or "decide later"), so a relaunch doesn't ask again.
+    @ObservationIgnored private var promptedClashes: Set<String> =
+        Set(UserDefaults.standard.stringArray(forKey: "Cadence.promptedClashes") ?? [])
+    /// Clash key → when its last meeting ends. Saved choices and prompts are forgotten after that,
+    /// not when a clash is briefly missing (sources still loading after launch).
+    @ObservationIgnored private var clashExpiry: [String: Date] =
+        (UserDefaults.standard.dictionary(forKey: "Cadence.clashExpiry") as? [String: Double] ?? [:])
+            .mapValues { Date(timeIntervalSince1970: $0) }
+    /// False until every source has delivered once after launch; clash prompts wait for it, since a
+    /// half-loaded agenda gives clashes different keys (another copy of a meeting wins de-duplication).
+    @ObservationIgnored private var sourcesSettled = false
     @ObservationIgnored private var sentReminders: Set<String> = []
     @ObservationIgnored private var travelTimes: [String: (eta: TimeInterval, at: Date)] = [:]
     @ObservationIgnored private var travelInFlight: Set<String> = []
@@ -121,6 +131,8 @@ final class AppState {
         Task {
             await requestAccess()
             await refreshRemote()
+            sourcesSettled = true
+            recompute()
         }
 
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
@@ -179,12 +191,11 @@ final class AppState {
         companion.pushSnapshot()
         clashes = ClashDetector.clashes(in: activeMeetings, after: Date())
         emitChanges(from: previous, all: previousAll)
-        let live = Set(clashes.map(\.key))
-        clashChoices = clashChoices.filter { live.contains($0.key) }
-        UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
-        if prefs.clashPromptEnabled,
+        saveClashMemory()
+        if prefs.clashPromptEnabled, sourcesSettled,
            let fresh = clashes.first(where: { clashChoices[$0.key] == nil && !promptedClashes.contains($0.key) }) {
             promptedClashes.insert(fresh.key)
+            saveClashMemory()
             onClash?(fresh)
         }
     }
@@ -417,8 +428,29 @@ final class AppState {
         onInvites?(invites, .daily)
     }
 
+    /// Records when each live clash ends, drops choices and prompts for clashes that are over, and saves.
+    private func saveClashMemory(now: Date = Date()) {
+        for clash in clashes {
+            if let end = clash.meetings.map(\.end).max() { clashExpiry[clash.key] = end }
+        }
+        // Entries saved before expiry was tracked get a couple of days.
+        for key in Set(clashChoices.keys).union(promptedClashes) where clashExpiry[key] == nil {
+            clashExpiry[key] = now.addingTimeInterval(2 * 86_400)
+        }
+        let expired = Set(clashExpiry.filter { $0.value < now }.keys)
+        clashExpiry = clashExpiry.filter { !expired.contains($0.key) }
+        clashChoices = clashChoices.filter { !expired.contains($0.key) }
+        promptedClashes.subtract(expired)
+        let known = Set(clashChoices.keys).union(promptedClashes)
+        clashExpiry = clashExpiry.filter { known.contains($0.key) }
+        let d = UserDefaults.standard
+        d.set(clashChoices, forKey: "Cadence.clashChoices")
+        d.set(Array(promptedClashes).sorted(), forKey: "Cadence.promptedClashes")
+        d.set(clashExpiry.mapValues(\.timeIntervalSince1970), forKey: "Cadence.clashExpiry")
+    }
+
     func resolveClash(_ clash: Clash, choice: String?) {
-        // nil = "decide later": alerts fire for everything, and we won't ask again this session.
+        // nil = "decide later": alerts fire for everything, and we won't ask again for this clash.
         guard let choice else { return }
         clashChoices[clash.key] = choice
         UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
@@ -436,16 +468,16 @@ final class AppState {
     /// Forgets the choice and shows the clash prompt again now.
     func askAgain(_ clash: Clash) {
         clashChoices[clash.key] = nil
-        UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
         promptedClashes.insert(clash.key)
+        saveClashMemory()
         onClash?(clash)
     }
 
     /// Forgets every clash choice; the prompt asks again for each current clash.
     func resetClashChoices() {
         clashChoices = [:]
-        UserDefaults.standard.set(clashChoices, forKey: "Cadence.clashChoices")
         promptedClashes = []
+        saveClashMemory()
         recompute()
     }
 
