@@ -96,16 +96,26 @@ struct Preferences: Codable, Equatable {
     var companionEscalation: CompanionEscalation = .thirtySeconds
     /// Which browser profile opens which meeting (default browser only).
     var profileRules = ProfileRules()
-    /// Music/Spotify here show on the phone's desk display, and the phone's music takes over the
-    /// Mac's Now Playing (media keys) while it plays.
+    /// Music/Spotify here show on the phone's desk display, with play, pause and skip.
     var shareMediaWithPhone = true
-    /// While the phone plays, stand in as the Mac's Now Playing app so the media keys control it.
-    /// Off by default: macOS then counts the Mac as playing, which can keep AirPods on the Mac.
-    var phoneMediaKeys = false
+    /// Media remote control: while the phone shows its desk display, the Mac's media keys (volume,
+    /// mute, play/pause, next, previous) go to the phone instead. Needs Accessibility access.
+    var mediaRemoteControl = false
+    /// Stop taking the keys once the phone has been paused this long (off = for as long as the
+    /// desk display is up).
+    var mediaRemotePauseLimitEnabled = true
+    var mediaRemotePauseLimitSeconds = 30
+    /// The Mac's mini-player for the phone.
+    var mediaHUD: MediaHUDMode = .onKeys
     /// A meeting alert fades out Music or Spotify on this Mac...
     var fadeMediaForAlerts = false
     /// ...and says which meeting it is.
     var announceAlerts = true
+
+    /// The pause limit for the media remote control, nil when it's off.
+    var mediaRemotePauseLimit: TimeInterval? {
+        mediaRemotePauseLimitEnabled ? TimeInterval(max(1, mediaRemotePauseLimitSeconds)) : nil
+    }
 
     private static let key = "Cadence.preferences.v1"
 
@@ -177,7 +187,10 @@ extension Preferences {
         companionEscalation = (try? c.decodeIfPresent(CompanionEscalation.self, forKey: .companionEscalation)) ?? d.companionEscalation
         profileRules = (try? c.decodeIfPresent(ProfileRules.self, forKey: .profileRules)) ?? d.profileRules
         shareMediaWithPhone = try c.decodeIfPresent(Bool.self, forKey: .shareMediaWithPhone) ?? d.shareMediaWithPhone
-        phoneMediaKeys = try c.decodeIfPresent(Bool.self, forKey: .phoneMediaKeys) ?? d.phoneMediaKeys
+        mediaRemoteControl = try c.decodeIfPresent(Bool.self, forKey: .mediaRemoteControl) ?? d.mediaRemoteControl
+        mediaRemotePauseLimitEnabled = try c.decodeIfPresent(Bool.self, forKey: .mediaRemotePauseLimitEnabled) ?? d.mediaRemotePauseLimitEnabled
+        mediaRemotePauseLimitSeconds = try c.decodeIfPresent(Int.self, forKey: .mediaRemotePauseLimitSeconds) ?? d.mediaRemotePauseLimitSeconds
+        mediaHUD = (try? c.decodeIfPresent(MediaHUDMode.self, forKey: .mediaHUD)) ?? d.mediaHUD
         fadeMediaForAlerts = try c.decodeIfPresent(Bool.self, forKey: .fadeMediaForAlerts) ?? d.fadeMediaForAlerts
         announceAlerts = try c.decodeIfPresent(Bool.self, forKey: .announceAlerts) ?? d.announceAlerts
     }

@@ -13,6 +13,8 @@ struct DeskView: View {
             let landscape = geo.size.width > geo.size.height
             ZStack {
                 background
+                // Lets the Mac's volume keys set this phone's volume (invisible).
+                PhoneVolumeHost(volume: state.volume).frame(width: 1, height: 1).allowsHitTesting(false)
                 Group {
                     if landscape {
                         HStack(spacing: 28) {

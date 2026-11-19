@@ -3,25 +3,30 @@ import AVFoundation
 import CadenceCore
 import MediaPlayer
 
-/// Media across the Mac and a connected iPhone, with no new UI on the Mac:
+/// Media across the Mac and a connected iPhone:
 /// - What Music or Spotify is playing here goes to the phone, whose desk controls drive it.
-/// - What the phone is playing takes over the Mac's own Now Playing (Control Center, media keys),
-///   so the keyboard's play/pause/skip control the phone.
+/// - Media remote control (opt-in): while the phone shows its desk display, the Mac's media keys go
+///   to the phone instead, with an optional mini-player. Off, or whenever it isn't sure the phone's
+///   there, on screen and you're not on a call, the keys are left alone for the Mac.
 /// - Optionally, a meeting alert fades out the Mac's music and says which meeting it is.
 @MainActor
 final class MediaBridge {
     private let state: AppState
     private let hub: CompanionHub
     private let players = MacPlayers()
-    private let phoneNowPlaying = PhoneNowPlaying()
+    private let keys = MediaKeyTap()
+    let hud = MediaHUDController()
     private let speech = AVSpeechSynthesizer()
     private var timer: Timer?
     private var last: MacPlayers.Status?
     private var stoppedAt: Date?
     private var sent: CompanionMedia?
     private var fading = false
-    /// The phone's latest report, so turning the media-keys setting on picks it up straight away.
-    private var phoneMedia: CompanionMedia?
+    /// The phone's playback, for the remote control's pause limit.
+    private var phonePlaying = false
+    private var phoneStoppedAt: Date?
+    /// Presenting or sharing (checked on the poll): the mini-player stays out of the way.
+    private var presenting = false
 
     init(state: AppState, hub: CompanionHub) {
         self.state = state
@@ -29,7 +34,13 @@ final class MediaBridge {
         hub.macMedia = { [weak self] in self?.current(includeArtwork: true) }
         hub.onPhoneMedia = { [weak self] media in self?.phoneMediaChanged(media) }
         hub.onMediaCommand = { [weak self] command in self?.players.send(command) }
-        phoneNowPlaying.send = { [weak hub] command in hub?.broadcast(.mediaCommand(command)) }
+        hub.onPhoneVolume = { [weak self] level, muted in
+            self?.hud.model.volume = level
+            self?.hud.model.muted = muted
+        }
+        keys.shouldIntercept = { [weak self] in self?.remoteTakesKeys() ?? false }
+        keys.onKey = { [weak self] key in self?.remoteKey(key.command) }
+        hud.send = { [weak self] command in self?.sendToPhone(command) }
 
         let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.poll() }
@@ -44,7 +55,7 @@ final class MediaBridge {
 
     /// Only asks the players while there's someone to tell (AppleScript isn't free).
     private func poll() {
-        applyPhoneNowPlaying()
+        updateRemote()
         guard sharing, hub.isConnected, !fading else {
             if !hub.isConnected { sent = nil; last = nil }
             return
@@ -73,14 +84,96 @@ final class MediaBridge {
     // MARK: Phone → Mac
 
     private func phoneMediaChanged(_ media: CompanionMedia?) {
-        phoneMedia = media
-        applyPhoneNowPlaying()
+        let playing = media?.isPlaying == true
+        if phonePlaying && !playing { phoneStoppedAt = Date() }
+        if playing { phoneStoppedAt = nil }
+        phonePlaying = playing
+        let model = hud.model
+        if let media {
+            if let data = media.artwork { model.artwork = NSImage(data: data) }
+            else if media.trackID != model.media?.trackID { model.artwork = nil }
+            model.media = media
+            model.lastApp = media.app
+        } else {
+            // Stopped: keep showing the last track, paused (the phone only reports what's playing).
+            model.media?.isPlaying = false
+        }
     }
 
-    /// Only with the setting on: claiming Now Playing makes macOS treat the Mac as the one
-    /// playing, and AirPods' automatic switching follows that.
-    private func applyPhoneNowPlaying() {
-        phoneNowPlaying.update(sharing && state.prefs.phoneMediaKeys ? phoneMedia : nil)
+    // MARK: Media remote control
+
+    /// The input to the remote's rules, minus the call check (that's done live, per key).
+    private var gateInput: MediaRemoteGate.Input {
+        MediaRemoteGate.Input(enabled: state.prefs.mediaRemoteControl, phoneDisplaying: hub.phoneDisplaying,
+                              lastHeard: hub.lastHeard, onCall: false, phonePlaying: phonePlaying,
+                              phoneStoppedAt: phoneStoppedAt, pauseLimit: state.prefs.mediaRemotePauseLimit)
+    }
+
+    /// Asked for each media key press, so it has to be quick: cheap checks first, the
+    /// microphone (on a call?) only when everything else says yes.
+    private func remoteTakesKeys() -> Bool {
+        guard MediaRemoteGate.intercepts(gateInput, now: Date()) else { return false }
+        return SystemContext.microphoneApp() == nil
+    }
+
+    private func remoteKey(_ command: MediaCommand) {
+        sendToPhone(command)
+        guard state.prefs.mediaHUD != .never, !presenting else { return }
+        let part: MediaHUDModel.Part = command.isVolume ? .volume
+            : command == .next ? .next : command == .previous ? .previous : .playPause
+        hud.flash(part)
+    }
+
+    /// Sends a key (or a mini-player click) to the phone, and shows the change straight away.
+    private func sendToPhone(_ command: MediaCommand) {
+        hub.broadcast(.mediaCommand(command))
+        let model = hud.model
+        switch command {
+        case .volumeUp:
+            if model.muted { model.muted = false } else if let v = model.volume { model.volume = MediaVolume.stepped(v, up: true) }
+        case .volumeDown:
+            if !model.muted, let v = model.volume { model.volume = MediaVolume.stepped(v, up: false) }
+        case .toggleMute:
+            model.muted.toggle()
+        case .togglePlayPause:
+            model.media?.isPlaying.toggle()
+        default:
+            break
+        }
+    }
+
+    /// On the poll: the key tap on or off, and the always-on mini-player.
+    private func updateRemote() {
+        let prefs = state.prefs
+        // Only tap the keys while a phone's connected: otherwise nothing's in their way at all.
+        keys.update(wanted: prefs.mediaRemoteControl && hub.isConnected)
+        let model = hud.model
+        guard hub.isConnected else {
+            phonePlaying = false
+            phoneStoppedAt = nil
+            model.media = nil
+            model.artwork = nil
+            model.volume = nil
+            hud.hide()
+            return
+        }
+        model.phoneName = hub.phones.first?.name ?? "iPhone"
+        let ready = MediaRemoteGate.phoneReady(gateInput, now: Date())
+        guard prefs.mediaRemoteControl, prefs.mediaHUD != .never, ready || hud.isVisible else {
+            if hud.isVisible { hud.hide() }
+            return
+        }
+        // Out of the way while presenting, sharing or on a call.
+        let context = SystemContext.current()
+        presenting = !context.presenting.isEmpty
+        let busy = presenting || context.microphoneApp != nil
+        if !ready || busy {
+            hud.hide()
+        } else if prefs.mediaHUD == .always {
+            hud.pin()
+        } else if hud.pinned {
+            hud.unpin(hide: true)
+        }
     }
 
     // MARK: Meeting alerts
@@ -227,6 +320,7 @@ final class MacPlayers {
         case .togglePlayPause: verb = "playpause"
         case .next: verb = "next track"
         case .previous: verb = "previous track"
+        case .volumeUp, .volumeDown, .toggleMute: return // the Mac's own keys already do this
         }
         run("tell application \"\(scriptName(app))\" to \(verb)")
     }
@@ -247,77 +341,5 @@ final class MacPlayers {
         run("tell application \"\(name)\" to pause")
         try? await Task.sleep(nanoseconds: 150_000_000)
         run("tell application \"\(name)\" to set sound volume to \(start)")
-    }
-}
-
-// MARK: - The phone's music in the Mac's Now Playing
-
-/// While the phone is playing, Cadence stands in as the Mac's Now Playing app: Control Center
-/// shows the phone's track and the media keys go to the phone. Lets go as soon as it stops.
-@MainActor
-final class PhoneNowPlaying {
-    var send: ((MediaCommand) -> Void)?
-    private var targets: [(MPRemoteCommand, Any)] = []
-    private var artwork: NSImage?
-    private var trackID: String?
-
-    private var last: CompanionMedia?
-
-    func update(_ media: CompanionMedia?) {
-        // Called on every poll: only touch Now Playing when something actually changed.
-        guard media != last else { return }
-        last = media
-        let center = MPNowPlayingInfoCenter.default()
-        guard let media else {
-            if !targets.isEmpty {
-                center.nowPlayingInfo = nil
-                center.playbackState = .stopped
-                removeTargets()
-            }
-            artwork = nil
-            trackID = nil
-            return
-        }
-        if let data = media.artwork { artwork = NSImage(data: data) } else if media.trackID != trackID { artwork = nil }
-        trackID = media.trackID
-        if targets.isEmpty { addTargets() }
-        let rc = MPRemoteCommandCenter.shared()
-        rc.nextTrackCommand.isEnabled = media.canSkip
-        rc.previousTrackCommand.isEnabled = media.canSkip
-
-        var info: [String: Any] = [
-            MPMediaItemPropertyTitle: media.title ?? "Playing on iPhone",
-            MPMediaItemPropertyArtist: media.title == nil ? media.app.name : (media.artist ?? media.app.name),
-            MPNowPlayingInfoPropertyPlaybackRate: media.isPlaying ? 1.0 : 0.0,
-        ]
-        if let image = artwork {
-            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
-        }
-        center.nowPlayingInfo = info
-        center.playbackState = media.isPlaying ? .playing : .paused
-    }
-
-    private func addTargets() {
-        let rc = MPRemoteCommandCenter.shared()
-        let pairs: [(MPRemoteCommand, MediaCommand)] = [
-            (rc.playCommand, .play), (rc.pauseCommand, .pause), (rc.togglePlayPauseCommand, .togglePlayPause),
-            (rc.nextTrackCommand, .next), (rc.previousTrackCommand, .previous),
-        ]
-        for (command, action) in pairs {
-            command.isEnabled = true
-            let token = command.addTarget { [weak self] _ in
-                Task { @MainActor in self?.send?(action) }
-                return .success
-            }
-            targets.append((command, token))
-        }
-    }
-
-    private func removeTargets() {
-        for (command, token) in targets {
-            command.removeTarget(token)
-            command.isEnabled = false
-        }
-        targets = []
     }
 }

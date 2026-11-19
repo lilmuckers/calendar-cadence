@@ -42,6 +42,9 @@ struct CompanionProtocolTests {
         .media(nil),
         .mediaCommand(.togglePlayPause),
         .mediaCommand(.next),
+        .mediaCommand(.volumeUp),
+        .mediaCommand(.toggleMute),
+        .volume(level: 0.4375, muted: false),
         .ping,
         .bye(reason: "unpaired"),
     ]
