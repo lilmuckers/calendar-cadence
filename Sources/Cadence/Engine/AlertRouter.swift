@@ -9,12 +9,14 @@ final class AlertRouter {
     private let takeover: TakeoverController
     private let banner: BannerController
     private let notifier: Notifier
+    let media: MediaBridge
 
     init(state: AppState) {
         self.state = state
         takeover = TakeoverController(state: state)
         banner = BannerController(state: state)
         notifier = Notifier(state: state)
+        media = MediaBridge(state: state, hub: state.companion)
         // Handled on the Mac (joined, dismissed, snoozed, timed out) → close it on the phone too.
         takeover.onClosed = { [weak self, weak state] id in
             self?.cancelEscalation(for: id)
@@ -81,6 +83,8 @@ final class AlertRouter {
         if sendToPhone { state.companion.broadcast(.alert(meeting)) }
         let plan = CompanionRouting.macPlan(full, phoneDisplaying: phoneDisplaying, mode: state.prefs.companionTakeover)
         NSLog("Cadence: alert for \(meeting.title): \(plan)\(sendToPhone ? " + iPhone" : "") — \(SystemContext.describe(context))")
+        // Music on the Mac: fade it and say what's on (the phone does the same for its own audio).
+        if style == nil { media.meetingAlert(meeting) }
         // The Mac held back for the phone: bring it up here too if the user's still late.
         if sendToPhone, plan != full, style == nil { scheduleEscalation(meeting) }
         show(meeting, plan)

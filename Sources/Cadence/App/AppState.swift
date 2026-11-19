@@ -52,6 +52,8 @@ final class AppState {
     /// Off while rendering screenshots so demo tweaks never touch the user's saved settings.
     @ObservationIgnored var persistPrefs = true
     @ObservationIgnored var onReminder: ((Reminder) -> Void)?
+    /// Settings → Alerts → Test music fade.
+    @ObservationIgnored var onTestMediaFade: (() -> Void)?
     /// Invites to show: `.daily` review, `.new` arrivals, or `.manual` from the menu or Settings.
     @ObservationIgnored var onInvites: (([Meeting], InvitePromptReason) -> Void)?
     /// Events for connected AI assistants (MCP).

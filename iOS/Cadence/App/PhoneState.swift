@@ -41,6 +41,12 @@ final class PhoneState {
 
     let link = CompanionClient()
     let desk = DeskMode()
+    let nowPlaying = NowPlaying()
+    /// What the Mac is playing (Music or Spotify there), while connected.
+    private(set) var macMedia: CompanionMedia?
+    private(set) var macArtwork: UIImage?
+    @ObservationIgnored private var sentMedia: CompanionMedia?
+    @ObservationIgnored let audioHandoff = MeetingAudioHandoff()
     @ObservationIgnored let notifier = PhoneNotifier()
     @ObservationIgnored let liveActivity = LiveActivityController()
 
@@ -133,10 +139,24 @@ final class PhoneState {
         if ProcessInfo.processInfo.arguments.contains("-previewPrompts") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.loadPreviewPrompts() }
         }
+        // -previewMedia spotify: pretend the Mac is playing, to see the desk's media card.
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-previewMedia") {
+            let app = args.indices.contains(i + 1) ? MediaApp(rawValue: args[i + 1]) ?? .appleMusic : .appleMusic
+            // "-previewMedia launcher": nothing playing, so the corner shows the open-app button.
+            if args.indices.contains(i + 1), let preferred = MediaApp(rawValue: args[i + 1]), args.contains("-launcher") {
+                prefs.mediaApp = preferred
+            } else {
+                macMedia = CompanionMedia(app: app, title: "Midnight Drive", artist: "The Night Shift", isPlaying: true, canSkip: true)
+            }
+            desk.set(true)
+        }
         #endif
         eventKit.onChange = { [weak self] in self?.refresh() }
         link.onMessage = { [weak self] in self?.handle($0) }
         link.onDisconnected = { [weak self] in
+            self?.macMedia = nil
+            self?.sentMedia = nil
             self?.invitePrompts = []
             self?.clashPrompts = []
         }
@@ -267,6 +287,12 @@ final class PhoneState {
             haptic(.warning)
         case .clashHandled(let key):
             clashPrompts.removeAll { $0.key == key }
+        case .media(let media):
+            if let art = media?.artwork { macArtwork = UIImage(data: art) }
+            else if media?.trackID != macMedia?.trackID { macArtwork = nil }
+            macMedia = media
+        case .mediaCommand(let command):
+            applyMediaCommand(command)
         case .reminder(let reminder):
             banner = reminder
             haptic(.warning)
@@ -303,6 +329,40 @@ final class PhoneState {
             self.alerting = nil
         }
         if Int(now.timeIntervalSince1970) % 30 == 0 { updateLiveActivity() }
+        if isActive && (displaying || link.isConnected) { nowPlaying.poll() }
+        syncMediaToMac()
+    }
+
+    /// Tells the Mac when what's playing here changes, so its media keys and Now Playing follow.
+    private func syncMediaToMac() {
+        guard link.isConnected else { sentMedia = nil; return }
+        let current = nowPlaying.companionMedia(preferred: prefs.mediaApp, includeArtwork: false)
+        guard current != sentMedia else { return }
+        let newTrack = current?.trackID != sentMedia?.trackID
+        sentMedia = current
+        link.send(.media(newTrack ? nowPlaying.companionMedia(preferred: prefs.mediaApp, includeArtwork: true) : current))
+    }
+
+    /// Mac media keys / Control Center (via the Mac), aimed at what's playing on this phone.
+    private func applyMediaCommand(_ command: MediaCommand) {
+        let np = nowPlaying
+        switch command {
+        case .play: if np.hasTrack { np.resumeMusic() }
+        case .pause: pauseMedia()
+        case .togglePlayPause:
+            if np.isPlaying { pauseMedia() } else if np.hasTrack { np.resumeMusic() }
+        case .next: np.next()
+        case .previous: np.previous()
+        }
+    }
+
+    /// Desk controls aimed at the Mac's player.
+    func controlMac(_ command: MediaCommand) {
+        link.send(.mediaCommand(command))
+        if var m = macMedia, command == .togglePlayPause || command == .play || command == .pause {
+            m.isPlaying = command == .togglePlayPause ? !m.isPlaying : command == .play
+            macMedia = m
+        }
     }
 
     /// When an ignored alert closes itself: the auto-dismiss minutes after the start (the Mac's while
@@ -327,7 +387,32 @@ final class PhoneState {
     private func present(_ meeting: Meeting) {
         alerting = meeting
         haptic(.warning)
-        if prefs.alertSound { AlertSound.play() }
+        // Music through this phone: fade it, say what's on, and free the headphones for the Mac.
+        // The voice stands in for the chime then. Audio can only be taken while Cadence is on screen.
+        if isActive && prefs.pauseMediaForAlerts && audioHandoff.otherAudioPlaying {
+            audioHandoff.run(for: meeting, now: now, nowPlaying: nowPlaying, announce: prefs.announceAlerts)
+        } else if prefs.alertSound {
+            AlertSound.play()
+        }
+    }
+
+    /// Settings → Media → Test: the hand-off on a demo meeting, even with nothing playing.
+    func testAudioHandoff() {
+        let m = Meeting(
+            id: "preview-audio", title: "Design Review",
+            start: Date().addingTimeInterval(60), end: Date().addingTimeInterval(1860),
+            calendar: CalendarInfo(id: "preview", title: "Work", sourceTitle: "Preview", color: RGBAColor(red: 0.35, green: 0.45, blue: 1)))
+        audioHandoff.run(for: m, now: Date(), nowPlaying: nowPlaying, announce: true, force: true)
+    }
+
+    /// Desk media button: open the preferred player.
+    func openMediaApp() {
+        UIApplication.shared.open(prefs.mediaApp.url)
+    }
+
+    /// Pause from the desk controls: Music directly, anything else by taking the audio.
+    func pauseMedia() {
+        if nowPlaying.musicPlaying { nowPlaying.pauseMusic() } else { audioHandoff.interruptOthers() }
     }
 
     private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {

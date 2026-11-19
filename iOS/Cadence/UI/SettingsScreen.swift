@@ -85,6 +85,20 @@ struct SettingsScreen: View {
                     Text("Put your iPhone on a MagSafe stand or charger and Cadence becomes a desk clock for your meetings. While it's showing and connected, your Mac stays quiet.")
                 }
                 Section {
+                    Toggle("Media controls", isOn: $state.prefs.deskMediaControls)
+                    Picker("Media app", selection: $state.prefs.mediaApp) {
+                        ForEach(MediaApp.allCases) { app in
+                            Label { Text(app.name) } icon: { MediaLogo(app: app, size: 22) }.tag(app)
+                        }
+                    }
+                    Toggle("Fade out for meetings", isOn: $state.prefs.pauseMediaForAlerts)
+                    Toggle("Announce the meeting", isOn: $state.prefs.announceAlerts)
+                        .disabled(!state.prefs.pauseMediaForAlerts)
+                    Button("Test the hand-off") { state.testAudioHandoff() }
+                } header: { Text("Media") } footer: {
+                    Text("Landscape desk mode shows what's playing in the corner, or a button for your media app. Track details and skip work for Apple Music; other apps show that they're playing and can be paused. When connected, it shows and controls the Mac's Music or Spotify too, and the Mac's media keys control this iPhone's music.\n\nWhen an alert comes up with music playing here, Cadence fades it out, says which meeting it is, then lets go of the audio so your headphones can switch to the Mac. Siri's own voice isn't available to apps: for a better voice, download an Enhanced or Premium one in Settings → Accessibility → Spoken Content → Voices.")
+                }
+                Section {
                     Toggle("Live Activity", isOn: $state.prefs.liveActivityEnabled)
                     Picker("Count down from", selection: $state.prefs.liveActivityLeadMinutes) {
                         ForEach([10, 15, 30, 60, 120], id: \.self) { Text($0 >= 60 ? "\($0 / 60) h before" : "\($0) min before").tag($0) }
