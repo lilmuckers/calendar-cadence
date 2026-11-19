@@ -72,6 +72,12 @@ struct PairedMacTests {
         #expect(mac.displayName == "C02XK1ABCDEF")
     }
 
+    @Test func oldSingleAddressMigratesIntoTheBook() {
+        let mac = PairedMac(id: "m1", name: "Mac", hosts: ["192.168.0.21"], port: 62166)
+        #expect(mac.directAddresses.map(\.host) == ["192.168.0.21"])
+        #expect(mac.book().entries.count == 1)
+    }
+
     @Test func nicknameWinsAndRoundTrips() throws {
         let mac = PairedMac(id: "m1", name: "C02XK1ABCDEF", nickname: "Work laptop")
         #expect(mac.displayName == "Work laptop")

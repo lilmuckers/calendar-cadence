@@ -225,12 +225,12 @@ final class CompanionHub {
                 return
             }
             channels[id]?.phoneID = hello.deviceID
-            upsertPhone(ConnectedPhone(id: hello.deviceID, name: hello.deviceName, displaying: hello.displaying))
+            upsertPhone(ConnectedPhone(id: hello.deviceID, name: hello.label, displaying: hello.displaying))
             if let i = paired.firstIndex(where: { $0.id == hello.deviceID }) {
-                paired[i].name = hello.deviceName
+                paired[i].name = hello.label
                 paired[i].lastSeen = Date()
             } else {
-                paired.append(PairedPhone(id: hello.deviceID, name: hello.deviceName, lastSeen: Date()))
+                paired.append(PairedPhone(id: hello.deviceID, name: hello.label, lastSeen: Date()))
             }
             savePaired()
             entry.channel.send(.welcome(macID: macID, macName: macName))

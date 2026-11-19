@@ -11,16 +11,26 @@ struct PairedMac: Codable, Equatable {
     var name: String
     /// What the user calls it on this phone ("Work laptop"). Nil = use `name`.
     var nickname: String? = nil
-    /// LAN addresses and port from the pairing code, dialled when Bonjour finds nothing.
+    /// LAN addresses and port from the pairing code, as saved before the address book. Only read to
+    /// migrate older saves into `addresses`.
     var hosts: [String]? = nil
     var port: UInt16? = nil
+    /// Every network's addresses the Mac has been seen at (pairing codes, and the Mac telling a
+    /// connected phone), dialled in turn when Bonjour finds nothing.
+    var addresses: CompanionAddressBook? = nil
 
     var displayName: String { nickname ?? name }
 
-    var directEndpoints: [NWEndpoint] {
-        guard let port, let p = NWEndpoint.Port(rawValue: port) else { return [] }
-        return (hosts ?? []).map { .hostPort(host: NWEndpoint.Host($0), port: p) }
+    /// The address book, seeded from the old single address set if this save predates it.
+    func book(now: Date = Date()) -> CompanionAddressBook {
+        if let addresses { return addresses }
+        var book = CompanionAddressBook()
+        book.learn(hosts: hosts ?? [], port: port, now: now, worked: false)
+        return book
     }
+
+    /// Addresses to dial directly, the most recently working network first.
+    var directAddresses: [(host: String, port: UInt16)] { book().dialOrder }
 }
 
 /// The phone end of the Mac link: browses Bonjour for *its* Mac (matched by the id in the TXT record),
@@ -38,6 +48,7 @@ final class CompanionClient {
     }
 
     private static let macKey = "Cadence.companion.mac"
+    private static let deviceNameKey = "Cadence.companion.deviceName"
 
     private(set) var status: Status = .unpaired {
         didSet { if oldValue == .connected, status != .connected { onDisconnected?() } }
@@ -68,11 +79,39 @@ final class CompanionClient {
     @ObservationIgnored private var directIndex = 0
     @ObservationIgnored private var stuck: Timer?
     private static let stuckAfter: TimeInterval = 20
+    /// A direct dial that hasn't been welcomed by then is given up, so the next address gets a go
+    /// (an address from another network usually just hangs rather than failing).
+    @ObservationIgnored private var dialTimeout: Timer?
+    private static let dialTimeoutAfter: TimeInterval = 5
+    /// The address being dialled directly, if this connection is a direct dial.
+    @ObservationIgnored private var dialling: (host: String, port: UInt16)?
+    @ObservationIgnored private var helloResend: Timer?
     @ObservationIgnored private var running = false
     @ObservationIgnored private var failures = 0
 
+    /// What this phone is called on the Mac. Blank = what iOS reports, which since iOS 16 is just
+    /// "iPhone" (the Mac then shows the model, e.g. "iPhone 16 Pro").
+    private(set) var deviceName: String = UserDefaults.standard.string(forKey: CompanionClient.deviceNameKey) ?? ""
+
+    /// The name the Mac shows when the user hasn't set one.
+    var defaultDeviceName: String {
+        CompanionDeviceName.label(name: UIDevice.current.name, model: Self.modelIdentifier)
+    }
+
     init() {
         status = mac == nil ? .unpaired : .off
+        // Move older saves (one address set) into the address book, and drop sets gone stale.
+        if var mac {
+            var book = mac.book()
+            book.prune(now: Date())
+            if mac.addresses != book || mac.hosts != nil {
+                mac.addresses = book
+                mac.hosts = nil
+                mac.port = nil
+                self.mac = mac
+                saveMac()
+            }
+        }
     }
 
     // MARK: Pairing
@@ -80,10 +119,14 @@ final class CompanionClient {
     func pair(_ invite: PairingInvite) {
         stop()
         CompanionIdentity.store(key: invite.key)
-        // Re-pairing the same Mac keeps the name the user gave it.
-        let nickname = mac?.id == invite.macID ? mac?.nickname : nil
-        mac = PairedMac(id: invite.macID, name: invite.macName, nickname: nickname, hosts: invite.hosts, port: invite.port)
+        // Re-pairing the same Mac keeps the name the user gave it, and the networks it was seen on:
+        // a code scanned on a second network adds that network's addresses rather than replacing.
+        let same = mac?.id == invite.macID
+        var book = same ? mac?.book() ?? CompanionAddressBook() : CompanionAddressBook()
+        book.learn(hosts: invite.hosts, port: invite.port, now: Date(), worked: false)
+        mac = PairedMac(id: invite.macID, name: invite.macName, nickname: same ? mac?.nickname : nil, addresses: book)
         saveMac()
+        directIndex = 0
         failures = 0
         needsRescan = false
         start()
@@ -98,6 +141,38 @@ final class CompanionClient {
         mac = updated
         saveMac()
     }
+
+    /// Name this phone for the Mac; blank goes back to what iOS reports. A connected Mac hears it shortly.
+    func renameDevice(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed != deviceName else { return }
+        deviceName = trimmed
+        if trimmed.isEmpty { UserDefaults.standard.removeObject(forKey: Self.deviceNameKey) }
+        else { UserDefaults.standard.set(trimmed, forKey: Self.deviceNameKey) }
+        // Typing sends a change per keystroke; tell the Mac once it settles.
+        helloResend?.invalidate()
+        helloResend = Timer.scheduledTimer(withTimeInterval: 1, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.status == .connected else { return }
+                self.channel?.send(.hello(self.hello))
+            }
+        }
+    }
+
+    private var hello: CompanionHello {
+        CompanionHello(deviceID: deviceID, deviceName: deviceName.isEmpty ? UIDevice.current.name : deviceName,
+                       deviceModel: Self.modelIdentifier, displaying: displaying)
+    }
+
+    /// "iPhone17,1" (the simulator reports the model it's simulating).
+    static let modelIdentifier: String = {
+        if let sim = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] { return sim }
+        var info = utsname()
+        uname(&info)
+        return withUnsafeBytes(of: &info.machine) { raw in
+            String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
+        }
+    }()
 
     private func saveMac() {
         if let data = try? JSONEncoder().encode(mac) { UserDefaults.standard.set(data, forKey: Self.macKey) }
@@ -141,7 +216,9 @@ final class CompanionClient {
 
     private func armStuckTimer() {
         guard stuck == nil, status != .connected else { return }
-        stuck = Timer.scheduledTimer(withTimeInterval: Self.stuckAfter, repeats: false) { [weak self] _ in
+        // Give every saved address a go before suggesting a rescan.
+        let wait = Self.stuckAfter + Self.dialTimeoutAfter * Double(mac?.directAddresses.count ?? 0)
+        stuck = Timer.scheduledTimer(withTimeInterval: wait, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.stuck = nil
@@ -152,17 +229,25 @@ final class CompanionClient {
 
     /// If Bonjour hasn't turned up the Mac shortly, dial the address from the pairing code instead.
     /// Some networks and Mac security tools drop multicast DNS while plain TCP still gets through.
-    private func scheduleDirect() {
+    private func scheduleDirect(after delay: TimeInterval = 3) {
         direct?.invalidate()
-        direct = Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { [weak self] _ in
+        direct = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.running, self.channel == nil, self.endpoint == nil,
-                      let endpoints = self.mac?.directEndpoints, !endpoints.isEmpty else { return }
-                let endpoint = endpoints[self.directIndex % endpoints.count]
+                      let addresses = self.mac?.directAddresses, !addresses.isEmpty else { return }
+                let address = addresses[self.directIndex % addresses.count]
                 self.directIndex += 1
-                self.connect(endpoint)
+                guard let port = NWEndpoint.Port(rawValue: address.port) else { return }
+                self.connect(.hostPort(host: NWEndpoint.Host(address.host), port: port), direct: address)
             }
         }
+    }
+
+    /// Whether a failed direct dial should move straight on to the next address rather than backing
+    /// off: true until every address has had a go this round.
+    private var moreAddressesThisRound: Bool {
+        let count = mac?.directAddresses.count ?? 0
+        return count > 1 && directIndex % count != 0
     }
 
     /// Say goodbye and drop the link. Called when the app leaves the foreground, so the Mac
@@ -171,6 +256,8 @@ final class CompanionClient {
         running = false
         retry?.invalidate()
         direct?.invalidate()
+        dialTimeout?.invalidate()
+        dialling = nil
         stuck?.invalidate()
         stuck = nil
         if let channel {
@@ -223,19 +310,38 @@ final class CompanionClient {
     /// Macs that turned out not to be ours this session.
     @ObservationIgnored private var rejected: Set<NWEndpoint> = []
 
-    private func connect(_ endpoint: NWEndpoint) {
+    private func connect(_ endpoint: NWEndpoint, direct: (host: String, port: UInt16)? = nil) {
         guard let key = CompanionIdentity.storedKey(), running else { return }
         status = .connecting
         let channel = CompanionChannel(connection: NWConnection(to: endpoint, using: CompanionNetwork.parameters(key: key)))
         self.channel = channel
+        dialTimeout?.invalidate()
+        dialling = direct
+        if direct != nil {
+            dialTimeout = Timer.scheduledTimer(withTimeInterval: Self.dialTimeoutAfter, repeats: false) { [weak self, weak channel] _ in
+                MainActor.assumeIsolated {
+                    guard let self, let channel, self.channel === channel, self.status != .connected else { return }
+                    channel.close(URLError(.timedOut))
+                }
+            }
+        }
         channel.onReady = { [weak self, weak channel] in
             guard let self, let channel else { return }
-            channel.send(.hello(CompanionHello(deviceID: self.deviceID, deviceName: UIDevice.current.name, displaying: self.displaying)))
+            channel.send(.hello(self.hello))
         }
         channel.onMessage = { [weak self] message in self?.handle(message) }
         channel.onClose = { [weak self, weak channel] error in
             guard let self, self.channel === channel else { return }
             self.channel = nil
+            self.dialTimeout?.invalidate()
+            let wasDirect = self.dialling != nil
+            self.dialling = nil
+            if self.running, wasDirect, self.endpoint == nil, self.moreAddressesThisRound {
+                // Another network's address didn't answer: try the next one straight away.
+                self.status = .connecting
+                self.scheduleDirect(after: 0.2)
+                return
+            }
             self.failures += 1
             if self.running {
                 self.status = error.map { .failed(Self.describe($0)) } ?? .searching
@@ -256,6 +362,16 @@ final class CompanionClient {
             failures = 0
             status = .connected
             needsRescan = false
+            dialTimeout?.invalidate()
+            if let dialled = dialling, var updated = mac {
+                var book = updated.book()
+                book.markWorked(host: dialled.host, port: dialled.port, now: Date())
+                updated.addresses = book
+                mac = updated
+                saveMac()
+                // Next time, start from the address that worked.
+                directIndex = 0
+            }
             stuck?.invalidate()
             stuck = nil
             if mac?.name != macName, var updated = mac {
@@ -264,9 +380,13 @@ final class CompanionClient {
                 saveMac()
             }
         case .address(let hosts, let port):
-            guard var updated = mac, updated.hosts != hosts || updated.port != port else { break }
-            updated.hosts = hosts
-            updated.port = port
+            // Where the Mac is on the network we're connected over: keep it alongside the others,
+            // and count it as working now.
+            guard var updated = mac else { break }
+            var book = updated.book()
+            book.learn(hosts: hosts, port: port, now: Date(), worked: true)
+            guard book != updated.addresses else { break }
+            updated.addresses = book
             mac = updated
             saveMac()
         case .bye(let reason):
