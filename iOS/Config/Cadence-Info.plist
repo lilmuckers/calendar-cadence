@@ -4,6 +4,8 @@
 <dict>
 	<key>CadenceGoogleIOSClientPrefix</key>
 	<string>$(GOOGLE_IOS_CLIENT_PREFIX)</string>
+	<key>CadenceSpotifyClientID</key>
+	<string>$(SPOTIFY_CLIENT_ID)</string>
 	<key>CadenceMicrosoftClientID</key>
 	<string>$(MICROSOFT_CLIENT_ID)</string>
 	<key>CFBundleURLTypes</key>
@@ -33,6 +35,10 @@
 				<string>msauth.$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			</array>
 		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>spotify</string>
 	</array>
 	<key>NSBonjourServices</key>
 	<array>

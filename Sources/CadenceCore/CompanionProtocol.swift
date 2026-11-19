@@ -99,6 +99,62 @@ public struct CompanionInvite: Codable, Equatable, Sendable {
     }
 }
 
+/// A media player Cadence knows how to show (and, where it can, open or control).
+public enum MediaApp: String, Codable, CaseIterable, Identifiable, Sendable {
+    case appleMusic, spotify, youTubeMusic, podcasts
+
+    public var id: String { rawValue }
+
+    public var name: String {
+        switch self {
+        case .appleMusic: "Apple Music"
+        case .spotify: "Spotify"
+        case .youTubeMusic: "YouTube Music"
+        case .podcasts: "Podcasts"
+        }
+    }
+
+    /// Opens the app on iPhone.
+    public var url: URL {
+        switch self {
+        case .appleMusic: URL(string: "music://")!
+        case .spotify: URL(string: "spotify://")!
+        case .youTubeMusic: URL(string: "youtubemusic://")!
+        case .podcasts: URL(string: "podcasts://")!
+        }
+    }
+}
+
+/// What's playing on one side of the link. `title` is nil when the player doesn't share its track
+/// (on iPhone, anything but the Music app).
+public struct CompanionMedia: Codable, Equatable, Sendable {
+    public var app: MediaApp
+    public var title: String?
+    public var artist: String?
+    public var isPlaying: Bool
+    /// Small JPEG, sent only when the track changes (nil otherwise: keep the last one).
+    public var artwork: Data?
+    /// Changes with the track, so the other side knows when `artwork` nil means "none".
+    public var trackID: String?
+    /// Whether next/previous work (only for players Cadence can control).
+    public var canSkip: Bool
+
+    public init(app: MediaApp, title: String? = nil, artist: String? = nil, isPlaying: Bool,
+                artwork: Data? = nil, trackID: String? = nil, canSkip: Bool = false) {
+        self.app = app
+        self.title = title
+        self.artist = artist
+        self.isPlaying = isPlaying
+        self.artwork = artwork
+        self.trackID = trackID
+        self.canSkip = canSkip
+    }
+}
+
+public enum MediaCommand: String, Codable, Sendable {
+    case play, pause, togglePlayPause, next, previous
+}
+
 public enum CompanionMessage: Codable, Equatable, Sendable {
     // Phone → Mac
     case hello(CompanionHello)
@@ -131,7 +187,11 @@ public enum CompanionMessage: Codable, Equatable, Sendable {
     case clashPrompt(CompanionClash)
     /// The clash was settled (on either side): close its pop-up.
     case clashHandled(key: String)
-    // Both
+    // Both (older peers skip these)
+    /// What's playing on the sender's side; nil = nothing.
+    case media(CompanionMedia?)
+    /// Control the receiver's media (from its controls on the other device, or the Mac's media keys).
+    case mediaCommand(MediaCommand)
     case ping
     case bye(reason: String)
 }

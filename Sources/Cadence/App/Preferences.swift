@@ -96,6 +96,13 @@ struct Preferences: Codable, Equatable {
     var companionEscalation: CompanionEscalation = .thirtySeconds
     /// Which browser profile opens which meeting (default browser only).
     var profileRules = ProfileRules()
+    /// Music/Spotify here show on the phone's desk display, and the phone's music takes over the
+    /// Mac's Now Playing (media keys) while it plays.
+    var shareMediaWithPhone = true
+    /// A meeting alert fades out Music or Spotify on this Mac...
+    var fadeMediaForAlerts = false
+    /// ...and says which meeting it is.
+    var announceAlerts = true
 
     private static let key = "Cadence.preferences.v1"
 
@@ -166,5 +173,8 @@ extension Preferences {
         companionTakeover = (try? c.decodeIfPresent(CompanionTakeoverMode.self, forKey: .companionTakeover)) ?? d.companionTakeover
         companionEscalation = (try? c.decodeIfPresent(CompanionEscalation.self, forKey: .companionEscalation)) ?? d.companionEscalation
         profileRules = (try? c.decodeIfPresent(ProfileRules.self, forKey: .profileRules)) ?? d.profileRules
+        shareMediaWithPhone = try c.decodeIfPresent(Bool.self, forKey: .shareMediaWithPhone) ?? d.shareMediaWithPhone
+        fadeMediaForAlerts = try c.decodeIfPresent(Bool.self, forKey: .fadeMediaForAlerts) ?? d.fadeMediaForAlerts
+        announceAlerts = try c.decodeIfPresent(Bool.self, forKey: .announceAlerts) ?? d.announceAlerts
     }
 }

@@ -36,6 +36,12 @@ struct CompanionProtocolTests {
         .clashPrompt(CompanionClash(key: "a|b", meetings: [meeting(), meeting("b")])),
         .dismissAlert(meetingID: "a"),
         .reminder(CompanionReminder(key: "k", title: "t", body: "b", joinMeetingID: "a")),
+        .media(CompanionMedia(app: .appleMusic, title: "Song", artist: "Band", isPlaying: true,
+                              artwork: Data([0xFF, 0xD8]), trackID: "appleMusic-1", canSkip: true)),
+        .media(CompanionMedia(app: .spotify, isPlaying: false)),
+        .media(nil),
+        .mediaCommand(.togglePlayPause),
+        .mediaCommand(.next),
         .ping,
         .bye(reason: "unpaired"),
     ]

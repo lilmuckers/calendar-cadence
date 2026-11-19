@@ -24,6 +24,8 @@
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Cadence reads what Music or Spotify is playing to show it on your iPhone, and fades it out before meetings.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_cadence._tcp</string>

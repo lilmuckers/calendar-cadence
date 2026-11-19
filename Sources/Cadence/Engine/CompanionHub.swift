@@ -45,6 +45,12 @@ final class CompanionHub {
     @ObservationIgnored var onRSVP: ((String, RSVP?) -> Void)?
     @ObservationIgnored var onInviteLater: ((String) -> Void)?
     @ObservationIgnored var onResolveClash: ((String, String?) -> Void)?
+    /// What's playing on the Mac, sent to a phone when it says hello.
+    @ObservationIgnored var macMedia: (() -> CompanionMedia?)?
+    /// What's playing on the phone changed (nil = nothing, or the phone went away).
+    @ObservationIgnored var onPhoneMedia: ((CompanionMedia?) -> Void)?
+    /// The phone's controls, aimed at the Mac's player.
+    @ObservationIgnored var onMediaCommand: ((MediaCommand) -> Void)?
     /// A phone said hello (so it's ready for prompts).
     @ObservationIgnored var onPhoneConnected: (() -> Void)?
     /// The last connected phone went away.
@@ -192,7 +198,10 @@ final class CompanionHub {
             self.channels[id] = nil
             if let phoneID, !self.channels.values.contains(where: { $0.phoneID == phoneID }) {
                 self.phones.removeAll { $0.id == phoneID }
-                if self.phones.isEmpty { self.onPhonesGone?() }
+                if self.phones.isEmpty {
+                    self.onPhoneMedia?(nil)
+                    self.onPhonesGone?()
+                }
             }
         }
         channel.start()
@@ -221,6 +230,7 @@ final class CompanionHub {
                 entry.channel.send(.address(hosts: Self.lanAddresses(), port: port))
             }
             if let snapshot = snapshot?() { entry.channel.send(.snapshot(snapshot)) }
+            if let media = macMedia?() { entry.channel.send(.media(media)) }
             onPhoneConnected?()
         case .displayState(let displaying):
             guard let phoneID = entry.phoneID, let i = phones.firstIndex(where: { $0.id == phoneID }) else { return }
@@ -240,6 +250,10 @@ final class CompanionHub {
             onInviteLater?(meetingID)
         case .resolveClash(let key, let choice):
             onResolveClash?(key, choice)
+        case .media(let media):
+            onPhoneMedia?(media)
+        case .mediaCommand(let command):
+            onMediaCommand?(command)
         case .bye:
             entry.channel.close()
         default:

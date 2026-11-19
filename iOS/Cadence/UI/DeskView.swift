@@ -25,9 +25,11 @@ struct DeskView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             // Pop-ups sit under the agenda, so the countdown keeps the whole left side.
                             VStack(alignment: .leading, spacing: 12) {
-                                AgendaColumn(limit: prompting ? 2 : 8)
+                                AgendaColumn(limit: prompting ? 2 : (state.prefs.deskMediaControls ? 6 : 8))
                                 Spacer(minLength: 0)
                                 PromptStrip(style: .panel)
+                                // Room for the media corner, drawn above the dimming below.
+                                if state.prefs.deskMediaControls { Color.clear.frame(height: MediaCorner.height) }
                             }
                             .frame(width: min(360, geo.size.width * 0.42))
                         }
@@ -49,6 +51,14 @@ struct DeskView: View {
                 }
                 // A pop-up wakes it: nothing dims while one is up.
                 .opacity(dimmed && !prompting ? 0.55 : 1)
+                // Bottom right, landscape only; full brightness while something's playing.
+                if landscape && state.prefs.deskMediaControls {
+                    MediaCorner()
+                        .frame(width: min(360, geo.size.width * 0.42))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                        .padding(.horizontal, 28).padding(.vertical, 20)
+                        .opacity(dimmed && !prompting && !state.nowPlaying.isPlaying && state.macMedia == nil ? 0.55 : 1)
+                }
             }
             .foregroundStyle(.white)
             .contentShape(Rectangle())

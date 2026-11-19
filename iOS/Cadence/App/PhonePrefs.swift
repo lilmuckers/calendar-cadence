@@ -26,6 +26,14 @@ struct PhonePrefs: Codable, Equatable {
     var deskWhenCharging = true
     /// Dim the desk display between meetings.
     var deskDimWhenIdle = true
+    /// Media controls in the corner of the landscape desk display.
+    var deskMediaControls = true
+    /// Opened by the desk's media button, and the look of the controls.
+    var mediaApp: MediaApp = .appleMusic
+    /// A meeting alert fades out music playing on this phone and hands the headphones over.
+    var pauseMediaForAlerts = true
+    /// ...and says which meeting it is before letting go.
+    var announceAlerts = true
 
     // Live Activity on the Lock Screen / StandBy.
     var liveActivityEnabled = true
@@ -63,6 +71,10 @@ extension PhonePrefs {
         wrapUpMinutes = v(.wrapUpMinutes, d.wrapUpMinutes)
         deskWhenCharging = v(.deskWhenCharging, d.deskWhenCharging)
         deskDimWhenIdle = v(.deskDimWhenIdle, d.deskDimWhenIdle)
+        deskMediaControls = v(.deskMediaControls, d.deskMediaControls)
+        mediaApp = v(.mediaApp, d.mediaApp)
+        pauseMediaForAlerts = v(.pauseMediaForAlerts, d.pauseMediaForAlerts)
+        announceAlerts = v(.announceAlerts, d.announceAlerts)
         liveActivityEnabled = v(.liveActivityEnabled, d.liveActivityEnabled)
         liveActivityLeadMinutes = v(.liveActivityLeadMinutes, d.liveActivityLeadMinutes)
     }

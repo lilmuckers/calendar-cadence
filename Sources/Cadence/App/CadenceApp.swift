@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         state.onAlert = { meeting, style in router.alert(meeting, forcing: style) }
         state.onReminder = { reminder in router.remind(reminder) }
+        state.onTestMediaFade = { router.media.test() }
         let inviteReview = InviteReviewController(state: state)
         self.inviteReview = inviteReview
         let showNewInvitesOnMac: ([Meeting]) -> Void = { [weak self] invites in
