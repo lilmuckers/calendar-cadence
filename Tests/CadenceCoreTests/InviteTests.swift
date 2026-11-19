@@ -71,6 +71,23 @@ struct InviteTests {
         #expect(EventColorChoice.palette(labels: []) == EventColorChoice.palette)
     }
 
+    @Test func namedOnlyKeepsNamedLabelsAndCurrentColour() throws {
+        let labels = [
+            GoogleEventLabel(id: "a", backgroundColor: "#33B679", name: "Focus time"),
+            GoogleEventLabel(id: "b", backgroundColor: "#d50000", name: ""),
+            GoogleEventLabel(id: "c", backgroundColor: "#123456", name: "Side project"),
+            GoogleEventLabel(id: "e", backgroundColor: "#654321", name: nil),
+        ]
+        let choices = EventColorChoice.palette(labels: labels)
+        #expect(choices.count == 13)
+        #expect(EventColorChoice.namedOnly(choices).map(\.id) == ["2", "label:c"])
+        // The event's current colour stays even when unnamed.
+        #expect(EventColorChoice.namedOnly(choices, keeping: "label:e").map(\.id) == ["2", "label:c", "label:e"])
+        // Nothing named: show everything.
+        let plain = EventColorChoice.palette(labels: [GoogleEventLabel(id: "x", backgroundColor: "#654321", name: nil)])
+        #expect(EventColorChoice.namedOnly(plain, keeping: "11") == plain)
+    }
+
     @Test func eventLabelColourWinsOverLegacyColorId() throws {
         let json = """
         {"id": "e1", "summary": "Deep work", "colorId": "5", "eventLabelId": "c",

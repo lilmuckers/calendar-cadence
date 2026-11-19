@@ -44,6 +44,10 @@ private struct CalendarsTab: View {
                     Text("Use event colours")
                     Text("Events coloured individually in Google Calendar (or with a colour in an ICS feed) use that colour instead of their calendar's. Google event colours need the direct Google sign-in; macOS Calendar doesn't pass them on.")
                 }
+                Toggle(isOn: Binding(get: { state.prefs.namedColorsOnly }, set: { state.prefs.namedColorsOnly = $0 })) {
+                    Text("Only offer named colours")
+                    Text("When picking a colour for a Google event, show just the colours you've named in Google Calendar, hiding the stock and unnamed custom ones. Calendars with no named colours still show them all.")
+                }
             }
             ForEach(grouped, id: \.0) { source, calendars in
                 Section {

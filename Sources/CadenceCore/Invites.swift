@@ -82,11 +82,26 @@ public struct EventColorChoice: Identifiable, Hashable, Sendable {
                 out[i].labelID = label.id
                 if let name { out[i].name = name }
             } else if hex != nil {
-                out.append(EventColorChoice(id: "label:\(label.id)", name: name ?? "Custom colour",
+                out.append(EventColorChoice(id: "label:\(label.id)", name: name ?? unnamedCustom,
                                             color: GoogleMapper.color(hex: hex), labelID: label.id))
             }
         }
         return out
+    }
+
+    /// True when the calendar gave this colour a name of its own (a renamed standard colour or a
+    /// named custom colour), rather than Google's stock name or "Custom colour".
+    public var isNamedLabel: Bool {
+        labelID != nil && name != (Self.choice(id: id)?.name ?? Self.unnamedCustom)
+    }
+
+    static let unnamedCustom = "Custom colour"
+
+    /// Just the colours the calendar named, plus `keeping` (the event's current colour) so it stays
+    /// visible. Falls back to all of `choices` when the calendar named none.
+    public static func namedOnly(_ choices: [EventColorChoice], keeping current: String? = nil) -> [EventColorChoice] {
+        let named = choices.filter { $0.isNamedLabel || $0.id == current }
+        return named.contains(where: \.isNamedLabel) ? named : choices
     }
 
     /// "Sage" for an unlabelled standard colour; "Focus time (Sage)" when the calendar renamed it.

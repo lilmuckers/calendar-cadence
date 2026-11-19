@@ -179,7 +179,7 @@ final class CadenceBackend: MCPBackend {
         case "set_event_color":
             let raw = a["color"]?.stringValue
             // The calendar's own label names win; Google's standard names still work.
-            let choices = state.colorChoices(for: m)
+            let choices = state.colorChoices(for: m, all: true)
             let choice = raw.flatMap { name in
                 choices.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
                     ?? choices.first { EventColorChoice.choice(id: $0.id)?.name.caseInsensitiveCompare(name) == .orderedSame }
