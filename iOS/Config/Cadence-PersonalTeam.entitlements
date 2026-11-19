@@ -3,5 +3,10 @@
 <!-- For free Personal Team signing, which can't use Time Sensitive Notifications.
      Alerts still arrive, they just don't break through Focus. -->
 <plist version="1.0">
-<dict/>
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.$(CADENCE_BUNDLE_ID)</string>
+	</array>
+</dict>
 </plist>
