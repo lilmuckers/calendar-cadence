@@ -105,6 +105,14 @@ struct SettingsScreen: View {
                             Label { Text(app.name) } icon: { MediaLogo(app: app, size: 22) }.tag(app)
                         }
                     }
+                    if state.prefs.mediaApp == .spotify {
+                        NavigationLink {
+                            SpotifySetupScreen()
+                        } label: {
+                            LabeledContent("Spotify app", value: state.spotify.customClientID != nil ? "Your own"
+                                           : state.spotify.isAvailable ? "Built-in" : "Not set up")
+                        }
+                    }
                     if state.prefs.mediaApp == .spotify && state.spotify.isAvailable {
                         if state.spotify.connected {
                             LabeledContent("Spotify", value: "Connected")
@@ -123,7 +131,7 @@ struct SettingsScreen: View {
                         .disabled(!state.prefs.pauseMediaForAlerts)
                     Button("Test the hand-off") { state.testAudioHandoff() }
                 } header: { Text("Media") } footer: {
-                    Text("Landscape desk mode shows what's playing in the corner, or a button for your media app. Track details and skip work for Apple Music and, once connected, Spotify (connecting opens Spotify for a moment to approve); other apps show that they're playing and can be paused. When connected, it shows and controls the Mac's Music or Spotify too (and, if you turn it on in Cadence on the Mac, the Mac's media keys control this iPhone's music).\n\nWhen an alert comes up with music playing here, Cadence fades it out, says which meeting it is, then lets go of the audio so your headphones can switch to the Mac. Siri's own voice isn't available to apps: for a better voice, download an Enhanced or Premium one in Settings → Accessibility → Spoken Content → Voices.")
+                    Text("Landscape desk mode shows what's playing in the corner, or a button for your media app. Track details and skip work for Apple Music and, once set up and connected, Spotify (with your own free Spotify developer app; connecting opens Spotify for a moment to approve); other apps show that they're playing and can be paused. When connected, it shows and controls the Mac's Music or Spotify too (and, if you turn it on in Cadence on the Mac, the Mac's media keys control this iPhone's music).\n\nWhen an alert comes up with music playing here, Cadence fades it out, says which meeting it is, then lets go of the audio so your headphones can switch to the Mac. Siri's own voice isn't available to apps: for a better voice, download an Enhanced or Premium one in Settings → Accessibility → Spoken Content → Voices.")
                 }
                 Section {
                     Toggle("Live Activity", isOn: $state.prefs.liveActivityEnabled)
@@ -278,5 +286,76 @@ private struct WorkHoursScreen: View {
         }
         .navigationTitle("Working Hours")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// Bring-your-own Spotify developer app. Spotify's App Remote SDK needs a client ID, and an app
+/// in development mode only works for accounts its owner adds, so each person makes their own.
+private struct SpotifySetupScreen: View {
+    @Environment(PhoneState.self) private var state
+    @State private var clientID = ""
+    @State private var copied: String?
+
+    private var bundleID: String { Bundle.main.bundleIdentifier ?? "" }
+    private var redirectURI: String { SpotifyRemote.redirectURL.absoluteString }
+    private var trimmed: String { clientID.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var changed: Bool { trimmed != (state.spotify.customClientID ?? "") }
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("32-character Client ID", text: $clientID)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .font(.body.monospaced())
+                    .submitLabel(.done)
+                    .onSubmit(save)
+                if !trimmed.isEmpty && !SpotifyRemote.isValidClientID(trimmed) {
+                    Text("That doesn't look like a Client ID: it's 32 letters and numbers, from your app's Settings page.")
+                        .font(.footnote).foregroundStyle(.red)
+                }
+                Button("Save") { save() }
+                    .disabled(!changed || (!trimmed.isEmpty && !SpotifyRemote.isValidClientID(trimmed)))
+                if state.spotify.customClientID != nil {
+                    Button(state.spotify.hasBundledClientID ? "Use the built-in app" : "Remove", role: .destructive) {
+                        clientID = ""
+                        state.spotify.setClientID(nil)
+                    }
+                }
+            } header: { Text("Client ID") } footer: {
+                Text("Saving a different one disconnects Spotify; connect again afterwards. The Client ID isn't a secret (there's no Client Secret to enter), and it stays on this iPhone.")
+            }
+            Section {
+                Link("Open the Spotify Developer Dashboard", destination: URL(string: "https://developer.spotify.com/dashboard")!)
+                Text("1. Sign in with your Spotify account and tap **Create app**. Any name and description will do.")
+                Text("2. Under **Redirect URIs**, add:")
+                copyRow(redirectURI)
+                Text("3. Under **Which API/SDKs are you planning to use?** tick **iOS**, then add this **Bundle ID**:")
+                copyRow(bundleID)
+                Text("4. Save, open the app's **Settings** and copy its **Client ID** into the field above.")
+            } header: { Text("Make your own Spotify app") } footer: {
+                Text("It's free and takes a couple of minutes. Spotify keeps new apps in development mode, which is fine here: they work for the account that made them (add anyone else under User Management).")
+            }
+        }
+        .navigationTitle("Spotify app")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear { clientID = state.spotify.customClientID ?? "" }
+    }
+
+    private func save() {
+        guard changed, trimmed.isEmpty || SpotifyRemote.isValidClientID(trimmed) else { return }
+        state.spotify.setClientID(trimmed)
+    }
+
+    private func copyRow(_ value: String) -> some View {
+        Button {
+            UIPasteboard.general.string = value
+            copied = value
+        } label: {
+            HStack {
+                Text(value).font(.callout.monospaced()).foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.6)
+                Spacer()
+                Image(systemName: copied == value ? "checkmark" : "doc.on.doc")
+            }
+        }
     }
 }
