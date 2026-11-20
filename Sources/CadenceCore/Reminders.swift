@@ -10,6 +10,10 @@ public struct Reminder: Equatable, Sendable {
         case wrapUp(minutes: Int, next: Meeting?)
         /// Morning digest of the day ahead.
         case summary(day: Date, meetings: [Meeting])
+        /// A break starts now (`meeting` is the break's stand-in).
+        case breakStart
+        /// The live `meeting` is about to run into `breakMeeting`.
+        case breakOverrun(breakMeeting: Meeting)
     }
 
     public var key: String
@@ -29,6 +33,8 @@ public struct Reminder: Equatable, Sendable {
         switch kind {
         case .wrapUp: meeting.end
         case .summary(let day, _): Calendar.current.date(byAdding: .hour, value: 4, to: fireAt) ?? day
+        case .breakStart: meeting.end
+        case .breakOverrun(let b): b.start
         default: meeting.start
         }
     }
@@ -36,6 +42,14 @@ public struct Reminder: Equatable, Sendable {
     public var isSummary: Bool {
         if case .summary = kind { return true }
         return false
+    }
+
+    /// About a break rather than a meeting: nothing to join.
+    public var isBreak: Bool {
+        switch kind {
+        case .breakStart, .breakOverrun: true
+        default: false
+        }
     }
 
     /// Only worth sending while you're actually on the call: a wrap-up for an online meeting (one with a
@@ -91,6 +105,29 @@ public enum ReminderPlanner {
         }
     }
 
+    /// How long before a break the overrun warning goes out.
+    public static let overrunLead: TimeInterval = 5 * 60
+
+    /// A nudge as each break starts, and (for meetings live across a break's start) a warning
+    /// `overrunLead` before. `breaks` are the stand-ins from `WorkSchedule.breakMeetings`, already
+    /// without the ones you gave up; `live` the meetings you're in.
+    public static func breakNudges(breaks: [Meeting], meetings: [Meeting], nudge: Bool, overrun: Bool) -> [Reminder] {
+        var out: [Reminder] = []
+        for b in breaks {
+            if nudge {
+                out.append(Reminder(key: "break:\(b.id)", meeting: b, kind: .breakStart, fireAt: b.start))
+            }
+            if overrun {
+                for m in meetings where !m.isAllDay && !m.isCanceled && m.participation != .declined && !m.isBreak
+                    && m.start < b.start.addingTimeInterval(-overrunLead) && m.end > b.start {
+                    out.append(Reminder(key: "overrun:\(b.id):\(m.id)", meeting: m, kind: .breakOverrun(breakMeeting: b),
+                                        fireAt: b.start.addingTimeInterval(-overrunLead)))
+                }
+            }
+        }
+        return out
+    }
+
     /// Reminders whose time has come and that haven't been sent. A reminder only fires before the
     /// meeting starts, and at most `staleness` late (e.g. the Mac was asleep), so nothing stale pops up.
     public static func due(_ reminders: [Reminder], now: Date, sent: Set<String>, staleness: TimeInterval = 120) -> [Reminder] {
@@ -128,6 +165,10 @@ public enum ReminderPlanner {
             if let last = timed.last, timed.count > 1 { body += " · done by \(timeString(last.end))" }
             if pending > 0 { body += " · \(pending) to RSVP" }
             return ("Good morning — \(count) today", body)
+        case .breakStart:
+            return ("Time for \(r.meeting.title)", "Step away — back at \(timeString(r.meeting.end)).")
+        case .breakOverrun(let b):
+            return ("\(b.title) starts in 5 min", "\(r.meeting.title) runs until \(timeString(r.meeting.end)) — time to wrap up?")
         }
     }
 

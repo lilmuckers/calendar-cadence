@@ -116,22 +116,31 @@ final class CadenceBackend: MCPBackend {
         guard let minutes = a["duration_minutes"]?.intValue, minutes >= 5 else {
             throw MCPToolError("duration_minutes must be at least 5.")
         }
-        var hours = (state.prefs.workStart, state.prefs.workEnd)
+        var hours: (Int, Int)?
         if let custom = a["working_hours"]?.stringValue {
             guard let parsed = FreeTimeFinder.parseHours(custom) else { throw MCPToolError("working_hours should look like 09:00-17:30.") }
             hours = parsed
         }
+        let schedule = state.prefs.workSchedule
         let from = max(Date(), try date(a["from"]) ?? Date())
         let to = min(loadedUntil, try date(a["to"]) ?? loadedUntil)
         let slots = FreeTimeFinder.slots(meetings: state.activeMeetings, from: from, to: to, minDuration: Double(minutes) * 60,
-                                         workStart: hours.0, workEnd: hours.1)
+                                         schedule: schedule, hours: hours)
+        func hhmm(_ m: Int) -> String { String(format: "%02d:%02d", m / 60, m % 60) }
+        let symbols = Calendar.current.shortWeekdaySymbols
+        let days = (1...7).map { wd -> JSONValue in
+            let d = schedule.day(wd)
+            return .string(d.enabled ? "\(symbols[wd - 1]) \(hhmm(d.start))-\(hhmm(d.end))" : "\(symbols[wd - 1]) off")
+        }
+        let protected = schedule.enabled && schedule.defences.protectInFreeTime
         return [
             "slots": .array(slots.map {
                 ["start": .string(MeetingDTO.format($0.start)), "end": .string(MeetingDTO.format($0.end)),
                  "minutes": .number(($0.duration / 60).rounded())]
             }),
-            "working_hours": .string(String(format: "%02d:%02d-%02d:%02d", hours.0 / 60, hours.0 % 60, hours.1 / 60, hours.1 % 60)),
-            "note": "Based on the meetings Cadence loads (today and tomorrow), skipping weekends, free and declined events, and agenda-only calendars.",
+            "working_hours": hours.map { .string("\(hhmm($0.0))-\(hhmm($0.1))") } ?? .array(days),
+            "breaks_kept_clear": .array(protected ? schedule.breaks.map { .string("\($0.name) \(hhmm($0.start))-\(hhmm($0.end))") } : []),
+            "note": "Based on the meetings Cadence loads (today and tomorrow), only on the user's working days, skipping their breaks (unless they allow it), free and declined events, and agenda-only calendars. Avoid suggesting times that land on a break or outside working hours.",
         ]
     }
 

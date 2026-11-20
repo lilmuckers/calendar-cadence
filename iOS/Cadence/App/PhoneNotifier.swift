@@ -29,7 +29,7 @@ final class PhoneNotifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     /// Replaces every scheduled notification with ones for `meetings`.
-    func reschedule(meetings: [Meeting], prefs: PhonePrefs) {
+    func reschedule(meetings: [Meeting], prefs: PhonePrefs, schedule: WorkSchedule, skipping: Set<String>) {
         let now = Date()
         var requests: [UNNotificationRequest] = []
         if prefs.backgroundNotifications {
@@ -49,9 +49,19 @@ final class PhoneNotifier: NSObject, UNUserNotificationCenterDelegate {
                 let timed = meetings.filter { !$0.isAllDay && $0.end > now && $0.participation != .declined }
                 reminders += ReminderPlanner.wrapUps(live: timed, all: meetings, minutes: prefs.wrapUpMinutes, onlyBackToBack: false)
             }
+            let d = schedule.defences
+            if schedule.enabled && (d.breakNudge || d.overrunWarning) {
+                let from = Calendar.current.startOfDay(for: now)
+                let breaks = schedule.breakMeetings(from: from, to: from.addingTimeInterval(2 * 86_400))
+                    .filter { $0.start > now && !skipping.contains($0.id) }
+                let timed = meetings.filter { !$0.isAllDay && $0.end > now }
+                reminders += ReminderPlanner.breakNudges(breaks: breaks, meetings: timed, nudge: d.breakNudge, overrun: d.overrunWarning)
+            }
             for r in reminders where r.fireAt > now {
                 let text = ReminderPlanner.message(for: r)
-                requests += request(r.key, at: r.fireAt, title: text.title, body: text.body, meeting: r.joinTarget, timeSensitive: false)
+                var target = r.joinTarget
+                if r.isBreak { target.joinLink = nil } // nothing to join from a break nudge
+                requests += request(r.key, at: r.fireAt, title: text.title, body: text.body, meeting: target, timeSensitive: false)
             }
         }
         requests = Array(requests.sorted { trigger($0) < trigger($1) }.prefix(Self.limit))

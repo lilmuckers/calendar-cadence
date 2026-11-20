@@ -140,9 +140,9 @@ private struct AssistantSetupView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
 
-            Section("Working hours (for finding free time)") {
-                DatePicker("Start", selection: minutes($state.prefs.workStart), displayedComponents: .hourAndMinute)
-                DatePicker("End", selection: minutes($state.prefs.workEnd), displayedComponents: .hourAndMinute)
+            Section("Working hours") {
+                Text("find_free_time uses your working hours and breaks from the Work tab.")
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -180,14 +180,6 @@ private struct AssistantSetupView: View {
     }
 
     /// Minutes after midnight as a time-of-day Date.
-    private func minutes(_ binding: Binding<Int>) -> Binding<Date> {
-        Binding(
-            get: { Calendar.current.startOfDay(for: Date()).addingTimeInterval(Double(binding.wrappedValue) * 60) },
-            set: { d in
-                let c = Calendar.current.dateComponents([.hour, .minute], from: d)
-                binding.wrappedValue = (c.hour ?? 0) * 60 + (c.minute ?? 0)
-            })
-    }
 }
 
 private struct ClientRow: View {

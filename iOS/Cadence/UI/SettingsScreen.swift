@@ -72,6 +72,16 @@ struct SettingsScreen: View {
                 } header: { Text("Alerts") } footer: {
                     Text("Once a meeting has started the alert gets redder and more insistent for the first 3 minutes, then starts falling apart (not with Reduce Motion). While connected, the Mac decides when alerts fire and when they close, using its own settings.")
                 }
+                Section {
+                    NavigationLink {
+                        WorkHoursScreen()
+                    } label: {
+                        LabeledContent("Working hours & breaks",
+                                       value: state.schedule.enabled ? (state.scheduleFromMac != nil ? "From Mac" : "On") : "Off")
+                    }
+                } footer: {
+                    Text("Gives the desk display its moments: before work, focus time, breaks and the end of the day.")
+                }
                 Section("Notifications when Cadence isn't open") {
                     Toggle("Notify me", isOn: $state.prefs.backgroundNotifications)
                     Toggle("Heads-up", isOn: $state.prefs.headsUpEnabled)
@@ -244,5 +254,29 @@ struct SettingsScreen: View {
         let name = URL(string: raw)?.host ?? "Calendar"
         state.prefs.icsFeeds.append(ICSFeed(name: name, url: raw, color: RGBAColor(red: 0.4, green: 0.6, blue: 0.95)))
         newFeedURL = ""
+    }
+}
+
+/// Working hours, breaks and how they're defended. Paired to a Mac that sends its schedule, shows that
+/// one read-only (set it in Cadence on the Mac, Settings → Work).
+private struct WorkHoursScreen: View {
+    @Environment(PhoneState.self) private var state
+
+    var body: some View {
+        @Bindable var state = state
+        Form {
+            if let mac = state.scheduleFromMac {
+                Section {
+                    Text("Set on \(state.link.mac?.displayName ?? "your Mac") in Settings → Work. Unpair to use your own here.")
+                        .foregroundStyle(.secondary)
+                }
+                WorkScheduleEditor(schedule: .constant(mac), readOnly: true)
+            } else {
+                WorkScheduleEditor(schedule: $state.prefs.workSchedule,
+                                   defencesFooter: "Without a Mac, this iPhone nudges you when breaks start. Invite flags and break questions come from Cadence on the Mac.")
+            }
+        }
+        .navigationTitle("Working Hours")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

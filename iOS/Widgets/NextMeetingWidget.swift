@@ -22,6 +22,8 @@ struct NextMeetingEntry: TimelineEntry {
     /// Tomorrow's first meeting, set only in the evening once nothing is left today.
     let tomorrow: WidgetMeeting?
     let mood: ActivityMood
+    /// Focus time, a break, before or after work, when no meeting is live or close.
+    let segment: WidgetSegment?
     /// No schedule saved yet (app not opened since install, or no App Group).
     let unknown: Bool
 
@@ -32,6 +34,7 @@ struct NextMeetingEntry: TimelineEntry {
         following = next.flatMap { schedule?.following($0) }
         tomorrow = schedule?.tomorrowFirst(after: date)
         mood = schedule?.mood(at: date) ?? .calm
+        segment = schedule?.segment(at: date)
     }
 
     static let placeholder = NextMeetingEntry(date: Date(), schedule: WidgetSchedule(meetings: [
@@ -83,6 +86,14 @@ struct NextMeetingView: View {
     }
 
     @ViewBuilder private var content: some View {
+        if let seg = entry.segment {
+            MomentWidgetView(segment: seg, family: family, date: entry.date)
+        } else {
+            meetingContent
+        }
+    }
+
+    @ViewBuilder private var meetingContent: some View {
         switch family {
         case .systemMedium: MediumView(entry: entry)
         case .accessoryRectangular: RectangularView(entry: entry)
@@ -312,4 +323,79 @@ private func iconTint(_ m: WidgetMeeting?) -> Color {
         (r, g, b) = (r + (1 - r) * lift, g + (1 - g) * lift, b + (1 - b) * lift)
     }
     return Color(red: r, green: g, blue: b)
+}
+
+// MARK: - Day moments
+
+/// Focus time, a break, before or after work: the mascot in its pose and what's going on.
+private struct MomentWidgetView: View {
+    let segment: WidgetSegment
+    let family: WidgetFamily
+    let date: Date
+
+    var body: some View {
+        switch family {
+        case .systemMedium:
+            HStack(spacing: 16) {
+                GooglyMascot(pose: segment.pose, height: 70, animated: false).foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(segment.title).font(.headline).foregroundStyle(.white).lineLimit(1)
+                    if segment.countsDown {
+                        CountdownText(target: segment.end)
+                            .font(.system(size: 30, weight: .semibold, design: .rounded)).monospacedDigit()
+                            .lineLimit(1).minimumScaleFactor(0.6)
+                            .foregroundStyle(segment.pose.propColor)
+                    }
+                    Text(segment.detail).font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(2)
+                }
+                Spacer(minLength: 0)
+            }
+        case .accessoryRectangular:
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    GooglyMascot(pose: segment.pose, height: 13, animated: false)
+                    Text(segment.title).font(.caption.weight(.semibold)).lineLimit(1)
+                }
+                if segment.countsDown {
+                    CountdownText(target: segment.end).font(.headline).monospacedDigit().widgetAccentable()
+                }
+                Text(segment.detail).font(.caption).foregroundStyle(.secondary).lineLimit(segment.countsDown ? 1 : 2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        case .accessoryCircular:
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: 0) {
+                    GooglyMascot(pose: segment.pose, height: 14, animated: false)
+                    if segment.countsDown {
+                        CountdownText(target: segment.end, showsHours: false)
+                            .font(.system(size: 11, weight: .semibold, design: .rounded)).monospacedDigit()
+                            .minimumScaleFactor(0.5).lineLimit(1).padding(.horizontal, 4)
+                    }
+                }
+            }
+            .accessibilityLabel(segment.title)
+        case .accessoryInline:
+            if segment.countsDown {
+                Text("\(segment.title) · \(Text(timerInterval: date...max(date, segment.end), countsDown: true)) left")
+            } else {
+                Text(segment.title)
+            }
+        default:
+            VStack(alignment: .leading, spacing: 4) {
+                GooglyMascot(pose: segment.pose, height: 46, animated: false).foregroundStyle(.white)
+                Spacer(minLength: 0)
+                Text(segment.title).font(.subheadline.weight(.semibold)).foregroundStyle(.white).lineLimit(1)
+                if segment.countsDown {
+                    CountdownText(target: segment.end)
+                        .font(.system(size: 26, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .minimumScaleFactor(0.6).lineLimit(1)
+                        .foregroundStyle(segment.pose.propColor)
+                } else {
+                    Text(segment.detail).font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(3)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 }

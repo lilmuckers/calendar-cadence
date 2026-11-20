@@ -48,6 +48,9 @@ struct PhonePrefs: Codable, Equatable {
     var widgetShowsTomorrow = true
     var widgetTomorrowHour = 20
 
+    /// Working hours and breaks, used when not connected to the Mac (the Mac's win while it is).
+    var workSchedule = WorkSchedule()
+
     private static let key = "Cadence.phone.preferences.v1"
 
     static func load() -> PhonePrefs {
@@ -90,5 +93,6 @@ extension PhonePrefs {
         liveActivityLeadMinutes = v(.liveActivityLeadMinutes, d.liveActivityLeadMinutes)
         widgetShowsTomorrow = v(.widgetShowsTomorrow, d.widgetShowsTomorrow)
         widgetTomorrowHour = v(.widgetTomorrowHour, d.widgetTomorrowHour)
+        workSchedule = v(.workSchedule, d.workSchedule)
     }
 }
