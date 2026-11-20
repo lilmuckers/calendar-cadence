@@ -135,15 +135,15 @@ struct TakeoverView: View {
     @State private var meltdown = MeltdownModel()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var remaining: TimeInterval { meeting.start.timeIntervalSince(state.now) }
+    private var remaining: TimeInterval { meeting.start.timeIntervalSince(state.clock.now) }
     /// How late you are, counted from when you said you'd be there once you've sent a running-late message.
-    private var secondsLate: TimeInterval { state.now.timeIntervalSince(state.lateClockStart(for: meeting)) }
+    private var secondsLate: TimeInterval { state.clock.now.timeIntervalSince(state.lateClockStart(for: meeting)) }
     /// Grows from calm to full panic over the first few minutes the user is late.
     private var urgency: TakeoverUrgency { TakeoverUrgency(secondsLate: secondsLate) }
 
     private var headline: String {
         guard let notice = state.lateNotices[meeting.id] else { return TakeoverUrgency.headline(remaining: remaining) }
-        if state.now < notice.promised { return "THEY KNOW YOU'RE ON YOUR WAY" }
+        if state.clock.now < notice.promised { return "THEY KNOW YOU'RE ON YOUR WAY" }
         // You said you'd be there by now: straight back to "late".
         return TakeoverUrgency.headline(remaining: -max(30, secondsLate))
     }
@@ -151,7 +151,9 @@ struct TakeoverView: View {
     private var mood: Color { Color(urgency.color(from: meeting.displayColor)) }
 
     var body: some View {
-        TimelineView(.animation) { context in
+        // 60 fps is plenty for the pulse and shake; at ProMotion's 120 Hz, redrawing a full-screen blur
+        // on every display costs twice the CPU and GPU for nothing you'd see.
+        TimelineView(.animation(minimumInterval: 1.0 / 60)) { context in
             let u = urgency
             let phase = clock.advance(to: context.date, period: reduceMotion ? 2 : u.period)
             let pulse = (1 - cos(phase * 2 * .pi)) / 2
@@ -218,7 +220,7 @@ struct TakeoverView: View {
                         .trim(from: 0, to: ringProgress)
                         .stroke(mood.gradient, style: StrokeStyle(lineWidth: 6 + 4 * u.level, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                        .animation(.linear(duration: 1), value: state.now)
+                        .animation(.linear(duration: 1), value: state.clock.now)
                     if melting {
                         BreakableCountdown(text: clockText, broken: meltdown.brokenSlots)
                             .font(GlyphStyle.countdown.font(level: u.level))

@@ -32,7 +32,20 @@ final class AppState {
 
     private(set) var calendars: [CalendarInfo] = []
     private(set) var allMeetings: [Meeting] = []
-    private(set) var now = Date()
+
+    /// The current time, exact to the last tick (once a second), for logic.
+    /// SwiftUI views and observers reading it are only invalidated when the minute changes, or every
+    /// second while a meeting starts or ends within the next minute (when "45s" labels need it). That
+    /// keeps the agenda, menu bar label, Settings and hidden windows from rebuilding every second.
+    /// Views that show seconds read `clock.now` instead.
+    var now: Date {
+        access(keyPath: \.now)
+        return exactNow
+    }
+    @ObservationIgnored private var exactNow = Date()
+    @ObservationIgnored private var publishedMinute = 0
+    /// Ticks every second, for the few small views that show seconds (countdowns).
+    @ObservationIgnored let clock = Clock()
     private(set) var access: AccessState = .unknown
     private(set) var lastRefresh: Date?
     private(set) var lastRemoteRefresh: Date?
@@ -61,7 +74,8 @@ final class AppState {
     @ObservationIgnored var onEvent: ((MCPEvent) -> Void)?
     /// Open the enrichment drawer for a meeting (menu bar, countdown panel).
     @ObservationIgnored var onShowEnrichments: ((Meeting) -> Void)?
-    @ObservationIgnored private var sentEvents: Set<String> = []
+    /// Timeline events and reminders already sent, by key → when (pruned after two days).
+    @ObservationIgnored private var sentEvents: [String: Date] = [:]
     @ObservationIgnored private var announcedClashes: Set<String>?
     /// Clashes found while sources are still loading after launch are taken as already known.
     @ObservationIgnored private let launchedAt = Date()
@@ -76,9 +90,9 @@ final class AppState {
     private(set) var clashes: [Clash] = []
     /// Unanswered invitations within the chosen horizon, soonest first.
     private(set) var invites: [Meeting] = []
-    /// Ids of every invite we've already told the user about (nil until the first fetch).
-    @ObservationIgnored private var knownInvites: Set<String>? =
-        (UserDefaults.standard.array(forKey: "Cadence.knownInvites") as? [String]).map(Set.init)
+    /// Invites we've already told the user about → when last seen (nil until the first fetch).
+    /// Forgotten 60 days after they stop showing up, so the list doesn't grow forever.
+    @ObservationIgnored private var knownInvites: [String: Date]? = AppState.loadKnownInvites()
     @ObservationIgnored private var rawInvites: [Meeting] = []
     /// Replies sent this session, so a stale fetch doesn't resurrect them.
     @ObservationIgnored private var answered: Set<String> = []
@@ -93,7 +107,7 @@ final class AppState {
     /// False until every source has delivered once after launch; clash prompts wait for it, since a
     /// half-loaded agenda gives clashes different keys (another copy of a meeting wins de-duplication).
     @ObservationIgnored private var sourcesSettled = false
-    @ObservationIgnored private var sentReminders: Set<String> = []
+    @ObservationIgnored private var sentReminders: [String: Date] = [:]
     @ObservationIgnored private var travelTimes: [String: (eta: TimeInterval, at: Date)] = [:]
     @ObservationIgnored private var travelInFlight: Set<String> = []
     @ObservationIgnored private var travelFailures: [String: Date] = [:]
@@ -117,8 +131,11 @@ final class AppState {
     @ObservationIgnored private var providers: [CalendarProvider] { [eventKit] + googleProviders + microsoftProviders + icsProviders }
     @ObservationIgnored private var planner = AlertPlanner()
     @ObservationIgnored private var timer: Timer?
-    @ObservationIgnored private var menuOpen = false
+    /// When a menu (a context menu in the agenda) started tracking, nil when none is open.
+    @ObservationIgnored private var menuOpenSince: Date?
+    @ObservationIgnored private var lastPeriodicCheck = Date.distantPast
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    @ObservationIgnored private let network = NetworkWatcher()
 
     init() {
         prefs = Preferences.load()
@@ -145,6 +162,8 @@ final class AppState {
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
+        // A little slack lets macOS coalesce this wake-up with others (fewer CPU wake-ups, same seconds).
+        timer.tolerance = 0.1
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
 
@@ -152,18 +171,36 @@ final class AppState {
         observers.append(ws.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.refresh()
+                // The network is often not back yet; the watcher below refetches when it is.
                 Task { await self?.refreshRemote() }
             }
         })
+        // Back online (after sleep, a Wi-Fi change, a VPN): refetch if the last try may have failed.
+        network.onRestored = { [weak self] in
+            guard let self, let last = self.lastRemoteRefresh, Date().timeIntervalSince(last) > 30 else { return }
+            Task { await self.refreshRemote() }
+        }
+        network.start()
         observers.append(NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.menuOpen = true }
+            MainActor.assumeIsolated { self?.menuOpenSince = Date() }
         })
         observers.append(NotificationCenter.default.addObserver(forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.menuOpen = false }
+            MainActor.assumeIsolated { self?.menuOpenSince = nil }
         })
         observers.append(NotificationCenter.default.addObserver(forName: .NSCalendarDayChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         })
+        // Travelling or a clock correction: "today", the 2-day window and feed times all move.
+        for name in [Notification.Name.NSSystemTimeZoneDidChange, .NSSystemClockDidChange] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    NSTimeZone.resetSystemTimeZone()
+                    self?.refresh()
+                    Task { await self?.refreshRemote() }
+                }
+            })
+        }
+        DispatchQueue.global(qos: .utility).async { HTTP.removeLegacyCache() }
     }
 
     func requestAccess() async {
@@ -188,8 +225,20 @@ final class AppState {
             .sorted { ($0.start, $0.end, $0.title) < ($1.start, $1.end, $1.title) }
         planner.prune(keeping: allMeetings)
         enrichments.prune()
+        pruneBookkeeping()
         lastRefresh = Date()
         recompute()
+    }
+
+    /// Drops per-meeting bookkeeping nothing can need any more, so a Mac left running for weeks
+    /// doesn't accumulate it. Time-based, not "meeting still listed", so a source that briefly
+    /// drops out can't make a reminder or assistant event fire twice.
+    private func pruneBookkeeping(now: Date = Date()) {
+        let twoDays: TimeInterval = 2 * 86_400
+        sentEvents = sentEvents.filter { now.timeIntervalSince($0.value) < twoDays }
+        sentReminders = sentReminders.filter { now.timeIntervalSince($0.value) < twoDays }
+        travelTimes = travelTimes.filter { now.timeIntervalSince($0.value.at) < 3600 }
+        travelFailures = travelFailures.filter { now.timeIntervalSince($0.value) < 900 }
     }
 
     private func recompute() {
@@ -258,10 +307,10 @@ final class AppState {
 
     private func checkTimelineEvents() {
         guard let onEvent else { return }
-        let due = MCPEventPlanner.due(activeMeetings, now: now, sent: sentEvents,
+        let due = MCPEventPlanner.due(activeMeetings, now: now, sent: Set(sentEvents.keys),
                                       leadMinutes: max(1, prefs.headsUpMinutes), wrapMinutes: prefs.wrapUpMinutes)
         for d in due {
-            sentEvents.insert(d.key)
+            sentEvents[d.key] = now
             onEvent(MCPEvent(type: d.type, message: MCPEventPlanner.message(d, now: now), data: ["meeting": dto(d.meeting)],
                              uris: ["cadence://next", "cadence://agenda/today", "cadence://status"]))
         }
@@ -318,7 +367,7 @@ final class AppState {
         let merged = InvitePlanner.merge(enabled) { [unowned self] in canRespond($0) }
         invites = InvitePlanner.pending(merged, now: Date(), horizon: prefs.inviteHorizon)
 
-        let fresh = InvitePlanner.newInvites(invites, known: knownInvites)
+        let fresh = InvitePlanner.newInvites(invites, known: knownInvites.map { Set($0.keys) })
         if let onEvent {
             for m in fresh {
                 onEvent(MCPEvent(type: "invite.new", message: "New invite: \(m.title), \(Theme.dayTime(m.start))",
@@ -326,12 +375,38 @@ final class AppState {
             }
             onEvent(MCPEvent(type: "invites.updated", message: "Invites updated", uris: ["cadence://invites"], log: false))
         }
-        knownInvites = (knownInvites ?? []).union(invites.map(\.seriesID))
-        UserDefaults.standard.set(Array(knownInvites ?? []), forKey: "Cadence.knownInvites")
+        var known = knownInvites ?? [:]
+        let seen = Date()
+        for id in invites.map(\.seriesID) { known[id] = seen }
+        known = known.filter { seen.timeIntervalSince($0.value) < 60 * 86_400 }
+        knownInvites = known
+        Self.saveKnownInvites(known)
         if announce, !fresh.isEmpty, prefs.newInviteAlert != .off { onInvites?(fresh, .new) }
     }
 
     func reviewInvites() { onInvites?(invites, .manual) }
+
+    private static let knownInvitesKey = "Cadence.knownInvites"
+
+    /// Saved as id → last seen (seconds since 1970). Builds before that saved a plain list of ids.
+    private static func loadKnownInvites() -> [String: Date]? {
+        let d = UserDefaults.standard
+        if let dict = d.dictionary(forKey: knownInvitesKey) as? [String: Double] {
+            return dict.mapValues { Date(timeIntervalSince1970: $0) }
+        }
+        if let ids = d.array(forKey: knownInvitesKey) as? [String] {
+            let now = Date()
+            return Dictionary(ids.map { ($0, now) }, uniquingKeysWith: { a, _ in a })
+        }
+        return nil
+    }
+
+    private static func saveKnownInvites(_ known: [String: Date]) {
+        // Day precision is plenty for a 60-day expiry, and keeps this from rewriting defaults on every fetch.
+        let value = known.mapValues { ($0.timeIntervalSince1970 / 86_400).rounded(.down) * 86_400 }
+        let d = UserDefaults.standard
+        if (d.dictionary(forKey: knownInvitesKey) as? [String: Double]) != value { d.set(value, forKey: knownInvitesKey) }
+    }
 
     func provider(for meeting: Meeting) -> CalendarProvider? { providers.first { $0.owns(meeting) } }
 
@@ -460,10 +535,15 @@ final class AppState {
         promptedClashes.subtract(expired)
         let known = Set(clashChoices.keys).union(promptedClashes)
         clashExpiry = clashExpiry.filter { known.contains($0.key) }
+        // Runs on every recompute; only write what changed.
         let d = UserDefaults.standard
-        d.set(clashChoices, forKey: "Cadence.clashChoices")
-        d.set(Array(promptedClashes).sorted(), forKey: "Cadence.promptedClashes")
-        d.set(clashExpiry.mapValues(\.timeIntervalSince1970), forKey: "Cadence.clashExpiry")
+        if (d.dictionary(forKey: "Cadence.clashChoices") as? [String: String]) != clashChoices {
+            d.set(clashChoices, forKey: "Cadence.clashChoices")
+        }
+        let prompted = Array(promptedClashes).sorted()
+        if d.stringArray(forKey: "Cadence.promptedClashes") != prompted { d.set(prompted, forKey: "Cadence.promptedClashes") }
+        let expiry = clashExpiry.mapValues(\.timeIntervalSince1970)
+        if (d.dictionary(forKey: "Cadence.clashExpiry") as? [String: Double]) != expiry { d.set(expiry, forKey: "Cadence.clashExpiry") }
     }
 
     func resolveClash(_ clash: Clash, choice: String?) {
@@ -525,7 +605,7 @@ final class AppState {
     /// Replace live data with fixed demo meetings (used by the screenshot renderer).
     func loadDemo(_ demo: [Meeting], calendars: [CalendarInfo], now: Date) {
         timer?.invalidate()
-        self.now = now
+        setNow(now, publish: true)
         self.calendars = calendars
         access = .granted
         allMeetings = demo.sorted { $0.start < $1.start }
@@ -588,12 +668,12 @@ final class AppState {
         // Checked only when a call-dependent reminder is due. Not marked sent when skipped, so if the
         // call starts again within the reminder's grace period it still goes out.
         var onCall: Bool?
-        for r in ReminderPlanner.due(reminders, now: now, sent: sentReminders) {
+        for r in ReminderPlanner.due(reminders, now: now, sent: Set(sentReminders.keys)) {
             if r.needsActiveCall {
                 if onCall == nil { onCall = SystemContext.microphoneApp() != nil }
                 if onCall == false { continue }
             }
-            sentReminders.insert(r.key)
+            sentReminders[r.key] = now
             if r.isSummary { UserDefaults.standard.set(r.key, forKey: "Cadence.lastSummary") }
             onReminder?(r)
         }
@@ -618,14 +698,27 @@ final class AppState {
     }
 
     /// Fetch every network source (ICS feeds, Google), then rebuild.
+    /// Wake, network-back, the 10-minute timer and sign-ins can all ask at once. One fetch runs at a
+    /// time; a request that arrives meanwhile runs once more when it finishes (it may want newer data).
     func refreshRemote() async {
-        lastRemoteRefresh = Date()
-        await withTaskGroup(of: Void.self) { group in
-            for provider in providers { group.addTask { await provider.refreshRemote() } }
+        if remoteInFlight {
+            remoteAgain = true
+            return
         }
-        refresh()
-        await refreshInvites()
+        remoteInFlight = true
+        defer { remoteInFlight = false }
+        repeat {
+            remoteAgain = false
+            lastRemoteRefresh = Date()
+            await withTaskGroup(of: Void.self) { group in
+                for provider in providers { group.addTask { await provider.refreshRemote() } }
+            }
+            refresh()
+            await refreshInvites()
+        } while remoteAgain
     }
+    @ObservationIgnored private var remoteInFlight = false
+    @ObservationIgnored private var remoteAgain = false
 
     /// Keep one ICSProvider per enabled feed, reusing unchanged ones so their cache survives.
     private func syncFeeds(fetch: Bool) {
@@ -726,18 +819,44 @@ final class AppState {
     }
 
     private func tick() {
-        // While a menu is open, don't touch observed state: SwiftUI would rebuild the open
-        // context menu every second, which collapses submenus. Alerts catch up once it closes.
-        guard !menuOpen else { return }
-        now = Date()
-        // Belt and braces: EventKit notifies on change, but refetch every 5 minutes anyway.
-        if let last = lastRefresh, now.timeIntervalSince(last) > 300 { refresh() }
-        if let last = lastRemoteRefresh, now.timeIntervalSince(last) > 600 { Task { await refreshRemote() } }
+        let t = Date()
+        // While a menu is open, don't touch observed state: SwiftUI would rebuild the open context
+        // menu, which collapses submenus. Alerts and reminders still run on time (they change no
+        // observed state). A menu can't track for 10 minutes, so a lost "ended" can't freeze the clock.
+        if let since = menuOpenSince, t.timeIntervalSince(since) > 600 { menuOpenSince = nil }
+        let menuOpen = menuOpenSince != nil
+        setNow(t, publish: !menuOpen && shouldPublish(t))
+        if !menuOpen { clock.now = t }
+        if !menuOpen {
+            // Belt and braces: EventKit notifies on change, but refetch every 5 minutes anyway.
+            if let last = lastRefresh, t.timeIntervalSince(last) > 300 { refresh() }
+            if let last = lastRemoteRefresh, t.timeIntervalSince(last) > 600 { Task { await refreshRemote() } }
+        }
         checkAlert()
-        if Int(now.timeIntervalSince1970) % 5 == 0 {
+        // Every 5 seconds, measured rather than "seconds % 5", which a late or coalesced tick can skip.
+        if t.timeIntervalSince(lastPeriodicCheck) >= 4.5 || t < lastPeriodicCheck {
+            lastPeriodicCheck = t
             checkReminders()
             checkTimelineEvents()
-            checkDailyReview()
+            if !menuOpen { checkDailyReview() }
+        }
+    }
+
+    /// Updates the exact time; with `publish`, tells observers `now` changed.
+    private func setNow(_ t: Date, publish: Bool) {
+        exactNow = t
+        guard publish else { return }
+        publishedMinute = Int(t.timeIntervalSince1970 / 60)
+        withMutation(keyPath: \.now) {}
+    }
+
+    /// Whether views reading `now` need to hear about this tick: the minute changed (or the clock
+    /// jumped back), or a meeting starts or ends within a minute, when countdowns are in seconds.
+    private func shouldPublish(_ t: Date) -> Bool {
+        let minute = Int(t.timeIntervalSince1970 / 60)
+        if minute != publishedMinute { return true }
+        return activeMeetings.contains { m in
+            !m.isAllDay && (abs(m.start.timeIntervalSince(t)) <= 61 || abs(m.end.timeIntervalSince(t)) <= 61)
         }
     }
 
@@ -1035,3 +1154,11 @@ final class AppState {
 }
 
 enum InvitePromptReason { case daily, new, manual }
+
+/// A once-a-second clock for views that show seconds. Kept apart from `AppState.now` so only the
+/// small views that read it redraw every second, not everything that reads `AppState`.
+@MainActor
+@Observable
+final class Clock {
+    fileprivate(set) var now = Date()
+}

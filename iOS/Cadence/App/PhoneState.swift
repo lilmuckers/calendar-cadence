@@ -280,6 +280,7 @@ final class PhoneState {
             return self.isActive
         }
         notifier.setUp()
+        DispatchQueue.global(qos: .utility).async { HTTP.removeLegacyCache() }
         syncGoogle(fetch: false)
         syncMicrosoft(fetch: false)
         syncFeeds(fetch: false)

@@ -285,7 +285,7 @@ final class LateMessenger {
             req.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: json)
         }
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await HTTP.session.data(for: req)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(code) else { throw SendError.http(code, String(data: data, encoding: .utf8) ?? "") }
         return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]

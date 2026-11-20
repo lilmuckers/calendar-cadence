@@ -50,7 +50,7 @@ final class MicrosoftCalendarProvider: CalendarProvider {
             // Profile photo (many accounts have none: Graph answers 404).
             AvatarStore.shared.refresh(account.avatarKey) { [weak self] in
                 guard let self else { return nil }
-                guard let (data, response) = try? await URLSession.shared.data(for: self.request("me/photo/$value", token: token)),
+                guard let (data, response) = try? await HTTP.session.data(for: self.request("me/photo/$value", token: token)),
                       (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
                 return data
             }
@@ -146,14 +146,14 @@ final class MicrosoftCalendarProvider: CalendarProvider {
     }
 
     private func get<T: Decodable>(_ path: String, token: String) async throws -> T {
-        let (data, response) = try await URLSession.shared.data(for: request(path, token: token))
+        let (data, response) = try await HTTP.session.data(for: request(path, token: token))
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard code == 200 else { throw ProviderError.http(code, String(data: data, encoding: .utf8) ?? "") }
         return try JSONDecoder().decode(T.self, from: data)
     }
 
     private func getJSON(_ path: String, token: String) async throws -> [String: Any] {
-        let (data, _) = try await URLSession.shared.data(for: request(path, token: token))
+        let (data, _) = try await HTTP.session.data(for: request(path, token: token))
         return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
@@ -162,7 +162,7 @@ final class MicrosoftCalendarProvider: CalendarProvider {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await HTTP.session.data(for: req)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         if code == 403, let account { throw ProviderError.needsReconnect(account.label) }
         guard (200..<300).contains(code) else { throw ProviderError.http(code, String(data: data, encoding: .utf8) ?? "") }

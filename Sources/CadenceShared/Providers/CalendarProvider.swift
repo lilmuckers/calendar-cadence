@@ -27,6 +27,33 @@ protocol CalendarProvider: AnyObject {
     func colorChoices(for meeting: Meeting) -> [EventColorChoice]?
 }
 
+/// The one URLSession for every network call (calendar APIs, feeds, sign-in, messages, avatars).
+/// Ephemeral with no URL cache: `URLSession.shared` keeps every response in memory and in
+/// ~/Library/Caches (calendar data on disk, megabytes of it), and none of it is ever reused because
+/// every fetch wants fresh data. Bounded timeouts so a dead socket after sleep can't hang a refresh.
+enum HTTP {
+    static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 120
+        config.httpMaximumConnectionsPerHost = 4
+        return URLSession(configuration: config)
+    }()
+
+    /// Deletes the response cache older builds left behind via `URLSession.shared`.
+    static func removeLegacyCache() {
+        // Files only: touching URLCache.shared would create a fresh (empty) Cache.db.
+        guard let id = Bundle.main.bundleIdentifier,
+              let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return }
+        let dir = caches.appendingPathComponent(id, isDirectory: true)
+        for name in ["Cache.db", "Cache.db-shm", "Cache.db-wal", "fsCachedData"] {
+            try? FileManager.default.removeItem(at: dir.appendingPathComponent(name))
+        }
+    }
+}
+
 enum ProviderError: LocalizedError {
     case unsupported
     case needsReconnect(String)
