@@ -16,7 +16,7 @@ struct SettingsView: View {
             AssistantsTab().tabItem { Label("Assistants", systemImage: "sparkles") }
             GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
         }
-        .frame(width: 580, height: 520)
+        .frame(width: 680, height: 560)
     }
 }
 
