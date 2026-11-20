@@ -244,6 +244,7 @@ scripts/test.sh            # 131 unit tests (Swift Testing)
 scripts/build.sh --run     # build build/Cadence.app and launch it
 scripts/ios-build.sh       # build the iPhone app for the Simulator
 scripts/ios-test.sh        # iPhone unit tests in the Simulator (needs Xcode)
+scripts/sync-deploy.sh     # pull main into the main checkout, build both apps, install on your iPhone, relaunch the Mac app
 ```
 
 ### Building in a Google OAuth client
