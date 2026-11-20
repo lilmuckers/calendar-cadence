@@ -134,7 +134,7 @@ struct WorkScheduleEditor: View {
     }
 
     private func timeRange(_ start: Binding<Int>, _ end: Binding<Int>) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             DatePicker("From", selection: minutes(start), displayedComponents: .hourAndMinute)
                 .labelsHidden()
             Text("–").foregroundStyle(.secondary)
@@ -142,7 +142,8 @@ struct WorkScheduleEditor: View {
                 .labelsHidden()
         }
         #if os(macOS)
-        .datePickerStyle(.field)
+        // The standard compact field with stepper arrows, like the rest of Settings.
+        .datePickerStyle(.stepperField)
         #endif
         .fixedSize()
     }
