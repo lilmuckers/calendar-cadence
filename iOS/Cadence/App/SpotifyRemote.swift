@@ -31,44 +31,93 @@ final class SpotifyRemote: NSObject {
     /// Why the last approval or connection didn't work, shown in Settings and on the desk card.
     private(set) var lastError: String?
 
-    @ObservationIgnored private let clientID: String?
+    /// The Spotify developer app Cadence talks to as. Each person brings their own (Settings →
+    /// Spotify app), since a single app in Spotify's development mode only works for the 25
+    /// accounts its owner lists. A build-time one (Local.xcconfig → SPOTIFY_CLIENT_ID) is only a
+    /// fallback for development builds.
+    private(set) var clientID: String?
+    /// The user's own client ID, if they entered one.
+    private(set) var customClientID: String?
+    @ObservationIgnored private let bundledClientID: String?
     @ObservationIgnored private var lastAttempt: Date?
     @ObservationIgnored private var wantConnected = false
     @ObservationIgnored private var connecting = false
     @ObservationIgnored private var renewing = false
     @ObservationIgnored private var lastRenew: Date?
 
-    @ObservationIgnored private lazy var configuration: SPTConfiguration? = {
-        guard let clientID else { return nil }
+    @ObservationIgnored private var configuration: SPTConfiguration?
+    @ObservationIgnored private var remote: SPTAppRemote?
+    @ObservationIgnored private var sessions: SPTSessionManager?
+
+    private static let clientIDKey = "Cadence.spotify.clientID"
+    /// Which client ID the saved session belongs to (its refresh token only works for that one).
+    private static let sessionClientAccount = "spotify.session.clientID"
+
+    override init() {
+        let bundled = Self.normalized(Bundle.main.object(forInfoDictionaryKey: "CadenceSpotifyClientID") as? String)
+        let custom = Self.normalized(UserDefaults.standard.string(forKey: Self.clientIDKey))
+        let active = custom ?? bundled
+        bundledClientID = bundled
+        customClientID = custom
+        clientID = active
+        Keychain.set(nil, for: Self.legacyTokenAccount)
+        Keychain.set(nil, for: Self.legacyTokenAccount + ".date")
+        // A session made with another client ID can't be renewed with this one: drop it.
+        if let saved = Keychain.get(Self.sessionClientAccount), saved != active {
+            Keychain.set(nil, for: Self.sessionAccount)
+            Keychain.set(nil, for: Self.sessionClientAccount)
+        }
+        needsAuthorization = Self.storedSession() == nil
+        super.init()
+        configure()
+    }
+
+    private static func normalized(_ id: String?) -> String? {
+        let trimmed = id?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// Spotify client IDs are 32 hex characters.
+    static func isValidClientID(_ id: String) -> Bool {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count == 32 && trimmed.allSatisfy(\.isHexDigit)
+    }
+
+    /// (Re)builds the SDK objects for the current client ID.
+    private func configure() {
+        remote?.delegate = nil
+        configuration = nil
+        remote = nil
+        sessions = nil
+        guard let clientID else { return }
         let config = SPTConfiguration(clientID: clientID, redirectURL: Self.redirectURL)
         // Approving carries on with whatever was playing (or resumes the last track).
         config.playURI = ""
-        return config
-    }()
-
-    @ObservationIgnored private lazy var remote: SPTAppRemote? = {
-        guard let configuration else { return nil }
-        let remote = SPTAppRemote(configuration: configuration, logLevel: .error)
+        configuration = config
+        let remote = SPTAppRemote(configuration: config, logLevel: .error)
         remote.delegate = self
-        return remote
-    }()
-
-    @ObservationIgnored private lazy var sessions: SPTSessionManager? = {
-        guard let configuration else { return nil }
-        let manager = SPTSessionManager(configuration: configuration, delegate: self)
+        self.remote = remote
+        let manager = SPTSessionManager(configuration: config, delegate: self)
         manager.session = Self.storedSession()
-        return manager
-    }()
-
-    override init() {
-        let id = (Bundle.main.object(forInfoDictionaryKey: "CadenceSpotifyClientID") as? String)?
-            .trimmingCharacters(in: .whitespaces)
-        clientID = (id?.isEmpty ?? true) ? nil : id
-        Keychain.set(nil, for: Self.legacyTokenAccount)
-        Keychain.set(nil, for: Self.legacyTokenAccount + ".date")
-        needsAuthorization = Self.storedSession() == nil
-        super.init()
+        sessions = manager
     }
+
+    /// Switches to the user's own Spotify developer app (nil or empty goes back to the built-in
+    /// one, if there is one). Signs out, since the old session belongs to the old app.
+    func setClientID(_ id: String?) {
+        let id = Self.normalized(id)
+        guard id != customClientID else { return }
+        signOut()
+        customClientID = id
+        if let id { UserDefaults.standard.set(id, forKey: Self.clientIDKey) }
+        else { UserDefaults.standard.removeObject(forKey: Self.clientIDKey) }
+        clientID = id ?? bundledClientID
+        lastError = nil
+        configure()
+    }
+
+    /// There's a built-in client ID to fall back on (development builds).
+    var hasBundledClientID: Bool { bundledClientID != nil }
 
     private static func storedSession() -> SPTSession? {
         guard let text = Keychain.get(sessionAccount), let data = Data(base64Encoded: text) else { return nil }
@@ -78,9 +127,10 @@ final class SpotifyRemote: NSObject {
     private func save(_ session: SPTSession?) {
         let data = session.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) }
         Keychain.set(data?.base64EncodedString(), for: Self.sessionAccount)
+        Keychain.set(data == nil ? nil : clientID, for: Self.sessionClientAccount)
     }
 
-    /// Built with a Spotify client ID (Local.xcconfig → SPOTIFY_CLIENT_ID).
+    /// Has a Spotify client ID (the user's own, or a development build's).
     var isAvailable: Bool { clientID != nil }
 
     func showsControls(now: Date) -> Bool {

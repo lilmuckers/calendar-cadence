@@ -4,7 +4,8 @@ CADENCE_BUNDLE_ID = com.yourname.cadence
 // From a Google Cloud "iOS" OAuth client, e.g. 1234-abcd for 1234-abcd.apps.googleusercontent.com
 GOOGLE_IOS_CLIENT_PREFIX = 1234-abcd
 MICROSOFT_CLIENT_ID = 00000000-0000-0000-0000-000000000000
-// From developer.spotify.com/dashboard (iOS SDK); redirect URI cadence-companion://spotify-callback
-SPOTIFY_CLIENT_ID = 0123456789abcdef0123456789abcdef
+// Optional, for development builds: from developer.spotify.com/dashboard (iOS SDK); redirect URI
+// cadence-companion://spotify-callback. Without it, users enter their own in Settings → Spotify app.
+// SPOTIFY_CLIENT_ID = 0123456789abcdef0123456789abcdef
 // Free Personal Team (no paid developer account)? Uncomment:
 // CADENCE_ENTITLEMENTS = Config/Cadence-PersonalTeam.entitlements
