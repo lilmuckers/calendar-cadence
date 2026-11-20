@@ -79,7 +79,7 @@ final class SlackAuth {
             var req = URLRequest(url: URL(string: "https://slack.com/api/auth.revoke")!)
             req.httpMethod = "POST"
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            URLSession.shared.dataTask(with: req).resume()
+            HTTP.session.dataTask(with: req).resume()
         }
         Keychain.set(nil, for: account.tokenKey)
         Keychain.set(nil, for: account.refreshKey)
@@ -188,7 +188,7 @@ final class SlackAuth {
         allowed.remove(charactersIn: "&=+")
         req.httpBody = form.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: allowed) ?? $0.value)" }
             .joined(separator: "&").data(using: .utf8)
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, _) = try await HTTP.session.data(for: req)
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw AuthError.badResponse("bad JSON") }
         guard json["ok"] as? Bool == true else { throw AuthError.badResponse(json["error"] as? String ?? "unknown error") }
         return json

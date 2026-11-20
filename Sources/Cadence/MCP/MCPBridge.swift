@@ -15,6 +15,9 @@ final class MCPBridge {
         let connectedAt: Date
     }
 
+    /// Longest request line accepted before the connection is dropped.
+    static let maxLine = 8 << 20
+
     static var socketPath: String {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("Cadence/mcp.sock").path
@@ -145,7 +148,8 @@ final class MCPBridge {
                         }
                     }
                 }
-                if isComplete || error != nil {
+                // A request is a few KB; a client that sends megabytes without a newline is broken.
+                if isComplete || error != nil || buffer.count > Self.maxLine {
                     self.drop(id)
                 } else {
                     self.receive(id, conn, session, buffer: buffer)

@@ -197,12 +197,14 @@ struct EventRow: View {
 private struct LiveBadge: View {
     let color: Color
     @State private var pulse = false
+    /// The dropdown's window lives on while closed; don't keep a looping animation running in it.
+    @Environment(\.windowVisible) private var windowVisible
 
     var body: some View {
         HStack(spacing: 3) {
             Circle().fill(color).frame(width: 5, height: 5)
-                .opacity(pulse ? 0.3 : 1)
-                .animation(.easeInOut(duration: 0.9).repeatForever(), value: pulse)
+                .opacity(pulse && windowVisible ? 0.3 : 1)
+                .animation(windowVisible ? .easeInOut(duration: 0.9).repeatForever() : nil, value: pulse && windowVisible)
             Text("NOW").font(.system(size: 9, weight: .bold)).tracking(0.5)
         }
         .foregroundStyle(color)

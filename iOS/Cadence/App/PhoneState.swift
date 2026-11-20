@@ -281,6 +281,7 @@ final class PhoneState {
         }
         notifier.setUp()
         Keychain.keepOnThisDevice()
+        DispatchQueue.global(qos: .utility).async { HTTP.removeLegacyCache() }
         syncGoogle(fetch: false)
         syncMicrosoft(fetch: false)
         syncFeeds(fetch: false)

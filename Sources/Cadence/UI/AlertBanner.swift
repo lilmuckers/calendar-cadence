@@ -70,7 +70,7 @@ struct BannerView: View {
     let meeting: Meeting
     let dismiss: () -> Void
 
-    private var remaining: TimeInterval { meeting.start.timeIntervalSince(state.now) }
+    private var remaining: TimeInterval { meeting.start.timeIntervalSince(state.clock.now) }
 
     var body: some View {
         HStack(spacing: 12) {

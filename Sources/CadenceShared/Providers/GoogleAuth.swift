@@ -158,7 +158,7 @@ final class GoogleAuth {
            let url = URL(string: "https://oauth2.googleapis.com/revoke?token=\(token)") {
             var req = URLRequest(url: url)
             req.httpMethod = "POST"
-            URLSession.shared.dataTask(with: req).resume()
+            HTTP.session.dataTask(with: req).resume()
         }
         Keychain.set(nil, for: account.refreshKey)
         AvatarStore.shared.remove(account.avatarKey)
@@ -331,7 +331,7 @@ final class GoogleAuth {
         allowed.remove(charactersIn: "&=+")
         req.httpBody = form.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: allowed) ?? $0.value)" }
             .joined(separator: "&").data(using: .utf8)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await HTTP.session.data(for: req)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             let body = String(data: data, encoding: .utf8) ?? "HTTP error"
             if form["grant_type"] == "refresh_token", body.contains("invalid_grant") { throw TokenError.invalidGrant }
