@@ -95,6 +95,17 @@ The moment Cadence spots two meetings that overlap — real clashes, not the sam
 
 <br clear="right">
 
+## ☕ Working hours and breaks
+
+Set your hours per weekday and the breaks you want kept clear (lunch, a walk, the school run) in **Settings → Work**. Cadence then stands up for them, each defence switchable on its own:
+
+- **Invites** that land on a break, outside your hours or on a day off say so on the invite card, the notification and the iPhone pop-up.
+- **Assistants** get free time only inside your hours, with breaks kept out of `find_free_time`.
+- **A nudge** when a break starts, and a warning five minutes before if the meeting you're in is going to run into it.
+- **A meeting booked over a break** asks like a double-booking: keep the break (the meeting won't alert) or give it up for the day.
+
+On the iPhone desk display the googly calendar follows your day: coffee and a yawn before work, headphones on for focus time (*"Focus time — 1h 40m clear"*, and *"You got focus time!"* when a stretch ends), lunch or tea on a break, and a wave goodbye with a recap at the end of the day. The Live Activity counts down focus time and breaks when no meeting is close, and the widgets show the moment too. The phone uses the Mac's schedule while paired, or its own (*Settings → Working hours & breaks*) on its own.
+
 ## 💌 RSVP without opening your calendar
 
 <img align="right" src="docs/screenshots/invites.jpg" width="340" alt="Good morning! RSVP time — three invites with Accept, Maybe and Decline buttons and a colour picker">

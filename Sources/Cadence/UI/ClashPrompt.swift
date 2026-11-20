@@ -70,6 +70,9 @@ struct ClashPromptView: View {
     let clash: Clash
     let choose: (String?) -> Void
 
+    /// A break the meeting was booked over (Cadence's stand-in), if that's what this is.
+    private var breakTime: Meeting? { clash.meetings.first(where: \.isBreak) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
@@ -79,9 +82,9 @@ struct ClashPromptView: View {
                     .scaleEffect(1.4)
                     .frame(width: 28, height: 24)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Double-booked!")
+                    Text(breakTime == nil ? "Double-booked!" : "Break at risk!")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                    Text("Which one should I alert you for?")
+                    Text(breakTime.map { "Keep your \($0.title) break, or give it up today?" } ?? "Which one should I alert you for?")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -102,14 +105,14 @@ struct ClashPromptView: View {
                     HStack(spacing: 10) {
                         Capsule().fill(m.tint.gradient).frame(width: 4, height: 34)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(m.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                            Text("\(Theme.range(m)) · \(m.calendar.title)")
+                            Text(m.isBreak ? "Keep \(m.title)" : m.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                            Text(m.isBreak ? "\(Theme.range(m)) · \(clash.meetings.count > 2 ? "these meetings" : "the meeting") won't alert" : "\(Theme.range(m)) · \(m.calendar.title)")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
                         Spacer()
-                        Image(systemName: "bell.fill")
+                        Image(systemName: m.isBreak ? "cup.and.saucer.fill" : "bell.fill")
                             .font(.system(size: 11))
                             .foregroundStyle(m.tint)
                     }

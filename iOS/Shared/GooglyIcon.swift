@@ -37,7 +37,7 @@ struct GooglyIcon: View {
     }
 }
 
-private enum GooglyPage {
+enum GooglyPage {
     static let page = CGRect(x: 1.5, y: 3.5, width: 14.5, height: 13.5)
 
     struct PageOutline: Shape {
@@ -153,7 +153,7 @@ struct GooglyTeaBreak: View {
     }
 }
 
-private enum TeaBreak {
+enum TeaBreak {
     /// Everything that moves, worked out from the clock (nil: the still drawing).
     struct Pose {
         /// 0…1: how far into a sigh (lids droop, pupils settle, smile widens).

@@ -197,6 +197,11 @@ private struct InviteStrip: View {
                 .font(.system(size: 13, weight: .medium)).foregroundStyle(.orange).lineLimit(1)
                 .padding(.top, 4)
         }
+        ForEach(invite.conflicts ?? [], id: \.self) { conflict in
+            Label(conflict, systemImage: "cup.and.saucer.fill")
+                .font(.system(size: 13, weight: .medium)).foregroundStyle(.orange).lineLimit(1)
+                .padding(.top, 2)
+        }
         HStack(spacing: 8) {
             if invite.canRespond {
                 Pill(title: "Accept", primary: true) { state.answer(invite, .accept) }
@@ -235,8 +240,9 @@ private struct ClashStrip: View {
     let clash: CompanionClash
 
     var body: some View {
-        StripHeader(label: "DOUBLE-BOOKED") { state.resolve(clash, choice: nil) }
-        Text("Which one should I alert you for?")
+        let breakTime = clash.meetings.first(where: \.isBreak)
+        StripHeader(label: breakTime == nil ? "DOUBLE-BOOKED" : "BREAK AT RISK") { state.resolve(clash, choice: nil) }
+        Text(breakTime.map { "Keep your \($0.title) break, or give it up today?" } ?? "Which one should I alert you for?")
             .font(.system(size: 14)).foregroundStyle(.white.opacity(0.6))
             .padding(.top, 6)
         VStack(spacing: 6) {
@@ -249,9 +255,9 @@ private struct ClashStrip: View {
                         RoundedRectangle(cornerRadius: 2).fill(m.tint).frame(width: 4, height: 28)
                         Text(Theme.time(m.start)).font(.system(size: 14)).monospacedDigit()
                             .foregroundStyle(.white.opacity(0.6))
-                        Text(m.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                        Text(m.isBreak ? "Keep \(m.title)" : m.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
                         Spacer(minLength: 6)
-                        Image(systemName: "bell.fill").font(.system(size: 12)).foregroundStyle(m.tint)
+                        Image(systemName: m.isBreak ? "cup.and.saucer.fill" : "bell.fill").font(.system(size: 12)).foregroundStyle(m.tint)
                     }
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .background(.white.opacity(0.07), in: Capsule())

@@ -9,6 +9,7 @@ struct SettingsView: View {
             CalendarsTab().tabItem { Label("Calendars", systemImage: "calendar") }
             FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }
             AlertsTab().tabItem { Label("Alerts", systemImage: "bell.badge") }
+            WorkTab().tabItem { Label("Work", systemImage: "briefcase") }
             PhoneTab().tabItem { Label("iPhone", systemImage: "iphone") }
             MessagesTab().tabItem { Label("Messages", systemImage: "paperplane") }
             BrowserTab().tabItem { Label("Browser", systemImage: "globe") }
@@ -16,6 +17,19 @@ struct SettingsView: View {
             GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
         }
         .frame(width: 580, height: 520)
+    }
+}
+
+private struct WorkTab: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        @Bindable var state = state
+        Form {
+            WorkScheduleEditor(schedule: $state.prefs.workSchedule,
+                               defencesFooter: "Nudges and break questions also go to your paired iPhone. A meeting over a break asks like a double-booking: keep the break (the meeting won't alert) or give it up for the day.")
+        }
+        .formStyle(.grouped)
     }
 }
 

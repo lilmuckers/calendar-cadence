@@ -16,6 +16,32 @@ struct WidgetMeeting: Codable, Hashable {
     var joinURL: URL { URL(string: "cadence-companion://join?id=\(id.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")")! }
 }
 
+/// A stretch of the working day (`DaySegment` in CadenceCore, flattened for the widgets): before
+/// work, focus time, a break, the end of the day.
+struct WidgetSegment: Codable, Hashable {
+    /// "beforeWork", "focus", "meal", "rest" or "endOfDay".
+    var kind: String
+    var start: Date
+    var end: Date
+    var title: String
+    var detail: String
+
+    var pose: MascotPose {
+        switch kind {
+        case "beforeWork": .coffee
+        case "focus": .focus
+        case "meal": .lunch
+        case "endOfDay": .wave
+        default: .tea
+        }
+    }
+
+    /// Worth a countdown: focus and breaks end at a set time you're waiting on.
+    var countsDown: Bool { kind == "focus" || kind == "meal" || kind == "rest" }
+
+    func contains(_ date: Date) -> Bool { start <= date && date < end }
+}
+
 /// The upcoming meetings the app hands to the widgets through the App Group. Already filtered:
 /// no all-day events, nothing agenda-only or muted by a clash choice.
 struct WidgetSchedule: Codable, Equatable {
@@ -25,6 +51,19 @@ struct WidgetSchedule: Codable, Equatable {
     /// first meeting instead of "No more meetings today!". nil = never. Optional so schedules saved
     /// before this existed still decode.
     var tomorrowFromHour: Int? = nil
+    /// Today's and tomorrow's working-day stretches. Nil with working hours off, or from older builds.
+    var segments: [WidgetSegment]? = nil
+
+    /// Within this long of the next meeting the widgets show it rather than the day's moment.
+    static let momentYield: TimeInterval = 30 * 60
+
+    /// The day's moment to show at `now`: a stretch is on and no meeting is live or close.
+    func segment(at now: Date, calendar: Calendar = .current) -> WidgetSegment? {
+        guard let seg = segments?.first(where: { $0.contains(now) }) else { return nil }
+        if meetings.contains(where: { $0.start <= now && now < $0.end }) { return nil }
+        if let next = next(after: now, calendar: calendar), next.start.timeIntervalSince(now) <= Self.momentYield { return nil }
+        return seg
+    }
 
     /// Same stages as the Mac's menu bar icon (`IconMood` in CadenceCore).
     static let nervousLead: TimeInterval = 15 * 60
@@ -72,6 +111,13 @@ struct WidgetSchedule: Codable, Equatable {
         let midnight = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now.addingTimeInterval(86_400)
         var dates: Set<Date> = [now, midnight]
         if let from = tomorrowStart(on: now, calendar: calendar), from > now { dates.insert(from) }
+        for seg in segments ?? [] {
+            for d in [seg.start, seg.end] where d > now && d <= midnight { dates.insert(d) }
+        }
+        // With moments to show, also redraw when a meeting takes over from one and hands back.
+        for m in meetings where !(segments ?? []).isEmpty {
+            for d in [m.start.addingTimeInterval(-Self.momentYield), m.end] where d > now && d <= midnight { dates.insert(d) }
+        }
         for m in meetings where m.start > now && m.start <= midnight {
             dates.insert(m.start)
             for lead in [Self.nervousLead, Self.panicLead] {

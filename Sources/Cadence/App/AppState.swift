@@ -15,7 +15,8 @@ final class AppState {
             if persistPrefs { prefs.save() }
             if prefs.icsFeeds != oldValue.icsFeeds { syncFeeds(fetch: true) }
             if prefs.filters != oldValue.filters || prefs.useEventColors != oldValue.useEventColors
-                || prefs.localEventColors != oldValue.localEventColors { recompute() }
+                || prefs.localEventColors != oldValue.localEventColors
+                || prefs.workSchedule != oldValue.workSchedule { recompute() }
             if prefs.inviteHorizon != oldValue.inviteHorizon || prefs.filters.disabledCalendarIDs != oldValue.filters.disabledCalendarIDs {
                 Task { await refreshInvites() }
             }
@@ -196,7 +197,7 @@ final class AppState {
         let previousAll = meetings
         applyVisible()
         companion.pushSnapshot()
-        clashes = ClashDetector.clashes(in: activeMeetings, after: Date())
+        clashes = detectClashes(after: Date())
         emitChanges(from: previous, all: previousAll)
         saveClashMemory()
         if prefs.clashPromptEnabled, sourcesSettled,
@@ -246,7 +247,13 @@ final class AppState {
         let value = MeetingDTO(m, now: Date(), inClash: inClash, mutedByClash: suppressedByClash.contains(m.id),
                                hiddenFromPanel: isHiddenFromPanel(m), agendaOnly: isAgendaOnly(m),
                                enrichmentCount: enrichments.enrichments(for: m).count)
-        return (try? JSONValue(encoding: value)) ?? .null
+        var json = (try? JSONValue(encoding: value)) ?? .null
+        let conflicts = prefs.workSchedule.conflicts(for: m).map(\.label)
+        if !conflicts.isEmpty, case .object(var o) = json {
+            o["work_schedule"] = .array(conflicts.map { .string($0) })
+            json = .object(o)
+        }
+        return json
     }
 
     private func checkTimelineEvents() {
@@ -491,6 +498,27 @@ final class AppState {
         recompute()
     }
 
+    /// Breaks from the work schedule for the days Cadence loads (today and tomorrow), as stand-in meetings.
+    var breakMeetings: [Meeting] {
+        let from = Calendar.current.startOfDay(for: Date())
+        return prefs.workSchedule.breakMeetings(from: from, to: from.addingTimeInterval(2 * 86_400))
+    }
+
+    /// Double-bookings, plus meetings booked over a break when the schedule defends breaks that way.
+    private func detectClashes(after now: Date) -> [Clash] {
+        var pool = activeMeetings
+        if prefs.workSchedule.enabled && prefs.workSchedule.defences.clashPrompt {
+            pool = (pool + breakMeetings).sorted { ($0.start, $0.end, $0.title) < ($1.start, $1.end, $1.title) }
+        }
+        return ClashDetector.clashes(in: pool, after: now)
+    }
+
+    /// How a meeting sits against working hours and breaks, worded for an invite.
+    func workConflicts(_ m: Meeting) -> [String] {
+        guard prefs.workSchedule.defences.flagInvites else { return [] }
+        return prefs.workSchedule.conflicts(for: m).map(\.label)
+    }
+
     /// Meetings the user chose not to be alerted for because of a clash.
     var suppressedByClash: Set<String> { ClashDetector.suppressed(clashes: clashes, choices: clashChoices) }
 
@@ -502,7 +530,7 @@ final class AppState {
         access = .granted
         allMeetings = demo.sorted { $0.start < $1.start }
         applyVisible()
-        clashes = ClashDetector.clashes(in: activeMeetings, after: now)
+        clashes = detectClashes(after: now)
     }
 
     // MARK: - Hotkey
@@ -543,6 +571,13 @@ final class AppState {
             let live = current.filter { $0.participation != .declined && !suppressedByClash.contains($0.id) }
             reminders += ReminderPlanner.wrapUps(live: live, all: activeMeetings, minutes: prefs.wrapUpMinutes,
                                                  onlyBackToBack: prefs.wrapUpOnlyBackToBack)
+        }
+        let schedule = prefs.workSchedule
+        if schedule.enabled && (schedule.defences.breakNudge || schedule.defences.overrunWarning) {
+            let breaks = breakMeetings.filter { $0.end > now && !suppressedByClash.contains($0.id) }
+            let live = current.filter { !suppressedByClash.contains($0.id) }
+            reminders += ReminderPlanner.breakNudges(breaks: breaks, meetings: live,
+                                                     nudge: schedule.defences.breakNudge, overrun: schedule.defences.overrunWarning)
         }
         if prefs.summaryEnabled, canShowAgenda, lastRefresh != nil,
            let summary = ReminderPlanner.morningSummary(meetings: activeMeetings, now: now,
@@ -956,7 +991,8 @@ final class AppState {
                                  agendaOnlyIDs: agendaOnlyIDs, takeoverEnabled: prefs.takeoverEnabled,
                                  takeoverLeadSeconds: prefs.takeoverLeadSeconds,
                                  takeoverAutoDismissMinutes: prefs.takeoverAutoDismissMinutes,
-                                 enrichments: enrichments.book.slice(for: mirrored))
+                                 enrichments: enrichments.book.slice(for: mirrored),
+                                 workSchedule: prefs.workSchedule)
     }
 
     /// A meeting by id, for actions coming from the phone.

@@ -50,7 +50,7 @@ final class PhonePrompts {
 
     private func sendInvites(_ meetings: [Meeting]) {
         guard !meetings.isEmpty else { return }
-        hub.broadcast(.invitePrompt(meetings.map { CompanionInvite(meeting: $0, canRespond: state.canRespond($0)) }))
+        hub.broadcast(.invitePrompt(meetings.map { CompanionInvite(meeting: $0, canRespond: state.canRespond($0), conflicts: state.workConflicts($0)) }))
     }
 
     /// A phone (re)connected: show it everything still waiting.

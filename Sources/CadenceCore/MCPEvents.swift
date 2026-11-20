@@ -132,6 +132,41 @@ public enum FreeTimeFinder {
         return result
     }
 
+    /// Free time on each working day of `schedule`, in its hours (or `hours`, minutes after midnight,
+    /// when given), keeping breaks clear when the schedule protects them.
+    public static func slots(meetings: [Meeting], from: Date, to: Date, minDuration: TimeInterval,
+                             schedule: WorkSchedule, hours: (Int, Int)? = nil, calendar: Calendar = .current) -> [DateInterval] {
+        var busy = meetings
+            .filter { !$0.isAllDay && !$0.isCanceled && $0.participation != .declined && $0.availability != .free && !$0.isBreak }
+            .map { DateInterval(start: $0.start, end: max($0.start, $0.end)) }
+        if schedule.enabled && schedule.defences.protectInFreeTime {
+            var day = calendar.startOfDay(for: from)
+            while day < to {
+                busy += schedule.breaks(on: day, calendar: calendar).map(\.1)
+                day = calendar.date(byAdding: .day, value: 1, to: day)!
+            }
+        }
+        busy.sort { $0.start < $1.start }
+        var result: [DateInterval] = []
+        var day = calendar.startOfDay(for: from)
+        while day < to {
+            defer { day = calendar.date(byAdding: .day, value: 1, to: day)! }
+            guard var span = schedule.hours(on: day, calendar: calendar) else { continue }
+            if let hours {
+                span = DateInterval(start: WorkSchedule.at(hours.0, day, calendar), end: WorkSchedule.at(max(hours.0, hours.1), day, calendar))
+            }
+            var cursor = max(from, span.start)
+            let dayEnd = min(to, span.end)
+            guard cursor < dayEnd else { continue }
+            for b in busy where b.end > cursor && b.start < dayEnd {
+                if b.start.timeIntervalSince(cursor) >= minDuration { result.append(DateInterval(start: cursor, end: b.start)) }
+                cursor = max(cursor, b.end)
+            }
+            if dayEnd.timeIntervalSince(cursor) >= minDuration { result.append(DateInterval(start: cursor, end: dayEnd)) }
+        }
+        return result
+    }
+
     /// Parses "09:00-17:30" into minutes after midnight.
     public static func parseHours(_ s: String) -> (Int, Int)? {
         let parts = s.replacingOccurrences(of: " ", with: "").split(separator: "-")

@@ -185,6 +185,12 @@ struct InviteReviewView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    ForEach(state.workConflicts(m), id: \.self) { conflict in
+                        Label(conflict, systemImage: "cup.and.saucer.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.orange)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 0)
             }

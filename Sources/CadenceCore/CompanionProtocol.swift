@@ -51,10 +51,12 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
     public var takeoverAutoDismissMinutes: Int?
     /// What assistants attached to these meetings, with the user's ticks. Nil from older Macs.
     public var enrichments: EnrichmentBook?
+    /// Working hours and breaks set on the Mac. Nil from older Macs.
+    public var workSchedule: WorkSchedule?
 
     public init(macName: String, generatedAt: Date, meetings: [Meeting], suppressedIDs: Set<String> = [],
                 agendaOnlyIDs: Set<String>? = nil, takeoverEnabled: Bool = true, takeoverLeadSeconds: Double = 30, takeoverAutoDismissMinutes: Int? = nil,
-                enrichments: EnrichmentBook? = nil) {
+                enrichments: EnrichmentBook? = nil, workSchedule: WorkSchedule? = nil) {
         self.macName = macName
         self.generatedAt = generatedAt
         self.meetings = meetings
@@ -64,6 +66,7 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
         self.takeoverLeadSeconds = takeoverLeadSeconds
         self.takeoverAutoDismissMinutes = takeoverAutoDismissMinutes
         self.enrichments = enrichments
+        self.workSchedule = workSchedule
     }
 }
 
@@ -85,7 +88,7 @@ public struct CompanionReminder: Codable, Equatable, Sendable {
     public init(_ reminder: Reminder) {
         let text = ReminderPlanner.message(for: reminder)
         self.init(key: reminder.key, title: text.title, body: text.body,
-                  joinMeetingID: reminder.isSummary || reminder.joinTarget.joinLink == nil ? nil : reminder.joinTarget.id)
+                  joinMeetingID: reminder.isSummary || reminder.isBreak || reminder.joinTarget.joinLink == nil ? nil : reminder.joinTarget.id)
     }
 }
 
@@ -105,10 +108,13 @@ public struct CompanionClash: Codable, Equatable, Sendable {
 public struct CompanionInvite: Codable, Equatable, Sendable {
     public var meeting: Meeting
     public var canRespond: Bool
+    /// "Lands on your Lunch break", "Outside your working hours". Nil from older Macs.
+    public var conflicts: [String]?
 
-    public init(meeting: Meeting, canRespond: Bool) {
+    public init(meeting: Meeting, canRespond: Bool, conflicts: [String]? = nil) {
         self.meeting = meeting
         self.canRespond = canRespond
+        self.conflicts = conflicts
     }
 }
 

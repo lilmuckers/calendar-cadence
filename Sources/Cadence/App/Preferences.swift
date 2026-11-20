@@ -80,9 +80,8 @@ struct Preferences: Codable, Equatable {
     var showEnrichmentDrawer = true
     /// Slide the drawer open by itself when such a meeting starts.
     var enrichmentDrawerAutoOpen = false
-    /// Working hours for find_free_time, minutes after midnight.
-    var workStart = 9 * 60
-    var workEnd = 17 * 60 + 30
+    /// Working hours per weekday and daily breaks: find_free_time, break defences and the phone's day moments.
+    var workSchedule = WorkSchedule()
     var inviteHorizon: InviteHorizon = .twoDays
     /// Ask about unanswered invites once a day, at the morning summary time.
     var inviteReviewDaily = true
@@ -159,6 +158,7 @@ struct Preferences: Codable, Equatable {
 extension Preferences {
     private enum LegacyKeys: String, CodingKey {
         case showMenuBarTitle
+        case workStart, workEnd
     }
 
     // Tolerate older/partial saved blobs: any missing key falls back to its default.
@@ -202,8 +202,16 @@ extension Preferences {
         mcpEnrichments = try c.decodeIfPresent(Bool.self, forKey: .mcpEnrichments) ?? d.mcpEnrichments
         showEnrichmentDrawer = try c.decodeIfPresent(Bool.self, forKey: .showEnrichmentDrawer) ?? d.showEnrichmentDrawer
         enrichmentDrawerAutoOpen = try c.decodeIfPresent(Bool.self, forKey: .enrichmentDrawerAutoOpen) ?? d.enrichmentDrawerAutoOpen
-        workStart = try c.decodeIfPresent(Int.self, forKey: .workStart) ?? d.workStart
-        workEnd = try c.decodeIfPresent(Int.self, forKey: .workEnd) ?? d.workEnd
+        if let schedule = try? c.decodeIfPresent(WorkSchedule.self, forKey: .workSchedule) {
+            workSchedule = schedule
+        } else {
+            // Older builds kept one start and end for find_free_time, Monday to Friday.
+            let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+            let start = (try? legacy.decodeIfPresent(Int.self, forKey: .workStart)) ?? nil
+            let end = (try? legacy.decodeIfPresent(Int.self, forKey: .workEnd)) ?? nil
+            workSchedule = d.workSchedule
+            if let start, let end { workSchedule.days = WorkSchedule.weekdays(start: start, end: end) }
+        }
         inviteHorizon = (try? c.decodeIfPresent(InviteHorizon.self, forKey: .inviteHorizon)) ?? d.inviteHorizon
         inviteReviewDaily = try c.decodeIfPresent(Bool.self, forKey: .inviteReviewDaily) ?? d.inviteReviewDaily
         newInviteAlert = (try? c.decodeIfPresent(InviteAlertStyle.self, forKey: .newInviteAlert)) ?? d.newInviteAlert

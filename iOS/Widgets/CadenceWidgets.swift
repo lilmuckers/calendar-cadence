@@ -23,8 +23,8 @@ struct MeetingLiveActivity: Widget {
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
-                        GooglyIcon(mood: s.mood(), height: 20).foregroundStyle(s.iconTint)
-                        Text(s.live ? "Now" : "Next")
+                        StateIcon(state: s, height: 20)
+                        Text(s.isMoment ? "Left" : s.live ? "Now" : "Next")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(s.tint)
                     }
@@ -37,10 +37,11 @@ struct MeetingLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if s.hasLink { JoinLink(state: s) }
+                    else if let detail = s.momentDetail { Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
                 }
             } compactLeading: {
                 // The Mac's menu bar icon: calm, then nervous at 15 min, panicking at 5.
-                GooglyIcon(mood: s.mood(), height: 16).foregroundStyle(s.iconTint)
+                StateIcon(state: s, height: 16)
             } compactTrailing: {
                 Countdown(state: s, stale: stale).monospacedDigit().frame(maxWidth: 56)
                     .foregroundStyle(s.counting(stale: stale) ? s.tint : .secondary)
@@ -51,11 +52,25 @@ struct MeetingLiveActivity: Widget {
                         .monospacedDigit().font(.caption2.weight(.semibold)).foregroundStyle(s.tint)
                         .frame(maxWidth: 36)
                 } else {
-                    GooglyIcon(mood: s.mood(), height: 15).foregroundStyle(s.iconTint)
+                    StateIcon(state: s, height: 15)
                 }
             }
-            .widgetURL(s.joinURL)
+            .widgetURL(s.isMoment ? URL(string: "cadence-companion://open") : s.joinURL)
             .keylineTint(s.tint)
+        }
+    }
+}
+
+/// The googly icon for a meeting, or the mascot in its pose for focus time and breaks.
+private struct StateIcon: View {
+    let state: MeetingActivityAttributes.ContentState
+    var height: CGFloat
+
+    var body: some View {
+        if let pose = state.pose {
+            GooglyMascot(pose: pose, height: height, animated: false).foregroundStyle(.white)
+        } else {
+            GooglyIcon(mood: state.mood(), height: height).foregroundStyle(state.iconTint)
         }
     }
 }
@@ -65,6 +80,26 @@ private struct LockScreenView: View {
     let stale: Bool
 
     var body: some View {
+        if let pose = state.pose {
+            HStack(alignment: .center, spacing: 14) {
+                GooglyMascot(pose: pose, height: 48, animated: false).foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(state.title.uppercased()) · LEFT")
+                        .font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.6))
+                    Countdown(state: state, stale: stale)
+                        .font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .foregroundStyle(.white)
+                    Text(state.momentDetail ?? "").font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+        } else {
+            meetingBody
+        }
+    }
+
+    private var meetingBody: some View {
         HStack(alignment: .center, spacing: 14) {
             RoundedRectangle(cornerRadius: 3).fill(state.tint).frame(width: 6)
             VStack(alignment: .leading, spacing: 3) {
@@ -100,7 +135,7 @@ private struct Countdown: View {
         } else if state.target > Date() {
             Text(timerInterval: Date()...state.target, countsDown: true)
         } else {
-            Text("Now")
+            Text(state.isMoment ? "Done" : "Now")
         }
     }
 }

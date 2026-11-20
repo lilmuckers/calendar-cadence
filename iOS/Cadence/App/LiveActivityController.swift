@@ -47,6 +47,34 @@ final class LiveActivityController {
         activity = try? Activity.request(attributes: MeetingActivityAttributes(), content: content, pushType: nil)
     }
 
+    /// Counts down a focus stretch or break, with the mascot in the matching pose.
+    func show(segment: WidgetSegment, next: Meeting?) {
+        let pose = segment.pose
+        let tint: (Double, Double, Double) = switch pose {
+        case .focus: (0.45, 0.72, 1.0)
+        case .lunch: (0.96, 0.76, 0.42)
+        default: (0.93, 0.62, 0.38)
+        }
+        let state = MeetingActivityAttributes.ContentState(
+            meetingID: "moment:\(segment.kind):\(Int(segment.start.timeIntervalSince1970))", title: segment.title,
+            start: segment.start, end: segment.end, live: true,
+            calendarTitle: "Cadence", serviceName: nil, serviceSymbol: nil, location: nil, hasLink: false,
+            red: tint.0, green: tint.1, blue: tint.2,
+            nextTitle: next?.title, nextStart: next?.start, joinsOn: nil,
+            countdownFrom: segment.start, nervousFrom: nil, panicFrom: nil, mood: .calm,
+            iconRed: tint.0, iconGreen: tint.1, iconBlue: tint.2,
+            pose: pose, momentDetail: segment.detail)
+        guard state != lastState else { return }
+        lastState = state
+        let content = ActivityContent(state: state, staleDate: segment.end, relevanceScore: 20)
+        if let activity, activity.activityState == .active {
+            Task { await activity.update(content) }
+            return
+        }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        activity = try? Activity.request(attributes: MeetingActivityAttributes(), content: content, pushType: nil)
+    }
+
     func end() {
         lastState = nil
         let all = Activity<MeetingActivityAttributes>.activities

@@ -164,6 +164,21 @@ struct WidgetScheduleTests {
         #expect(try JSONDecoder().decode(WidgetSchedule.self, from: json).tomorrowFromHour == nil)
     }
 
+    @Test func momentYieldsToMeetings() {
+        let focus = WidgetSegment(kind: "focus", start: morning, end: morning.addingTimeInterval(7200), title: "Focus time", detail: "")
+        var schedule = WidgetSchedule(meetings: [item("review", inMinutes: 120)], generatedAt: morning, segments: [focus])
+        #expect(schedule.segment(at: morning.addingTimeInterval(600))?.pose == .focus)
+        // Within half an hour of the meeting, the meeting wins.
+        #expect(schedule.segment(at: morning.addingTimeInterval(100 * 60)) == nil)
+        // Its yield time and the segment's end are timeline entries.
+        let dates = schedule.entryDates(from: morning, calendar: cal)
+        #expect(dates.contains(morning.addingTimeInterval(90 * 60)))
+        #expect(dates.contains(focus.end))
+        schedule.segments = nil
+        #expect(schedule.segment(at: morning.addingTimeInterval(600)) == nil)
+        #expect(WidgetSegment(kind: "meal", start: morning, end: morning, title: "", detail: "").pose == .lunch)
+    }
+
     @Test func roundTripsThroughDefaults() throws {
         let defaults = try #require(UserDefaults(suiteName: "WidgetScheduleTests"))
         defer { defaults.removePersistentDomain(forName: "WidgetScheduleTests") }

@@ -8,6 +8,8 @@ struct DeskView: View {
     @Environment(\.verticalSizeClass) private var vSize
     var exit: () -> Void
     @State private var notesOpen = false
+    /// Minutes of the focus stretch that just ended, while its "You got focus time!" shows.
+    @State private var celebration: Int?
 
     var body: some View {
         GeometryReader { geo in
@@ -21,6 +23,10 @@ struct DeskView: View {
                         HStack(spacing: 28) {
                             VStack(alignment: .leading, spacing: 0) {
                                 header.layoutPriority(2)
+                                if let celebration {
+                                    FocusCelebration(minutes: celebration).padding(.top, 12)
+                                        .transition(.move(edge: .top).combined(with: .opacity))
+                                }
                                 Spacer(minLength: 8)
                                 // Fills the rest of the side, with Join pinned to the bottom.
                                 FocusBlock(scale: min(1.2, geo.size.height / 360), pinsJoin: true)
@@ -31,6 +37,17 @@ struct DeskView: View {
                                 if let m = notesMeeting {
                                     DeskNotes(meeting: m) { close() }
                                         .transition(.move(edge: .trailing).combined(with: .opacity))
+                                } else if let m = state.moment, showsMoment, !prompting {
+                                    VStack(spacing: 0) {
+                                        header.hidden().accessibilityHidden(true)
+                                        Spacer(minLength: 8)
+                                        MomentCard(moment: m, scale: min(1.2, geo.size.height / 360), art: dayDone ? 100 : 76)
+                                            .frame(maxWidth: .infinity, maxHeight: dayDone ? .infinity : nil)
+                                        if !dayDone {
+                                            AgendaColumn(limit: 2).padding(.top, 8)
+                                            Spacer(minLength: 0)
+                                        }
+                                    }
                                 } else if dayDone && !prompting {
                                     // Same header gap and centring as "All clear" on the left, so the two
                                     // line up; small enough to clear the media corner below.
@@ -55,10 +72,20 @@ struct DeskView: View {
                         VStack(spacing: 0) {
                             VStack(alignment: .leading, spacing: 0) {
                                 header
+                                if let celebration {
+                                    FocusCelebration(minutes: celebration).padding(.top, 12)
+                                        .transition(.move(edge: .top).combined(with: .opacity))
+                                }
                                 Spacer(minLength: 12)
                                 FocusBlock(scale: min(1.15, geo.size.width / 360))
                                 Spacer(minLength: 12)
-                                if dayDone {
+                                if let m = state.moment, showsMoment {
+                                    let s = min(1.15, geo.size.width / 360)
+                                    MomentCard(moment: m, scale: s * (prompting ? 0.6 : (dayDone ? 1 : 0.8)))
+                                        .frame(maxWidth: .infinity)
+                                    if !dayDone && !prompting { AgendaColumn(limit: 2) }
+                                    Spacer(minLength: 12)
+                                } else if dayDone {
                                     // Where the agenda would be: the icon, off duty.
                                     DayDone(scale: min(1.15, geo.size.width / 360) * (prompting ? 0.6 : 1))
                                         .frame(maxWidth: .infinity)
@@ -104,12 +131,36 @@ struct DeskView: View {
         .onChange(of: state.deskEnrichmentMeeting?.id) { _, id in
             if id == nil { notesOpen = false }
         }
+        .onChange(of: focusStretch) { old, new in
+            // A focus stretch just ended (not merely re-planned): say how long it was.
+            guard let old, new?.since != old.since, state.now >= old.until.addingTimeInterval(-60) else { return }
+            let minutes = Int(min(state.now, old.until).timeIntervalSince(old.since) / 60)
+            guard minutes >= state.schedule.focusMinimumMinutes else { return }
+            withAnimation(Theme.spring) { celebration = minutes }
+            Task {
+                try? await Task.sleep(for: .seconds(120))
+                withAnimation(Theme.spring) { if celebration == minutes { celebration = nil } }
+            }
+        }
         .preferredColorScheme(.dark)
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
     }
 
     private var prompting: Bool { state.currentPrompt != nil }
+
+    /// The current focus stretch, to notice when one ends.
+    private var focusStretch: FocusStretch? {
+        if case .focus(let since, let until, _)? = state.moment { return FocusStretch(since: since, until: until) }
+        return nil
+    }
+
+    /// Show the day's moment (mascot and report) when nothing's close: no meeting live or within 30 min.
+    private var showsMoment: Bool {
+        guard state.moment?.pose != nil else { return false }
+        guard let f = state.focus else { return true }
+        return !f.live && f.meeting.start.timeIntervalSince(state.now) > 30 * 60
+    }
 
     /// Nothing left today: no meeting on now and none to come (`focus` only looks at today).
     private var dayDone: Bool { state.focus == nil }
@@ -129,11 +180,13 @@ struct DeskView: View {
     private var dimmed: Bool {
         guard state.prefs.deskDimWhenIdle else { return false }
         guard let f = state.focus else { return true }
+        // Breaks, before and after work: fade back unless a meeting's about to start.
+        if state.moment?.isRestful == true, !f.live, f.meeting.start.timeIntervalSince(state.now) > 10 * 60 { return true }
         return !f.live && f.meeting.start.timeIntervalSince(state.now) > 30 * 60
     }
 
     private var background: some View {
-        let tint = state.focus?.meeting.tint ?? .gray
+        let tint = state.focus?.meeting.tint ?? state.moment?.pose?.propColor ?? .gray
         return ZStack {
             Color.black
             RadialGradient(colors: [tint.opacity(dimmed ? 0.12 : 0.35), .clear], center: .topLeading, startRadius: 0, endRadius: 700)
@@ -194,11 +247,22 @@ private struct FocusBlock: View {
             }
         } else {
             VStack(alignment: .leading, spacing: 8) {
-                Text("All clear").font(.system(size: 40 * scale, weight: .bold))
+                Text(clearTitle).font(.system(size: 40 * scale, weight: .bold))
                 Text(state.meetings.isEmpty ? "Nothing on the calendar." : "That's everything for today.")
                     .font(.title3).foregroundStyle(.white.opacity(0.6))
             }
             .frame(maxHeight: pinsJoin ? .infinity : nil)
+        }
+    }
+
+    /// The big line with nothing left today, following the working day.
+    private var clearTitle: String {
+        switch state.moment {
+        case .focus?: "Focus time"
+        case .onBreak(let b, _)?: b.name
+        case .endOfDay?: "That's a wrap"
+        case .beforeWork?: "Morning!"
+        default: "All clear"
         }
     }
 
@@ -354,4 +418,10 @@ private struct DeskNotes: View {
         .overlay(shape.strokeBorder(.white.opacity(0.12)))
         .clipShape(shape)
     }
+}
+
+/// A focus stretch's span, to tell when it ends.
+private struct FocusStretch: Equatable {
+    var since: Date
+    var until: Date
 }

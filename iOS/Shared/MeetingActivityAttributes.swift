@@ -38,6 +38,12 @@ struct MeetingActivityAttributes: ActivityAttributes {
         var iconRed: Double?
         var iconGreen: Double?
         var iconBlue: Double?
+        /// Set while the activity counts down a focus stretch or break instead of a meeting (`title`
+        /// is the moment's, `end` when it's over). Nil for meetings and from older builds.
+        var pose: MascotPose?
+        var momentDetail: String?
+
+        var isMoment: Bool { pose != nil }
 
         var target: Date { live ? end : start }
 

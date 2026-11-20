@@ -140,6 +140,46 @@ final class PhoneState {
         todayMeetings.filter { $0.end > now && $0.id != focus?.meeting.id && !($0.isInProgress(at: now) && focus?.live == false) }
     }
 
+    // MARK: - Working day
+
+    /// Working hours and breaks: the Mac's while paired (it owns them), else this phone's own.
+    var schedule: WorkSchedule {
+        #if DEBUG
+        if let previewSchedule { return previewSchedule }
+        #endif
+        return scheduleFromMac ?? prefs.workSchedule
+    }
+
+    /// The paired Mac's schedule, when it sent one.
+    var scheduleFromMac: WorkSchedule? { link.mac == nil ? nil : snapshot?.workSchedule }
+
+    #if DEBUG
+    /// `-previewDesk morning|focus|break|wrap`: a schedule placed around now.
+    private var previewSchedule: WorkSchedule?
+    #endif
+
+    /// Today's meetings that count: not muted by a clash choice or agenda-only.
+    private var countedMeetings: [Meeting] {
+        let hidden = suppressed
+        return meetings.filter { !hidden.contains($0.id) && !isAgendaOnly($0) }
+    }
+
+    /// Where we are in the working day (nil when working hours are off).
+    var moment: DayMoment? {
+        DayPlanner.moment(meetings: countedMeetings, schedule: schedule, now: now, skipping: suppressed)
+    }
+
+    /// Minutes of focus time had so far today.
+    var focusSoFar: Int { DayPlanner.focusSoFar(meetings: countedMeetings, schedule: schedule, now: now) }
+
+    /// Today's and tomorrow's working-day stretches, flattened for the widgets and Live Activity.
+    private func daySegments(from day: Date) -> [WidgetSegment] {
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? day.addingTimeInterval(86_400)
+        let counted = countedMeetings, hidden = suppressed
+        return [day, tomorrow].flatMap { DayPlanner.segments(meetings: counted, schedule: schedule, day: $0, skipping: hidden) }
+            .map { WidgetSegment(kind: $0.kind.rawValue, start: $0.start, end: $0.end, title: $0.title, detail: $0.detail) }
+    }
+
     /// Whether this phone counts as "displaying" for the Mac: on screen, in desk mode.
     var displaying: Bool { isActive && desk.isOn }
 
@@ -603,9 +643,30 @@ final class PhoneState {
                            end: Date().addingTimeInterval((inMin + len) * 60), calendar: cal,
                            joinLink: link ? MeetingLink(service: .zoom, url: URL(string: "https://example.com/cadence-preview")!) : nil)
         }
+        func schedule(start: Double, end: Double, breakFrom: Double? = nil, breakTo: Double? = nil) -> WorkSchedule {
+            // Minutes from now, as today's minutes after midnight (kept within the day).
+            let c = Calendar.current.dateComponents([.hour, .minute], from: Date())
+            let nowMin = Double((c.hour ?? 0) * 60 + (c.minute ?? 0))
+            func clamp(_ v: Double) -> Int { Int(min(24 * 60 - 1, max(0, nowMin + v))) }
+            let days = (1...7).map { _ in WorkDay(enabled: true, start: clamp(start), end: clamp(end)) }
+            let breaks = breakFrom.map { [WorkBreak(id: "preview-lunch", name: "Lunch", start: clamp($0), end: clamp(breakTo ?? $0 + 60))] } ?? []
+            return WorkSchedule(days: days, breaks: breaks)
+        }
         switch kind {
         case "done":
             previewMeetings = [m("a", "Standup", -120, 15), m("b", "Design Review", -60, 30)]
+        case "morning":
+            previewSchedule = schedule(start: 40, end: 520)
+            previewMeetings = [m("a", "Standup", 55, 15, link: true), m("b", "Design Review", 180, 30)]
+        case "focus":
+            previewSchedule = schedule(start: -120, end: 300, breakFrom: 200)
+            previewMeetings = [m("a", "Standup", -100, 15), m("b", "Design Review", 95, 30, link: true)]
+        case "break":
+            previewSchedule = schedule(start: -200, end: 240, breakFrom: -15, breakTo: 35)
+            previewMeetings = [m("a", "Standup", -180, 15), m("b", "Design Review", 70, 30, link: true)]
+        case "wrap":
+            previewSchedule = schedule(start: -540, end: -20, breakFrom: -300)
+            previewMeetings = [m("a", "Standup", -510, 15), m("b", "Design Review", -400, 45), m("c", "1:1 with Sam", -120, 30)]
         default:
             previewMeetings = [
                 m("long", "Quarterly cross-functional planning and roadmap alignment session with the platform, design and partnerships teams", 12, 45, link: true),
@@ -647,7 +708,8 @@ final class PhoneState {
 
     /// Notifications and the Live Activity keep working while the app is suspended.
     private func scheduleBackgroundWork() {
-        notifier.reschedule(meetings: offlineMeetings.filter { !suppressed.contains($0.id) }, prefs: prefs)
+        notifier.reschedule(meetings: offlineMeetings.filter { !suppressed.contains($0.id) }, prefs: prefs,
+                            schedule: schedule, skipping: suppressed)
         updateLiveActivity()
         updateWidgets()
     }
@@ -668,15 +730,18 @@ final class PhoneState {
                                      red: c.red, green: c.green, blue: c.blue, hasLink: m.joinLink != nil)
             }
         let tomorrowFromHour = prefs.widgetShowsTomorrow ? prefs.widgetTomorrowHour : nil
-        guard upcoming != lastWidgetMeetings || tomorrowFromHour != lastWidgetTomorrowHour else { return }
+        let segments = schedule.enabled ? daySegments(from: from) : nil
+        guard upcoming != lastWidgetMeetings || tomorrowFromHour != lastWidgetTomorrowHour || segments != lastWidgetSegments else { return }
         lastWidgetMeetings = upcoming
         lastWidgetTomorrowHour = tomorrowFromHour
-        WidgetSchedule(meetings: upcoming, generatedAt: Date(), tomorrowFromHour: tomorrowFromHour).save()
+        lastWidgetSegments = segments
+        WidgetSchedule(meetings: upcoming, generatedAt: Date(), tomorrowFromHour: tomorrowFromHour, segments: segments).save()
         WidgetCenter.shared.reloadAllTimelines()
     }
 
     @ObservationIgnored private var lastWidgetMeetings: [WidgetMeeting]?
     @ObservationIgnored private var lastWidgetTomorrowHour: Int??
+    @ObservationIgnored private var lastWidgetSegments: [WidgetSegment]??
 
     /// Live Activity (Lock Screen, StandBy, Dynamic Island): a countdown once the next meeting is within
     /// `liveActivityLeadMinutes`. iOS only lets an app start one while it's open, so when leaving
@@ -686,6 +751,14 @@ final class PhoneState {
         guard prefs.liveActivityEnabled else { liveActivity.end(); return }
         let now = Date()
         let lead = Double(prefs.liveActivityLeadMinutes) * 60
+        // Focus time or a break with no meeting close: count that down instead.
+        let segment = schedule.enabled
+            ? daySegments(from: Calendar.current.startOfDay(for: now)).first { $0.contains(now) && $0.countsDown } : nil
+        let meetingDue = focus.map { $0.live || $0.meeting.start.timeIntervalSince(now) <= max(lead, WidgetSchedule.momentYield) } ?? false
+        if let segment, !meetingDue {
+            liveActivity.show(segment: segment, next: focus?.meeting ?? next)
+            return
+        }
         guard let f = focus else { liveActivity.end(); return }
         let countdownFrom = f.meeting.start.addingTimeInterval(-lead)
         let early = leaving && Calendar.current.isDate(f.meeting.start, inSameDayAs: now)

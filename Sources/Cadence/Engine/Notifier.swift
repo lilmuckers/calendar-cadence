@@ -57,20 +57,22 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             content.sound = .default
             content.interruptionLevel = .timeSensitive
             content.userInfo = ["meetingID": reminder.joinTarget.id]
-            if reminder.joinTarget.joinLink != nil, !reminder.isSummary { content.categoryIdentifier = Self.category }
-            if reminder.isSummary { content.interruptionLevel = .active }
+            if reminder.joinTarget.joinLink != nil, !reminder.isSummary, !reminder.isBreak { content.categoryIdentifier = Self.category }
+            if reminder.isSummary || reminder.isBreak { content.interruptionLevel = .active }
             try? await center.add(UNNotificationRequest(identifier: reminder.key, content: content, trigger: nil))
         }
     }
 
     func notify(invite m: Meeting) {
         let canReply = state.canRespond(m)
+        let conflicts = state.workConflicts(m)
         Task {
             guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return }
             let content = UNMutableNotificationContent()
             content.title = "New invite: \(m.title)"
             let day = m.start.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute())
             content.body = [day, m.organizer.map { "from \($0)" }, m.calendar.title].compactMap { $0 }.joined(separator: " · ")
+            if let conflict = conflicts.first { content.body += "\n⚠︎ \(conflict)" }
             content.sound = .default
             content.userInfo = ["inviteID": m.id]
             content.categoryIdentifier = canReply ? Self.inviteCategory : Self.inviteViewCategory
