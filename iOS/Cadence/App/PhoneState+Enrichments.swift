@@ -1,18 +1,30 @@
 import CadenceCore
 import Foundation
 
-/// What assistants attached to meetings, mirrored from the Mac (which keeps the real copy).
+/// What assistants attached to meetings, mirrored from the Macs (each keeps the real copy of its own).
+/// With several Macs, a meeting's attachments come from every Mac that has it, each found through
+/// that Mac's own copy of the meeting.
 extension PhoneState {
-    /// The Mac's last copy, while paired; works from the saved snapshot when out of reach.
-    var enrichmentBook: EnrichmentBook {
-        link.mac == nil ? EnrichmentBook() : snapshot?.enrichments ?? EnrichmentBook()
+    /// Each Mac's copy of `m` with that Mac's enrichments, highest priority first.
+    private func enrichmentSources(_ m: Meeting) -> [(macID: String, meeting: Meeting, book: EnrichmentBook)] {
+        agenda.copies(of: m).compactMap { copy in
+            snapshots[copy.macID]?.enrichments.map { (copy.macID, copy.meeting, $0) }
+        }
     }
 
-    func enrichments(for m: Meeting) -> [Enrichment] { enrichmentBook.enrichments(for: m) }
+    func enrichments(for m: Meeting) -> [Enrichment] {
+        var seen = Set<String>()
+        return enrichmentSources(m).flatMap { $0.book.enrichments(for: $0.meeting) }.filter { seen.insert($0.id).inserted }
+    }
 
-    func enrichmentState(_ e: Enrichment, _ m: Meeting) -> EnrichmentState { enrichmentBook.state(e.id, meetingID: m.id) }
+    func enrichmentState(_ e: Enrichment, _ m: Meeting) -> EnrichmentState {
+        guard let source = enrichmentSources(m).first(where: { $0.book.enrichment(id: e.id) != nil }) else {
+            return EnrichmentState(enrichmentID: e.id, meetingID: m.id, updated: .distantPast)
+        }
+        return source.book.state(e.id, meetingID: source.meeting.id)
+    }
 
-    /// Ticks and log entries go to the Mac, so they need the link.
+    /// Ticks and log entries go to the Mac, so they need the link to the Mac that owns the enrichment.
     var canEditEnrichments: Bool { link.isConnected }
 
     /// The meeting the desk's Notes button is for: a live one with attachments (latest started),
@@ -24,10 +36,13 @@ extension PhoneState {
         return nil
     }
 
-    /// Applied here straight away, then sent to the Mac (whose next snapshot confirms it).
+    /// Applied here straight away, then sent to the Mac that owns the enrichment (whose next snapshot
+    /// confirms it), in that Mac's meeting id.
     func applyEnrichment(_ action: EnrichmentAction, meetingID: String) {
-        guard link.isConnected else { return }
-        updateSnapshotEnrichments { $0.apply(action, meetingID: meetingID) }
-        link.send(.enrichmentAction(meetingID: meetingID, action: action))
+        guard link.isConnected, let m = meeting(id: meetingID),
+              let source = enrichmentSources(m).first(where: { $0.book.enrichment(id: action.enrichmentID) != nil }),
+              link.link(source.macID)?.isConnected == true else { return }
+        updateSnapshotEnrichments(macID: source.macID) { $0.apply(action, meetingID: source.meeting.id) }
+        link.send(.enrichmentAction(meetingID: source.meeting.id, action: action), to: source.macID)
     }
 }

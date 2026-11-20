@@ -69,7 +69,9 @@ private struct AgendaScreen: View {
 
                 Section {
                     if state.usingMacCopy, let saved = state.macCopyDate {
-                        Text("\(state.link.mac?.displayName ?? "Mac") is out of reach. This is its agenda from \(Self.savedText(saved)); alerts and Join still work here.")
+                        Text(state.link.links.count > 1
+                             ? "Your Macs are out of reach. This is their agenda from \(Self.savedText(saved)); alerts and Join still work here."
+                             : "\(state.link.mac?.displayName ?? "Mac") is out of reach. This is its agenda from \(Self.savedText(saved)); alerts and Join still work here.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if state.todayMeetings.isEmpty {
@@ -77,7 +79,7 @@ private struct AgendaScreen: View {
                     }
                     ForEach(state.todayMeetings) { MeetingRow(meeting: $0) }
                 } header: {
-                    Text(state.usingMac || state.usingMacCopy ? "Today · from \(state.link.mac?.displayName ?? "Mac")" : "Today")
+                    Text(state.usingMac || state.usingMacCopy ? "Today · from \(agendaSource)" : "Today")
                 }
             }
             .navigationTitle("Cadence")
@@ -90,16 +92,24 @@ private struct AgendaScreen: View {
         }
     }
 
+    /// "Work laptop", or "Work laptop & Home iMac" with several Macs behind the agenda.
+    private var agendaSource: String {
+        let names = state.agenda.agendas.compactMap { a in state.link.link(a.macID)?.mac.displayName }
+        return names.isEmpty ? state.link.mac?.displayName ?? "Mac" : names.formatted(.list(type: .and))
+    }
+
     @ViewBuilder private var macRow: some View {
-        if state.link.mac == nil {
+        if state.link.links.isEmpty {
             Button { showPairing = true } label: {
                 Label("Pair with Cadence on your Mac", systemImage: "laptopcomputer.and.iphone")
             }
         } else {
-            HStack {
-                Label(state.link.mac?.displayName ?? "Mac", systemImage: "laptopcomputer")
-                Spacer()
-                Text(statusText).font(.caption).foregroundStyle(.secondary)
+            ForEach(state.link.links) { mac in
+                HStack {
+                    Label(mac.mac.displayName, systemImage: "laptopcomputer")
+                    Spacer()
+                    Text(statusText(mac)).font(.caption).foregroundStyle(.secondary)
+                }
             }
             if state.link.needsRescan {
                 VStack(alignment: .leading, spacing: 6) {
@@ -117,9 +127,9 @@ private struct AgendaScreen: View {
             : date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
     }
 
-    private var statusText: String {
-        switch state.link.status {
-        case .connected: "Connected · Join opens on the Mac"
+    private func statusText(_ mac: MacLink) -> String {
+        switch mac.status {
+        case .connected: state.link.connected.first === mac ? "Connected · Join opens on the Mac" : "Connected"
         case .connecting: "Connecting…"
         case .searching: "Looking…"
         case .failed(let why): why

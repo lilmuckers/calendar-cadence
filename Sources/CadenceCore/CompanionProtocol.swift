@@ -12,6 +12,13 @@ public enum CompanionService {
     public static let pingInterval: TimeInterval = 5
 }
 
+/// Optional abilities a Mac announces with `CompanionMessage.features`, so a phone only sends what
+/// the Mac understands.
+public enum CompanionFeature: String, Codable, Sendable {
+    /// Understands `CompanionMessage.joinMeeting`.
+    case joinMeeting
+}
+
 public struct CompanionHello: Codable, Equatable, Sendable {
     public var protocolVersion: Int
     public var deviceID: String
@@ -199,11 +206,18 @@ public enum CompanionMessage: Codable, Equatable, Sendable {
     case resolveClash(key: String, choice: String?)
     /// Tick an item, mark a bingo square or log an entry on an enrichment. Older Macs skip it.
     case enrichmentAction(meetingID: String, action: EnrichmentAction)
+    /// Join a meeting this Mac may not have on its own calendars (a phone paired with several Macs
+    /// opening another Mac's browser link here). Only sent to Macs that list
+    /// `CompanionFeature.joinMeeting`; older Macs skip it.
+    case joinMeeting(Meeting)
     // Mac → Phone
     case welcome(macID: String, macName: String)
     /// Where the phone can dial the Mac directly right now, sent after `welcome` so a phone whose
     /// network blocks Bonjour keeps up with a Mac that changed address. Older phones skip it.
     case address(hosts: [String], port: UInt16)
+    /// What this Mac understands beyond protocol 1 (`CompanionFeature` raw values), sent after
+    /// `welcome`. Older Macs never send it; older phones skip it.
+    case features([String])
     case snapshot(CompanionSnapshot)
     /// The full-screen alert for this meeting is due now.
     case alert(Meeting)

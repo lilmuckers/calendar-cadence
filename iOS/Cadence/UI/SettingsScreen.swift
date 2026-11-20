@@ -5,10 +5,8 @@ struct SettingsScreen: View {
     @Environment(PhoneState.self) private var state
     @Environment(\.dismiss) private var dismiss
     @State private var showPairing = false
-    @State private var confirmUnpair = false
     @State private var authError: String?
     @State private var newFeedURL = ""
-    @State private var macNickname = ""
     @State private var deviceName = ""
 
     var body: some View {
@@ -169,24 +167,33 @@ struct SettingsScreen: View {
             .alert("Sign-in failed", isPresented: Binding(get: { authError != nil }, set: { if !$0 { authError = nil } })) {
                 Button("OK") {}
             } message: { Text(authError ?? "") }
-            .confirmationDialog("Unpair from \(state.link.mac?.displayName ?? "Mac")?", isPresented: $confirmUnpair) {
-                Button("Unpair", role: .destructive) { state.link.unpair() }
-            }
+
         }
     }
 
     @ViewBuilder private var macSection: some View {
+        @Bindable var state = state
         Section {
-            if let mac = state.link.mac {
-                LabeledContent(mac.displayName) { ConnectionPill() }
-                LabeledContent("Name") {
-                    TextField(mac.name, text: $macNickname)
-                        .multilineTextAlignment(.trailing)
-                        .submitLabel(.done)
-                        .onSubmit { state.link.rename(macNickname) }
+            if !state.link.links.isEmpty {
+                ForEach(state.link.links) { mac in
+                    NavigationLink {
+                        MacDetailScreen(link: mac)
+                    } label: {
+                        LabeledContent {
+                            Text(Self.statusText(mac.status)).font(.caption).foregroundStyle(.secondary)
+                        } label: {
+                            Label(mac.mac.displayName, systemImage: "laptopcomputer")
+                        }
+                    }
                 }
-                .onAppear { macNickname = mac.nickname ?? "" }
-                .onChange(of: macNickname) { state.link.rename(macNickname) }
+                .onMove { state.link.move(fromOffsets: $0, toOffset: $1) }
+                Button("Pair another Mac") { showPairing = true }
+                if state.link.links.count > 1 {
+                    Toggle(isOn: $state.prefs.joinOnPriorityMac) {
+                        Text("Open web links on \(state.link.macs.first?.displayName ?? "the first Mac")")
+                        Text("A meeting only one Mac has still opens there, unless its link works in any browser: then it opens on the first Mac.")
+                    }
+                }
                 LabeledContent("This iPhone") {
                     TextField(state.link.defaultDeviceName, text: $deviceName)
                         .multilineTextAlignment(.trailing)
@@ -195,14 +202,34 @@ struct SettingsScreen: View {
                 }
                 .onAppear { deviceName = state.link.deviceName }
                 .onChange(of: deviceName) { state.link.renameDevice(deviceName) }
-                Button("Unpair", role: .destructive) { confirmUnpair = true }
             } else {
                 Button("Pair with Cadence on your Mac") { showPairing = true }
             }
-        } header: { Text("Mac") } footer: {
-            Text(state.link.mac == nil
+        } header: {
+            HStack {
+                Text(state.link.links.count > 1 ? "Macs" : "Mac")
+                if state.link.links.count > 1 {
+                    Spacer()
+                    EditButton().font(.caption).textCase(nil)
+                }
+            }
+        } footer: {
+            Text(state.link.links.isEmpty
                  ? "Paired and on the same Wi-Fi (or nearby), the phone shows the Mac's meetings and Join opens the meeting on the Mac."
-                 : "Name: shown on Join buttons and in the Dynamic Island, e.g. \"Join on Work laptop\". This iPhone: what the Mac calls this phone. Leave either blank for the device's own name. The phone remembers the Mac's address on each network it pairs or connects on, for a week after it last worked, and keeps a copy of the Mac's agenda so it carries on without the Mac.")
+                 : state.link.links.count > 1
+                 ? "Drag to set priority (Edit): a meeting more than one connected Mac has opens on the highest. This iPhone: what the Macs call this phone. The phone keeps a copy of each Mac's agenda so it carries on without them."
+                 : "This iPhone: what the Mac calls this phone; blank uses the device's own name. Pair another Mac to have meetings from both. The phone remembers the Mac's address on each network it pairs or connects on, for a week after it last worked, and keeps a copy of the Mac's agenda so it carries on without the Mac.")
+        }
+    }
+
+    static func statusText(_ status: CompanionClient.Status) -> String {
+        switch status {
+        case .connected: "Connected"
+        case .connecting: "Connecting…"
+        case .searching: "Looking…"
+        case .failed: "Unavailable"
+        case .off: "Not connected"
+        case .unpaired: "Pair again"
         }
     }
 
@@ -262,6 +289,59 @@ struct SettingsScreen: View {
         let name = URL(string: raw)?.host ?? "Calendar"
         state.prefs.icsFeeds.append(ICSFeed(name: name, url: raw, color: RGBAColor(red: 0.4, green: 0.6, blue: 0.95)))
         newFeedURL = ""
+    }
+}
+
+/// One paired Mac: its name on this phone, how it's connected, and unpairing it.
+private struct MacDetailScreen: View {
+    @Environment(PhoneState.self) private var state
+    @Environment(\.dismiss) private var dismiss
+    let link: MacLink
+    @State private var nickname = ""
+    @State private var confirmUnpair = false
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Status") {
+                    Text(status).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
+                }
+                LabeledContent("Name") {
+                    TextField(link.mac.name, text: $nickname)
+                        .multilineTextAlignment(.trailing)
+                        .submitLabel(.done)
+                        .onSubmit { state.link.rename(link.mac.id, nickname) }
+                }
+                .onAppear { nickname = link.mac.nickname ?? "" }
+                .onChange(of: nickname) { state.link.rename(link.mac.id, nickname) }
+            } footer: {
+                Text("Name: shown on Join buttons and in the Dynamic Island, e.g. \"Join on Work laptop\". Leave blank for the Mac's own name.")
+            }
+            if link.needsRescan {
+                Section {
+                    Text("Can't reach this Mac. Make sure Cadence is open on it and you're on the same Wi-Fi, or scan its pairing code again (Pair another Mac).")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            }
+            Section {
+                Button("Unpair", role: .destructive) { confirmUnpair = true }
+            }
+        }
+        .confirmationDialog("Unpair from \(link.mac.displayName)?", isPresented: $confirmUnpair) {
+            Button("Unpair", role: .destructive) {
+                state.unpair(link.mac.id)
+                dismiss()
+            }
+        } message: {
+            Text("Its meetings leave this iPhone. Scan its pairing code to pair it again.")
+        }
+        .navigationTitle(link.mac.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var status: String {
+        if case .failed(let why) = link.status { return why }
+        return SettingsScreen.statusText(link.status)
     }
 }
 

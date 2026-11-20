@@ -87,7 +87,7 @@ struct MediaCorner: View {
     }
 
     private func macModel(_ media: CompanionMedia) -> MediaCardModel {
-        let mac = state.link.mac?.displayName ?? "Mac"
+        let mac = state.macMediaSource.flatMap { state.link.link($0)?.mac.displayName } ?? "Mac"
         return MediaCardModel(
             app: media.app, title: media.title ?? "Playing on \(mac)",
             subtitle: [media.artist, "on \(mac)"].compactMap { $0 }.joined(separator: " · "),

@@ -15,6 +15,8 @@ struct ConnectedPhone: Identifiable, Equatable {
     var id: String
     var name: String
     var displaying: Bool
+    /// When it said hello, or last started displaying: the newest one takes the media keys.
+    var since = Date()
 }
 
 /// The Mac end of the iPhone link: advertises `_cadence._tcp` over Bonjour (Wi-Fi and peer-to-peer),
@@ -34,6 +36,12 @@ final class CompanionHub {
     /// True while a connected phone is in the foreground in desk mode: the Mac goes quiet.
     var phoneDisplaying: Bool { phones.contains(where: \.displaying) }
     var isConnected: Bool { !phones.isEmpty }
+
+    /// With several phones connected, the one the Mac's media keys, mini-player and volume follow:
+    /// the one that most recently went on display, else the one that most recently connected.
+    var remotePhone: ConnectedPhone? {
+        phones.filter(\.displaying).max { $0.since < $1.since } ?? phones.max { $0.since < $1.since }
+    }
 
     @ObservationIgnored let macID = CompanionIdentity.deviceID("Cadence.companion.macID")
     @ObservationIgnored var macName: String { Host.current().localizedName ?? "Mac" }
@@ -59,6 +67,13 @@ final class CompanionHub {
     }
     /// The phone's controls, aimed at the Mac's player.
     @ObservationIgnored var onMediaCommand: ((MediaCommand) -> Void)?
+    /// A phone paired with several Macs asked this one to open a meeting from another Mac.
+    @ObservationIgnored var onJoinMeeting: ((Meeting) -> Void)?
+    /// What each connected phone last said is playing (and its volume), so switching which phone
+    /// has the remote shows the right one straight away.
+    @ObservationIgnored private var phoneMedia: [String: CompanionMedia] = [:]
+    @ObservationIgnored private var phoneVolume: [String: (level: Double, muted: Bool)] = [:]
+    @ObservationIgnored private var reportedRemoteID: String?
     /// A phone said hello (so it's ready for prompts).
     @ObservationIgnored var onPhoneConnected: (() -> Void)?
     /// The last connected phone went away.
@@ -107,6 +122,9 @@ final class CompanionHub {
         for (_, entry) in channels { entry.channel.send(.bye(reason: "stopped")); entry.channel.close() }
         channels = [:]
         phones = []
+        phoneMedia = [:]
+        phoneVolume = [:]
+        remoteChanged()
         listener?.cancel()
         listener = nil
         listening = false
@@ -206,10 +224,10 @@ final class CompanionHub {
             self.channels[id] = nil
             if let phoneID, !self.channels.values.contains(where: { $0.phoneID == phoneID }) {
                 self.phones.removeAll { $0.id == phoneID }
-                if self.phones.isEmpty {
-                    self.onPhoneMedia?(nil)
-                    self.onPhonesGone?()
-                }
+                self.phoneMedia[phoneID] = nil
+                self.phoneVolume[phoneID] = nil
+                self.remoteChanged()
+                if self.phones.isEmpty { self.onPhonesGone?() }
             }
         }
         channel.start()
@@ -225,7 +243,11 @@ final class CompanionHub {
                 return
             }
             channels[id]?.phoneID = hello.deviceID
-            upsertPhone(ConnectedPhone(id: hello.deviceID, name: hello.label, displaying: hello.displaying))
+            // A repeat hello (the phone was renamed) keeps its place in the media-key queue.
+            let known = phones.first { $0.id == hello.deviceID }
+            upsertPhone(ConnectedPhone(id: hello.deviceID, name: hello.label, displaying: hello.displaying,
+                                       since: known?.since ?? Date()))
+            remoteChanged()
             if let i = paired.firstIndex(where: { $0.id == hello.deviceID }) {
                 paired[i].name = hello.label
                 paired[i].lastSeen = Date()
@@ -234,6 +256,7 @@ final class CompanionHub {
             }
             savePaired()
             entry.channel.send(.welcome(macID: macID, macName: macName))
+            entry.channel.send(.features([CompanionFeature.joinMeeting.rawValue]))
             if let port = listener?.port?.rawValue {
                 entry.channel.send(.address(hosts: Self.lanAddresses(), port: port))
             }
@@ -242,7 +265,9 @@ final class CompanionHub {
             onPhoneConnected?()
         case .displayState(let displaying):
             guard let phoneID = entry.phoneID, let i = phones.firstIndex(where: { $0.id == phoneID }) else { return }
+            if displaying, !phones[i].displaying { phones[i].since = Date() }
             phones[i].displaying = displaying
+            remoteChanged()
         case .join(let meetingID):
             onJoin?(meetingID)
             broadcast(.dismissAlert(meetingID: meetingID))
@@ -260,12 +285,18 @@ final class CompanionHub {
             onResolveClash?(key, choice)
         case .enrichmentAction(let meetingID, let action):
             onEnrichmentAction?(meetingID, action)
+        case .joinMeeting(let meeting):
+            onJoinMeeting?(meeting)
         case .media(let media):
-            onPhoneMedia?(media)
+            guard let phoneID = entry.phoneID else { return }
+            phoneMedia[phoneID] = media
+            if phoneID == remotePhone?.id { onPhoneMedia?(media) }
         case .mediaCommand(let command):
             onMediaCommand?(command)
         case .volume(let level, let muted):
-            onPhoneVolume?(level, muted)
+            guard let phoneID = entry.phoneID else { return }
+            phoneVolume[phoneID] = (level, muted)
+            if phoneID == remotePhone?.id { onPhoneVolume?(level, muted) }
         case .bye:
             entry.channel.close()
         default:
@@ -275,6 +306,21 @@ final class CompanionHub {
 
     private func upsertPhone(_ phone: ConnectedPhone) {
         if let i = phones.firstIndex(where: { $0.id == phone.id }) { phones[i] = phone } else { phones.append(phone) }
+    }
+
+    /// Which phone has the remote may have changed: replay what that one is playing.
+    private func remoteChanged() {
+        let remote = remotePhone?.id
+        guard remote != reportedRemoteID else { return }
+        reportedRemoteID = remote
+        onPhoneMedia?(remote.flatMap { phoneMedia[$0] })
+        if let remote, let v = phoneVolume[remote] { onPhoneVolume?(v.level, v.muted) }
+    }
+
+    /// Sends to the phone the media keys follow (see `remotePhone`).
+    func sendToRemotePhone(_ message: CompanionMessage) {
+        guard let id = remotePhone?.id else { return }
+        for (_, entry) in channels where entry.phoneID == id { entry.channel.send(message) }
     }
 
     /// Sends to every phone that has said hello.
