@@ -144,11 +144,8 @@ private struct AgendaScreen: View {
     private func statusText(_ mac: MacLink) -> String {
         switch mac.status {
         case .connected: state.link.connected.first === mac ? "Connected · Join opens on the Mac" : "Connected"
-        case .connecting: "Connecting…"
-        case .searching: "Looking…"
         case .failed(let why): why
-        case .off: "Not connected"
-        case .unpaired: "Pairing key missing — pair again"
+        default: mac.status.label
         }
     }
 }
