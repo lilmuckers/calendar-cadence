@@ -195,6 +195,7 @@ On the Mac a small **Notes** button sits at the bottom of the screen during the 
 - **🎨 Event colours.** Colour an event in Google Calendar (or give it a `COLOR` in an ICS feed) and Cadence uses that colour instead of the calendar's. Toggle in *Settings → Calendars*.
 - **🧹 Filters.** Toggle calendars; hide all-day, declined, tentative, free or link-less events; include/exclude by title keyword; minimum duration.
 - **🔕 Agenda-only calendars.** Click the bell next to a calendar (or right-click an event → *Make “…” Agenda Only*) to keep it in the agenda but out of alerts, reminders, clash detection, current/next, free-time and assistant events — for long room bookings and the like.
+- **💾 Export and import settings.** *Settings → General → Settings file* saves everything in Settings to a `.cadconf` file — plain YAML you can read, diff or trim by hand — to back up or copy to another Mac. Double-click one to import it: Cadence says how many settings change (and warns if it lets assistants act without asking) before it applies anything, and the import can be undone. Accounts, sign-ins, OAuth tokens and paired iPhones are never in the file; subscribed calendar links only if you tick the box, since they can be private addresses. Settings a file leaves out keep their current value.
 - **😰 A menu bar icon with feelings.** Calm, nervous at 15 minutes, sweating at 5.
 
 <p align="center"><img src="docs/screenshots/moods.png" width="360" alt="Menu bar icon moods: calm, nervous, panicking"></p>
