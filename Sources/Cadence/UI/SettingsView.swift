@@ -439,6 +439,7 @@ private struct GeneralTab: View {
     @Environment(AppState.self) private var state
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
+    @State private var canUndoImport = SettingsTransfer.beforeLastImport != nil
 
     var body: some View {
         @Bindable var state = state
@@ -521,8 +522,31 @@ private struct GeneralTab: View {
                     Text(loginError).font(.caption).foregroundStyle(.red)
                 }
             }
+            Section {
+                HStack {
+                    Button("Export Settings…") { SettingsTransfer.export(state) }
+                    Button("Import Settings…") {
+                        SettingsTransfer.chooseAndImport(state)
+                        canUndoImport = SettingsTransfer.beforeLastImport != nil
+                    }
+                    Spacer()
+                    if canUndoImport {
+                        Button("Undo Import") {
+                            SettingsTransfer.undoImport(state)
+                            canUndoImport = false
+                        }
+                        .help("Put back the settings you had before the last import")
+                    }
+                }
+            } header: {
+                Text("Settings file")
+            } footer: {
+                Text("A .\(SettingsArchive.fileExtension) file (YAML) with everything in Settings, to back up or copy to another Mac. Accounts, sign-ins and paired iPhones aren't included; subscribed calendar links only if you choose.")
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+        .onAppear { canUndoImport = SettingsTransfer.beforeLastImport != nil }
     }
 
     private func setLaunchAtLogin(_ on: Bool) {

@@ -40,6 +40,25 @@ enum TravelMode: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Writes an explicit `null` for nil: synthesized Codable leaves nil optionals out, and a missing
+/// key reads back as the default.
+@propertyWrapper
+struct EncodesNil<Value: Codable & Equatable>: Codable, Equatable {
+    var wrappedValue: Value?
+
+    init(wrappedValue: Value?) { self.wrappedValue = wrappedValue }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        wrappedValue = c.decodeNil() ? nil : try c.decode(Value.self)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        if let wrappedValue { try c.encode(wrappedValue) } else { try c.encodeNil() }
+    }
+}
+
 /// App-wide settings persisted to UserDefaults as one JSON blob.
 struct Preferences: Codable, Equatable {
     var filters = FilterSettings()
@@ -62,7 +81,8 @@ struct Preferences: Codable, Equatable {
     var preferNativeApps = true
     var travelMode: TravelMode = .driving
     var icsFeeds: [ICSFeed] = []
-    var joinHotKey: HotKeySpec? = .defaultJoin
+    /// nil = no shortcut. Saved as an explicit null so turning it off sticks.
+    @EncodesNil var joinHotKey: HotKeySpec? = .defaultJoin
     var headsUpEnabled = false
     var headsUpMinutes = 5
     var leaveEnabled = true

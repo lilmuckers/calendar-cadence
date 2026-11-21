@@ -4,6 +4,21 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>Cadence</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Cadence Settings</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.cadence.calendarmonitor.settings</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>Cadence</string>
 	<key>CFBundleIconFile</key>
@@ -42,5 +57,26 @@
 	<string>Cadence uses your location to estimate travel time to in-person meetings.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Cadence uses your location to estimate travel time to in-person meetings.</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.cadence.calendarmonitor.settings</string>
+			<key>UTTypeDescription</key>
+			<string>Cadence Settings</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.yaml</string>
+				<string>public.utf8-plain-text</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>cadconf</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

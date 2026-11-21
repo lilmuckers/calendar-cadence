@@ -32,6 +32,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var bridge: MCPBridge?
     private var drawer: EnrichmentDrawerController?
 
+    /// Double-clicking a .cadconf settings file.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.pathExtension.lowercased() == SettingsArchive.fileExtension {
+            SettingsTransfer.importFile(url, into: state)
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let i = CommandLine.arguments.firstIndex(of: "--screenshots") {
             let dir = CommandLine.arguments.indices.contains(i + 1) ? CommandLine.arguments[i + 1] : "screenshots"
