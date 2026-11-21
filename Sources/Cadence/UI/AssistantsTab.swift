@@ -178,8 +178,6 @@ private struct AssistantSetupView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { if copied == key { copied = nil } }
         }
     }
-
-    /// Minutes after midnight as a time-of-day Date.
 }
 
 private struct ClientRow: View {

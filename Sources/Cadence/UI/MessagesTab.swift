@@ -51,13 +51,13 @@ private struct SuggestionsSection: View {
         Section {
             MessageField(title: "Previous meeting overran", detail: "It's still running, or you're still on a call.",
                          text: $state.prefs.lateMessages.overrun)
-            MessageField(title: "…after a 1:1", detail: "Names who you were with. Only used when the switch below is on.",
-                         text: $state.prefs.lateMessages.overrunWithName)
-                .disabled(!state.prefs.lateMessages.mentionName)
             Toggle(isOn: $state.prefs.lateMessages.mentionName) {
                 Text("Mention who I'm with after a 1:1")
                 Text("Tells this meeting who you were just with — off by default.")
             }
+            MessageField(title: "…after a 1:1", detail: "Names who you were with.",
+                         text: $state.prefs.lateMessages.overrunWithName)
+                .disabled(!state.prefs.lateMessages.mentionName)
             MessageField(title: "Back-to-back", detail: "The previous meeting ended right as this one started.",
                          text: $state.prefs.lateMessages.breather)
             MessageField(title: "Just late", detail: "Nothing before it.", text: $state.prefs.lateMessages.late)

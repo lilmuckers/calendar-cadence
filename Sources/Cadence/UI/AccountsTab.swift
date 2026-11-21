@@ -337,6 +337,7 @@ private struct SlackSection: View {
     @State private var clientID = UserDefaults.standard.string(forKey: "Cadence.slack.clientID") ?? ""
     @State private var busy = false
     @State private var error: String?
+    @State private var confirmingSignOut: SlackAccount?
 
     private var auth: SlackAuth { state.slackAuth }
 
@@ -353,7 +354,7 @@ private struct SlackSection: View {
                     }
                     Spacer()
                     if auth.needsReconnect.contains(account.id) { Button("Reconnect", action: signIn).disabled(busy) }
-                    Button("Sign Out") { auth.signOut(account) }
+                    Button("Sign Out") { confirmingSignOut = account }
                 }
             }
             if !auth.hasBundledClient {
@@ -377,6 +378,15 @@ private struct SlackSection: View {
             Text("Optional — lets running-late messages for Slack huddles go to the huddle's channel, as you."
                  + (auth.hasBundledClient ? "" : " Needs a Slack app with PKCE turned on, the user scopes chat:write, users:read, users:read.email and im:write, and the redirect URL \(SlackAuth.redirect) — see the README."))
                 .foregroundStyle(.secondary)
+        }
+        .confirmationDialog("Sign out of \(confirmingSignOut?.label ?? "")?", isPresented: Binding(
+            get: { confirmingSignOut != nil }, set: { if !$0 { confirmingSignOut = nil } })
+        ) {
+            Button("Sign Out", role: .destructive) {
+                if let account = confirmingSignOut { auth.signOut(account) }
+            }
+        } message: {
+            Text("Cadence can no longer post running-late messages to its huddles. You can add it again any time.")
         }
     }
 

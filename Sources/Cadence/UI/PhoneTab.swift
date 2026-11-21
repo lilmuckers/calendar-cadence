@@ -24,20 +24,23 @@ struct PhoneTab: View {
             }
 
             if state.prefs.companionEnabled {
-                Section("While the iPhone is displaying") {
+                Section {
                     Picker("Full-screen alert", selection: $state.prefs.companionTakeover) {
                         ForEach(CompanionTakeoverMode.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
                     Picker("If you're still late", selection: $state.prefs.companionEscalation) {
                         ForEach(CompanionEscalation.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
-                    Text("Brings the alert up on this Mac too once the meeting has started and you haven't joined, snoozed or dismissed it on the phone.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text("Join on the phone joins on this Mac while they're connected. Pair as many iPhones as you like: alerts and prompts go to all of them, and the media keys follow the one that went on display last.")
-                        .font(.caption).foregroundStyle(.secondary)
+                } header: {
+                    Text("While the iPhone is displaying")
+                } footer: {
+                    Text("\"If you're still late\" brings the alert up on this Mac too once the meeting has started and you haven't joined, snoozed or dismissed it on the phone. Join on the phone joins on this Mac while they're connected.")
+                        .foregroundStyle(.secondary)
                 }
 
-                Section("Pairing") {
+                PhoneMediaSection()
+
+                Section {
                     if let invite {
                         PairingCard(invite: invite) { self.invite = nil }
                     } else {
@@ -58,6 +61,11 @@ struct PhoneTab: View {
                         }
                         Button("Forget All iPhones…", role: .destructive) { confirmForget = true }
                     }
+                } header: {
+                    Text("Pairing")
+                } footer: {
+                    Text("Pair as many iPhones as you like: alerts and prompts go to all of them, and the media keys follow the one that went on display last.")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
