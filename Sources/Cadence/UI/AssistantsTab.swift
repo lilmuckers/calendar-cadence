@@ -198,7 +198,7 @@ private struct ClientRow: View {
                     HStack(spacing: 4) {
                         if !s.installed {
                             chip("Not found", .secondary)
-                        } else if client.bundleID != nil {
+                        } else if client.isApp {
                             chip(s.running ? "Running" : "Not running", s.running ? .blue : .secondary)
                         }
                         switch s.config {
@@ -222,7 +222,7 @@ private struct ClientRow: View {
             if case .stale(let path) = s.config {
                 Text("Configured for \(path)").font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
-            DisclosureGroup(client == .claudeCode ? "Command" : "Config", isExpanded: $showManual) {
+            DisclosureGroup(client.installsWithCLI ? "Command" : "Config", isExpanded: $showManual) {
                 let text = client.manualSetup(helper: clients.helperPath)
                 HStack(alignment: .top) {
                     Text(text).font(.caption.monospaced()).textSelection(.enabled)
@@ -235,7 +235,7 @@ private struct ClientRow: View {
                 }
                 .padding(8)
                 .background(RoundedRectangle(cornerRadius: 6).fill(.primary.opacity(0.05)))
-                if client != .claudeCode {
+                if !client.installsWithCLI {
                     Text(client.configURL.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
@@ -246,7 +246,7 @@ private struct ClientRow: View {
     }
 
     @ViewBuilder private func actions(_ s: AssistantClientStatus) -> some View {
-        let canInstall = s.problem == nil && (s.installed || client != .claudeCode)
+        let canInstall = s.problem == nil && (s.installed || !client.installsWithCLI)
         HStack(spacing: 6) {
             switch s.config {
             case .missing:
@@ -267,12 +267,21 @@ private struct ClientRow: View {
     @ViewBuilder private var icon: some View {
         if let url = clients.appURL(client) {
             Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable()
-        } else if client == .claudeCode {
+        } else if let tint = terminalTint {
             Image(systemName: "terminal.fill").font(.system(size: 15)).foregroundStyle(.white)
                 .frame(width: 26, height: 26)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color(red: 0.85, green: 0.47, blue: 0.34).gradient))
+                .background(RoundedRectangle(cornerRadius: 6).fill(tint.gradient))
         } else {
             Image(systemName: "app.dashed").font(.system(size: 20)).foregroundStyle(.tertiary)
+        }
+    }
+
+    /// Command-line tools get a terminal tile in their own colour.
+    private var terminalTint: Color? {
+        switch client {
+        case .claudeCode: Color(red: 0.85, green: 0.47, blue: 0.34)
+        case .geminiCLI: Color(red: 0.26, green: 0.52, blue: 0.96)
+        default: nil
         }
     }
 

@@ -23,7 +23,7 @@ enum AssistantLog {
 
 /// MCP clients Cadence knows how to set up.
 enum AssistantClient: String, CaseIterable, Identifiable {
-    case claudeDesktop, claudeCode, cursor, windsurf
+    case claudeDesktop, claudeCode, cursor, windsurf, geminiCLI, antigravity
 
     var id: String { rawValue }
 
@@ -33,17 +33,35 @@ enum AssistantClient: String, CaseIterable, Identifiable {
         case .claudeCode: "Claude Code"
         case .cursor: "Cursor"
         case .windsurf: "Windsurf"
+        case .geminiCLI: "Gemini CLI"
+        case .antigravity: "Antigravity"
         }
     }
 
-    var bundleID: String? {
+    /// The app's bundle identifiers (several where it has been renamed); empty for command-line tools.
+    var bundleIDs: [String] {
         switch self {
-        case .claudeDesktop: "com.anthropic.claudefordesktop"
-        case .cursor: "com.todesktop.230313mzl4w4u92"
-        case .windsurf: "com.exafunction.windsurf"
-        case .claudeCode: nil
+        case .claudeDesktop: ["com.anthropic.claudefordesktop"]
+        case .cursor: ["com.todesktop.230313mzl4w4u92"]
+        case .windsurf: ["com.exafunction.windsurf"]
+        case .antigravity: ["com.google.antigravity", "com.google.antigravity-ide"]
+        case .claudeCode, .geminiCLI: []
         }
     }
+
+    var isApp: Bool { !bundleIDs.isEmpty }
+
+    /// The command-line tool, found on this Mac to tell whether it's installed.
+    var cliName: String? {
+        switch self {
+        case .claudeCode: "claude"
+        case .geminiCLI: "gemini"
+        default: nil
+        }
+    }
+
+    /// Set up by running its CLI rather than by editing its config file.
+    var installsWithCLI: Bool { self == .claudeCode }
 
     /// JSON file holding `mcpServers`. Claude Code's is read only; changes go through its CLI.
     var configURL: URL {
@@ -53,6 +71,10 @@ enum AssistantClient: String, CaseIterable, Identifiable {
         case .claudeCode: return home.appendingPathComponent(".claude.json")
         case .cursor: return home.appendingPathComponent(".cursor/mcp.json")
         case .windsurf: return home.appendingPathComponent(".codeium/windsurf/mcp_config.json")
+        case .geminiCLI: return home.appendingPathComponent(".gemini/settings.json")
+        case .antigravity:
+            let fm = FileManager.default
+            return home.appendingPathComponent(MCPClientConfig.antigravityConfigPath { fm.fileExists(atPath: home.appendingPathComponent($0).path) })
         }
     }
 
@@ -66,11 +88,13 @@ enum AssistantClient: String, CaseIterable, Identifiable {
         case .claudeCode: return n.hasPrefix("claude-code")
         case .cursor: return n.contains("cursor")
         case .windsurf: return n.contains("windsurf")
+        case .geminiCLI: return n.contains("gemini") && !n.contains("antigravity")
+        case .antigravity: return n.contains("antigravity")
         }
     }
 
-    /// Needs restarting to pick up a new server.
-    var restartsToLoad: Bool { self != .claudeCode }
+    /// Needs restarting to pick up a new server (command-line tools load it in their next session).
+    var restartsToLoad: Bool { isApp }
 
     func manualSetup(helper: String) -> String {
         switch self {
@@ -97,6 +121,7 @@ final class AssistantClients {
     private(set) var busy: Set<AssistantClient> = []
     var lastError: String?
     private(set) var claudeCLI: String?
+    private(set) var geminiCLI: String?
 
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
@@ -109,22 +134,30 @@ final class AssistantClients {
                 MainActor.assumeIsolated { self?.refresh() }
             })
         }
-        Task { await self.findClaudeCLI(); self.refresh() }
+        Task {
+            self.claudeCLI = await Self.findCLI("claude")
+            self.geminiCLI = await Self.findCLI("gemini")
+            self.refresh()
+        }
     }
 
     func appURL(_ c: AssistantClient) -> URL? {
-        c.bundleID.flatMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }
+        c.bundleIDs.lazy.compactMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }.first
+    }
+
+    private func runningApps(_ c: AssistantClient) -> [NSRunningApplication] {
+        c.bundleIDs.flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0) }
     }
 
     func refresh() {
         var out: [AssistantClient: AssistantClientStatus] = [:]
         for c in AssistantClient.allCases {
             var s = AssistantClientStatus()
-            if let id = c.bundleID {
+            if c.isApp {
                 s.installed = appURL(c) != nil
-                s.running = !NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty
+                s.running = !runningApps(c).isEmpty
             } else {
-                s.installed = claudeCLI != nil
+                s.installed = (c == .claudeCode ? claudeCLI : geminiCLI) != nil
             }
             do {
                 let config = try MCPClientConfig.parse(try? Data(contentsOf: c.configURL))
@@ -207,18 +240,17 @@ final class AssistantClients {
         var errorDescription: String? { message }
     }
 
-    private func findClaudeCLI() async {
+    /// Where a command-line tool is installed: the usual places, then the login shell's PATH.
+    private static func findCLI(_ name: String) async -> String? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let candidates = ["/opt/homebrew/bin/claude", "/usr/local/bin/claude", "\(home)/.local/bin/claude",
-                          "\(home)/.claude/local/claude", "\(home)/.npm-global/bin/claude", "\(home)/.bun/bin/claude"]
-        if let found = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
-            claudeCLI = found
-            return
+        var dirs = ["/opt/homebrew/bin", "/usr/local/bin", "\(home)/.local/bin", "\(home)/.npm-global/bin", "\(home)/.bun/bin"]
+        if name == "claude" { dirs.append("\(home)/.claude/local") }
+        if let found = dirs.map({ "\($0)/\(name)" }).first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+            return found
         }
-        // Fall back to the user's login shell PATH.
-        let out = try? await Self.exec("/bin/zsh", ["-lc", "command -v claude"], path: nil)
+        let out = try? await exec("/bin/zsh", ["-lc", "command -v \(name)"], path: nil)
         let path = out?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        claudeCLI = path.hasPrefix("/") && FileManager.default.isExecutableFile(atPath: path) ? path : nil
+        return path.hasPrefix("/") && FileManager.default.isExecutableFile(atPath: path) ? path : nil
     }
 
     @discardableResult
@@ -266,8 +298,8 @@ final class AssistantClients {
 
     /// Quits the client and opens it again so it loads its MCP servers.
     func restart(_ c: AssistantClient) async {
-        guard let id = c.bundleID, let url = appURL(c) else { return }
-        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: id)
+        guard let url = appURL(c) else { return }
+        let apps = runningApps(c)
         apps.forEach { $0.terminate() }
         for _ in 0..<40 where apps.contains(where: { !$0.isTerminated }) {
             try? await Task.sleep(for: .milliseconds(250))
