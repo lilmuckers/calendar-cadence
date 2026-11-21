@@ -56,6 +56,33 @@ Keep it under 150 words, in plain sentences, most important thing first. This is
 Only use what's in the invite and the documents. If something's unclear, say so in the note rather than guessing.`,
   },
   {
+    id: "workspace-briefing",
+    emoji: "🗂️",
+    title: "Google Workspace briefing",
+    category: "before",
+    trigger: "schedule",
+    when: "Weekdays, 08:00, for the day's meetings",
+    summary: "Pulls together Drive docs, recent Gmail threads, a matching NotebookLM notebook and the Gemini notes from last time, then pins a brief, the actions still open and every source to each meeting.",
+    tools: ["get_agenda", "get_enrichments", "add_enrichment", "update_enrichment"],
+    kinds: ["markdown", "log", "links"],
+    connectors: true,
+    prompt: `Using the Cadence tools and my Google Workspace connectors (Google Drive, Gmail, and NotebookLM if you have it), get today's meetings ready.
+
+1. Call get_agenda for today. Skip declined meetings, all-day events and blocks with no other attendees.
+2. For each remaining meeting, call get_enrichments. If you've already attached items with the ids "ws-brief", "ws-actions" or "ws-sources", update them with update_enrichment instead of adding new ones.
+3. Look for material, newest first, and keep track of where each fact came from:
+   - Google Drive: documents linked in the invite; the "Notes by Gemini" documents from the last 3 times this meeting (or a meeting with the same title) happened, reading their summary and suggested next steps; and documents from the last 30 days that mention the meeting's title or project and were shared by or edited by an attendee.
+   - Gmail: threads from the last 14 days with the attendees that are about this meeting's topic. Note any questions or requests addressed to me.
+   - NotebookLM: if a notebook clearly matches the project, ask it for the key points and open questions on this meeting's topic. Otherwise skip it.
+4. Attach to the meeting with add_enrichment:
+   - kind "markdown", id "ws-brief", title "Brief": the purpose in one line, what's changed since last time, 3 to 5 key points each with its source in brackets, and anything people are waiting on from me;
+   - kind "log", id "ws-actions", title "Open actions": each next step from the previous Gemini notes as type "action" with its owner and due date. Leave out any that a later email or doc shows were done, and add a note entry saying which ones you dropped and why;
+   - kind "links", id "ws-sources", title "Sources": every document, thread and notebook you used, each with a one-line note.
+5. Finish with one line per meeting saying what you attached, and which meetings you found nothing for.
+
+Rules: only use material I can already open, and quote or summarise it briefly rather than copying whole documents. If any attendees are outside my organisation, leave out internal-only documents and threads. Don't send email, share files or change any document. If sources disagree or something's unclear, say so in the brief instead of guessing.`,
+  },
+  {
     id: "whos-who",
     emoji: "🪪",
     title: "Who's who",
