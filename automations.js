@@ -83,6 +83,33 @@ Only use what's in the invite and the documents. If something's unclear, say so 
 Rules: only use material I can already open, and quote or summarise it briefly rather than copying whole documents. If any attendees are outside my organisation, leave out internal-only documents and threads. Don't send email, share files or change any document. If sources disagree or something's unclear, say so in the brief instead of guessing.`,
   },
   {
+    id: "workspace-briefing-live",
+    emoji: "📥",
+    title: "Brief new invites as they land",
+    category: "invites",
+    trigger: "loop",
+    summary: "The live version of the Google Workspace briefing: when a new invite for today arrives, or a meeting moves into today, it gathers Drive, Gmail, NotebookLM and earlier Gemini notes and pins a brief straight away.",
+    tools: ["wait_for_event", "get_enrichments", "add_enrichment", "update_enrichment", "list_clashes"],
+    kinds: ["markdown", "log", "links"],
+    connectors: true,
+    prompt: `Using the Cadence tools and my Google Workspace connectors (Google Drive, Gmail, and NotebookLM if you have it), brief me on new meetings as they turn up today.
+
+Repeat until I tell you to stop:
+1. Call wait_for_event with types ["invite.new", "meeting.changed"] and timeout_seconds 300. If nothing comes back, go round again.
+2. Each event's data has the meeting (its id, title, start time and attendees). Only carry on for meetings that start later today. For "meeting.changed", call get_enrichments first and skip the meeting if it already has an item with the id "ws-brief" (it's been briefed).
+3. Look for material, newest first, and keep track of where each fact came from:
+   - Google Drive: documents linked in the invite; "Notes by Gemini" from the last 3 times a meeting with this title happened (their summary and suggested next steps); and documents from the last 30 days about the meeting's topic shared or edited by an attendee.
+   - Gmail: threads from the last 14 days with the attendees about this topic, including anything addressed to me.
+   - NotebookLM: if a notebook clearly matches the project, ask it for key points and open questions. Otherwise skip it.
+4. Attach with add_enrichment (or update_enrichment if the id already exists):
+   - kind "markdown", id "ws-brief", title "Brief": the purpose in one line, what's changed since last time, 3 to 5 key points each with its source, and anything people are waiting on from me;
+   - kind "log", id "ws-actions", title "Open actions": next steps from earlier Gemini notes that still look open, as type "action" with owner and due date;
+   - kind "links", id "ws-sources", title "Sources": every document, thread and notebook you used.
+5. Call list_clashes. Then tell me in two lines: what the meeting is and when, what you attached, and whether it clashes with anything.
+
+Rules: only use material I can already open, and summarise rather than copy whole documents. If any attendees are outside my organisation, leave out internal-only material. Never reply to the invite, send email, share files or change a document. If you find nothing useful, attach nothing and just say so.`,
+  },
+  {
     id: "whos-who",
     emoji: "🪪",
     title: "Who's who",
