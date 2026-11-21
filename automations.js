@@ -110,6 +110,62 @@ Repeat until I tell you to stop:
 Rules: only use material I can already open, and summarise rather than copy whole documents. If any attendees are outside my organisation, leave out internal-only material. Never reply to the invite, send email, share files or change a document. If you find nothing useful, attach nothing and just say so.`,
   },
   {
+    id: "m365-briefing",
+    emoji: "🏢",
+    title: "Microsoft 365 briefing",
+    category: "before",
+    trigger: "schedule",
+    when: "Weekdays, 08:00, for the day's meetings",
+    summary: "The Microsoft 365 take: pulls SharePoint and OneDrive files, recent Outlook mail and Teams chats, and the recap and follow-ups from last time, then pins a brief, the actions still open and every source to each meeting.",
+    tools: ["get_agenda", "get_enrichments", "add_enrichment", "update_enrichment"],
+    kinds: ["markdown", "log", "links"],
+    connectors: true,
+    prompt: `Using the Cadence tools and my Microsoft 365 connectors (SharePoint and OneDrive, Outlook, and Teams if you have them), get today's meetings ready.
+
+1. Call get_agenda for today. Skip declined meetings, all-day events and blocks with no other attendees.
+2. For each remaining meeting, call get_enrichments. If you've already attached items with the ids "m365-brief", "m365-actions" or "m365-sources", update them with update_enrichment instead of adding new ones.
+3. Look for material, newest first, and keep track of where each fact came from:
+   - SharePoint and OneDrive: files linked in the invite or shared in the meeting's chat; files from the last 30 days that mention the meeting's title or project and were shared or edited by an attendee; and the project's SharePoint site or Teams channel files if there's an obvious one.
+   - Previous meetings: for the last 3 times this meeting (or one with the same title) happened, the Teams recap (AI notes and follow-up tasks from Copilot or Teams Premium), the meeting notes or Loop page, or the transcript if that's all there is.
+   - Outlook: email threads from the last 14 days with the attendees about this topic. Note any questions or requests addressed to me.
+   - Teams: the meeting's own chat and recent messages in the matching channel or group chat.
+   - Planner or To Do: tasks linked to the meeting or assigned from its last recap, if you can see them.
+4. Attach to the meeting with add_enrichment:
+   - kind "markdown", id "m365-brief", title "Brief": the purpose in one line, what's changed since last time, 3 to 5 key points each with its source in brackets, and anything people are waiting on from me;
+   - kind "log", id "m365-actions", title "Open actions": each follow-up from the previous recaps as type "action" with its owner and due date. Leave out any that a later email, chat or task shows were done, and add a note entry saying which ones you dropped and why;
+   - kind "links", id "m365-sources", title "Sources": every file, thread, chat and recap you used, each with a one-line note.
+5. Finish with one line per meeting saying what you attached, and which meetings you found nothing for.
+
+Rules: only use material I can already open, and summarise rather than copy whole documents. Respect sensitivity labels: if any attendees are outside my organisation, leave out anything labelled Confidential or above, and anything else meant for internal use only. Don't send email or chat messages, share files, or change any document or task. If sources disagree or something's unclear, say so in the brief instead of guessing.`,
+  },
+  {
+    id: "m365-briefing-live",
+    emoji: "📨",
+    title: "Brief new Microsoft 365 invites as they land",
+    category: "invites",
+    trigger: "loop",
+    summary: "The live version of the Microsoft 365 briefing: when a new invite for today arrives, or a meeting moves into today, it gathers SharePoint, OneDrive, Outlook, Teams and the last recap and pins a brief straight away.",
+    tools: ["wait_for_event", "get_enrichments", "add_enrichment", "update_enrichment", "list_clashes"],
+    kinds: ["markdown", "log", "links"],
+    connectors: true,
+    prompt: `Using the Cadence tools and my Microsoft 365 connectors (SharePoint and OneDrive, Outlook, and Teams if you have them), brief me on new meetings as they turn up today.
+
+Repeat until I tell you to stop:
+1. Call wait_for_event with types ["invite.new", "meeting.changed"] and timeout_seconds 300. If nothing comes back, go round again.
+2. Each event's data has the meeting (its id, title, start time and attendees). Only carry on for meetings that start later today. For "meeting.changed", call get_enrichments first and skip the meeting if it already has an item with the id "m365-brief" (it's been briefed).
+3. Look for material, newest first, and keep track of where each fact came from:
+   - SharePoint and OneDrive: files linked in the invite, and files from the last 30 days about the meeting's topic shared or edited by an attendee.
+   - Previous meetings: the Teams recap (AI notes and follow-up tasks), meeting notes or Loop page from the last 3 times a meeting with this title happened.
+   - Outlook and Teams: email threads and chats from the last 14 days with the attendees about this topic, including anything addressed to me.
+4. Attach with add_enrichment (or update_enrichment if the id already exists):
+   - kind "markdown", id "m365-brief", title "Brief": the purpose in one line, what's changed since last time, 3 to 5 key points each with its source, and anything people are waiting on from me;
+   - kind "log", id "m365-actions", title "Open actions": follow-ups from earlier recaps that still look open, as type "action" with owner and due date;
+   - kind "links", id "m365-sources", title "Sources": every file, thread, chat and recap you used.
+5. Call list_clashes. Then tell me in two lines: what the meeting is and when, what you attached, and whether it clashes with anything.
+
+Rules: only use material I can already open, and summarise rather than copy whole documents. Respect sensitivity labels: if any attendees are outside my organisation, leave out anything labelled Confidential or above, and anything else meant for internal use only. Never reply to the invite, send email or chat messages, share files or change a document. If you find nothing useful, attach nothing and just say so.`,
+  },
+  {
     id: "whos-who",
     emoji: "🪪",
     title: "Who's who",
