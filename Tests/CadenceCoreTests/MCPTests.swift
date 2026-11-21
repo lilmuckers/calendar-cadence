@@ -249,7 +249,26 @@ struct MCPActivityTests {
         #expect(MCPClientNames.display("local-agent-mode-cadence") == "Claude (Code tab)")
         #expect(MCPClientNames.display("claude-code") == "Claude Code")
         #expect(MCPClientNames.display("cursor-vscode") == "Cursor")
+        #expect(MCPClientNames.display("gemini-cli-mcp-client") == "Gemini CLI")
+        #expect(MCPClientNames.display("antigravity-client") == "Antigravity")
         #expect(MCPClientNames.display("my-agent") == "my-agent")
+    }
+
+    @Test func antigravityConfigFollowsTheInstalledVersion() {
+        let current = ".gemini/config/mcp_config.json", legacy = ".gemini/antigravity/mcp_config.json"
+        #expect(MCPClientConfig.antigravityConfigPath { _ in false } == current)
+        #expect(MCPClientConfig.antigravityConfigPath { [current, legacy].contains($0) } == current)
+        #expect(MCPClientConfig.antigravityConfigPath { $0 == legacy } == legacy)
+        #expect(MCPClientConfig.antigravityConfigPath { $0 == ".gemini/antigravity" } == legacy)
+        #expect(MCPClientConfig.antigravityConfigPath { [".gemini/antigravity", ".gemini/config"].contains($0) } == current)
+    }
+
+    @Test func geminiSettingsKeepTheirOtherKeys() throws {
+        let settings = try MCPClientConfig.parse(Data(#"{"theme":"Dracula","mcpServers":{"other":{"command":"x"}}}"#.utf8))
+        let installed = MCPClientConfig.installing(into: settings, helperPath: "/A/cadence-mcp")
+        #expect(installed["theme"]?.stringValue == "Dracula")
+        #expect(installed["mcpServers"]?["other"]?["command"]?.stringValue == "x")
+        #expect(MCPClientConfig.status(installed, helperPath: "/A/cadence-mcp") == .current)
     }
 
     @Test func clientSummaryGroupsSessions() {

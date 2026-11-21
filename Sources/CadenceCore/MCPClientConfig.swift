@@ -45,6 +45,19 @@ public enum MCPClientConfig {
         return .object(root)
     }
 
+    /// Antigravity's global MCP config, relative to the home folder. Current versions (and the
+    /// Antigravity CLI) share `~/.gemini/config/mcp_config.json`; earlier ones read
+    /// `~/.gemini/antigravity/mcp_config.json`. Uses whichever file exists, else the one whose folder
+    /// does, preferring the current location.
+    public static func antigravityConfigPath(exists: (String) -> Bool) -> String {
+        let current = ".gemini/config/mcp_config.json"
+        let legacy = ".gemini/antigravity/mcp_config.json"
+        if exists(current) { return current }
+        if exists(legacy) { return legacy }
+        if exists(".gemini/antigravity") && !exists(".gemini/config") { return legacy }
+        return current
+    }
+
     public static func removing(from config: JSONValue) -> JSONValue {
         guard var root = config.objectValue, var servers = root["mcpServers"]?.objectValue else { return config }
         servers[serverName] = nil
@@ -62,6 +75,8 @@ public enum MCPClientNames {
         if n.hasPrefix("claude-code") || n == "claude code" { return "Claude Code" }
         if n.hasPrefix("cursor") { return "Cursor" }
         if n.hasPrefix("windsurf") { return "Windsurf" }
+        if n.contains("antigravity") { return "Antigravity" }
+        if n.hasPrefix("gemini-cli") || n == "gemini" { return "Gemini CLI" }
         return raw
     }
 
