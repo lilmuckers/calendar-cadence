@@ -9,3 +9,6 @@ MICROSOFT_CLIENT_ID = 00000000-0000-0000-0000-000000000000
 // SPOTIFY_CLIENT_ID = 0123456789abcdef0123456789abcdef
 // Free Personal Team (no paid developer account)? Uncomment:
 // CADENCE_ENTITLEMENTS = Config/Cadence-PersonalTeam.entitlements
+// Paid account and Apple granted "User-Assigned Device Name" for your App ID? Uncomment instead,
+// so the Macs show the phone's own name rather than "iPhone 15 Pro":
+// CADENCE_ENTITLEMENTS = Config/Cadence-DeviceName.entitlements
