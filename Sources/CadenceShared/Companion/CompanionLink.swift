@@ -44,6 +44,8 @@ final class CompanionChannel {
     var onReady: (() -> Void)?
     /// Called once, when the channel is gone for good.
     var onClose: ((Error?) -> Void)?
+    /// Every message each way, pings included, with its size on the wire: for `LinkTraffic`.
+    var onTraffic: ((CompanionMessage, LinkDirection, Int) -> Void)?
 
     private var decoder = CompanionFrameDecoder()
     /// When anything (pings included) last arrived.
@@ -104,6 +106,7 @@ final class CompanionChannel {
     func send(_ message: CompanionMessage) {
         guard !closed, let frame = try? CompanionFraming.encode(message) else { return }
         connection.send(content: frame, completion: .contentProcessed { _ in })
+        onTraffic?(message, .sent, frame.count)
     }
 
     private func receive() {
@@ -113,8 +116,9 @@ final class CompanionChannel {
                 if let data, !data.isEmpty {
                     self.lastHeard = Date()
                     do {
-                        for message in try self.decoder.append(data) where message != .ping {
-                            self.onMessage?(message)
+                        for (message, bytes) in try self.decoder.appendFrames(data) {
+                            self.onTraffic?(message, .received, bytes)
+                            if message != .ping { self.onMessage?(message) }
                         }
                     } catch {
                         self.close(error)

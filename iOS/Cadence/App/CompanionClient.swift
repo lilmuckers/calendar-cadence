@@ -63,6 +63,8 @@ final class CompanionClient {
 
     /// Every paired Mac's link, in the user's priority order.
     private(set) var links: [MacLink] = []
+    /// What's gone over the link with each Mac since the app opened (Settings → Mac → Advanced).
+    let traffic = LinkTrafficStore()
 
     /// Paired Macs, highest priority first.
     var macs: [PairedMac] { links.map(\.mac) }
@@ -138,6 +140,7 @@ final class CompanionClient {
 
     private func makeLink(_ mac: PairedMac) -> MacLink {
         let link = MacLink(mac: mac)
+        link.traffic = traffic
         link.hello = { [weak self] in self?.hello ?? CompanionHello(deviceID: "", deviceName: "", displaying: false) }
         link.displaying = displaying
         let id = mac.id
@@ -200,6 +203,7 @@ final class CompanionClient {
         link.stop()
         CompanionIdentity.store(key: nil, link.mac.keyAccount)
         links.removeAll { $0.mac.id == macID }
+        traffic.reset(macID)
         save()
         onLinksChanged?()
     }
@@ -298,6 +302,8 @@ final class MacLink: Identifiable {
     @ObservationIgnored var onMessage: ((CompanionMessage) -> Void)?
     @ObservationIgnored var onSaved: (() -> Void)?
     @ObservationIgnored var onConnectionChanged: ((Bool) -> Void)?
+    /// Where this link's analytics go (`CompanionClient.traffic`).
+    @ObservationIgnored weak var traffic: LinkTrafficStore?
 
     @ObservationIgnored private var browser: NWBrowser?
     @ObservationIgnored private var channel: CompanionChannel?
@@ -485,6 +491,10 @@ final class MacLink: Identifiable {
             self.sendHello(on: channel)
         }
         channel.onMessage = { [weak self] message in self?.handle(message) }
+        channel.onTraffic = { [weak self] message, direction, bytes in
+            guard let self else { return }
+            self.traffic?.record(kind: message.kind, direction, bytes: bytes, peer: self.macID)
+        }
         channel.onClose = { [weak self, weak channel] error in
             guard let self, self.channel === channel else { return }
             self.channel = nil

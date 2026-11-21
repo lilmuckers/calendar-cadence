@@ -9,11 +9,43 @@ struct PhoneTab: View {
     @State private var invite: PairingInvite?
     @State private var confirmForget = false
     @State private var forgetting: PairedPhone?
+    /// The paired phone whose details are open, in place of the list.
+    @State private var showing: String?
 
     var body: some View {
-        @Bindable var state = state
         let hub = state.companion
-        Form {
+        Group {
+            // Details open inside the tab rather than in a sheet, so Settings keeps its size and the page scrolls.
+            if let phone = hub.paired.first(where: { $0.id == showing }) {
+                PhoneDetail(phone: phone, back: { showing = nil }, forget: { forgetting = phone })
+            } else {
+                list(hub: hub)
+            }
+        }
+        // A code works once: close it when a phone pairs with it (or it expires).
+        .onChange(of: state.companion.pendingKeyID) { _, keyID in if keyID == nil { invite = nil } }
+        .confirmationDialog("Forget \(forgetting?.name ?? "this iPhone")?",
+                            isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } }),
+                            presenting: forgetting) { phone in
+            Button("Forget", role: .destructive) { state.companion.forget(phone.id) }
+        } message: { phone in
+            Text(phone.keyID == nil
+                 ? "It disconnects now and needs a new code to pair again. It still uses the key every iPhone shared before this version, so any other iPhone that hasn't connected since the update needs a new code too."
+                 : "It disconnects now and needs a new code to pair again. Other iPhones stay paired.")
+        }
+        .confirmationDialog("Forget every paired iPhone?", isPresented: $confirmForget) {
+            Button("Forget All", role: .destructive) {
+                invite = nil
+                state.companion.forgetAllPhones()
+            }
+        } message: {
+            Text("They disconnect now and need to scan a new code to pair again.")
+        }
+    }
+
+    private func list(hub: CompanionHub) -> some View {
+        @Bindable var state = state
+        return Form {
             Section {
                 Toggle(isOn: $state.prefs.companionEnabled) {
                     Text("Use Cadence on iPhone as a desk display")
@@ -54,17 +86,21 @@ struct PhoneTab: View {
                     }
                     if !hub.paired.isEmpty {
                         ForEach(hub.paired) { phone in
-                            LabeledContent {
-                                HStack(spacing: 10) {
-                                    Text(hub.phones.contains { $0.id == phone.id }
-                                         ? "Connected"
-                                         : "Last seen \(phone.lastSeen.formatted(.relative(presentation: .named)))")
-                                        .foregroundStyle(.secondary)
-                                    Button("Forget…") { forgetting = phone }
-                                        .controlSize(.small)
+                            HStack(spacing: 10) {
+                                // Click the phone for its details and the Advanced link analytics.
+                                Button { showing = phone.id } label: {
+                                    HStack {
+                                        Label(phone.name, systemImage: "iphone")
+                                        Spacer()
+                                        Text(PhoneDetail.status(of: phone, hub: hub)).foregroundStyle(.secondary)
+                                        Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                                    }
+                                    .contentShape(Rectangle())
                                 }
-                            } label: {
-                                Label(phone.name, systemImage: "iphone")
+                                .buttonStyle(.plain)
+                                .help("Details for \(phone.name)")
+                                Button("Forget…") { forgetting = phone }
+                                    .controlSize(.small)
                             }
                         }
                         Button("Forget All iPhones…", role: .destructive) { confirmForget = true }
@@ -78,25 +114,62 @@ struct PhoneTab: View {
             }
         }
         .formStyle(.grouped)
-        // A code works once: close it when a phone pairs with it (or it expires).
-        .onChange(of: state.companion.pendingKeyID) { _, keyID in if keyID == nil { invite = nil } }
-        .confirmationDialog("Forget \(forgetting?.name ?? "this iPhone")?",
-                            isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } }),
-                            presenting: forgetting) { phone in
-            Button("Forget", role: .destructive) { state.companion.forget(phone.id) }
-        } message: { phone in
-            Text(phone.keyID == nil
-                 ? "It disconnects now and needs a new code to pair again. It still uses the key every iPhone shared before this version, so any other iPhone that hasn't connected since the update needs a new code too."
-                 : "It disconnects now and needs a new code to pair again. Other iPhones stay paired.")
-        }
-        .confirmationDialog("Forget every paired iPhone?", isPresented: $confirmForget) {
-            Button("Forget All", role: .destructive) {
-                invite = nil
-                state.companion.forgetAllPhones()
+    }
+}
+
+/// One paired phone, shown inside the iPhone tab: whether it's connected, and behind Advanced,
+/// what's gone over the link with it.
+private struct PhoneDetail: View {
+    @Environment(AppState.self) private var state
+    let phone: PairedPhone
+    let back: () -> Void
+    let forget: () -> Void
+    @AppStorage("Cadence.companion.showLinkTraffic") private var advanced = false
+
+    var body: some View {
+        let hub = state.companion
+        Form {
+            Section {
+                LabeledContent("Status", value: Self.status(of: phone, hub: hub))
+                if let connected = hub.phones.first(where: { $0.id == phone.id }) {
+                    LabeledContent("On display", value: connected.displaying ? "Yes, the Mac is quiet" : "No")
+                }
+                LabeledContent("Key", value: phone.keyID == nil ? "Shared (older pairing)" : "Its own")
+                LabeledContent("Unpair") {
+                    Button("Forget…", role: .destructive, action: forget)
+                }
+            } header: {
+                HStack {
+                    Button(action: back) {
+                        Label("iPhone", systemImage: "chevron.left")
+                    }
+                    .buttonStyle(.borderless)
+                    .keyboardShortcut(.cancelAction)
+                    .help("Back to all iPhones")
+                    Spacer()
+                    Label(phone.name, systemImage: "iphone").font(.headline)
+                    Spacer()
+                    // Balances the back button so the name sits in the middle.
+                    Label("iPhone", systemImage: "chevron.left").hidden()
+                }
             }
-        } message: {
-            Text("They disconnect now and need to scan a new code to pair again.")
+            Section {
+                Toggle(isOn: $advanced.animation()) {
+                    Text("Advanced")
+                    Text("What goes over the link with this iPhone: data used and each type of message over time.")
+                }
+            }
+            if advanced {
+                LinkTrafficSections(traffic: hub.traffic.traffic(for: phone.id), peer: phone.name)
+            }
         }
+        .formStyle(.grouped)
+    }
+
+    static func status(of phone: PairedPhone, hub: CompanionHub) -> String {
+        hub.phones.contains { $0.id == phone.id }
+            ? "Connected"
+            : "Last seen \(phone.lastSeen.formatted(.relative(presentation: .named)))"
     }
 }
 

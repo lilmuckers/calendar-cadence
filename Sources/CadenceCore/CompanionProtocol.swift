@@ -329,8 +329,13 @@ public struct CompanionFrameDecoder: Sendable {
 
     /// Appends `data` and returns every complete message now available. Undecodable frames are skipped.
     public mutating func append(_ data: Data) throws -> [CompanionMessage] {
+        try appendFrames(data).map(\.message)
+    }
+
+    /// Like `append`, with each message's size on the wire (length prefix included), for `LinkTraffic`.
+    public mutating func appendFrames(_ data: Data) throws -> [(message: CompanionMessage, bytes: Int)] {
         buffer.append(data)
-        var out: [CompanionMessage] = []
+        var out: [(message: CompanionMessage, bytes: Int)] = []
         while buffer.count >= 4 {
             let start = buffer.startIndex
             let length = buffer[start..<start + 4].reduce(0) { ($0 << 8) | Int($1) }
@@ -338,7 +343,7 @@ public struct CompanionFrameDecoder: Sendable {
             guard buffer.count >= 4 + length else { break }
             let body = buffer[(start + 4)..<(start + 4 + length)]
             buffer = Data(buffer[(start + 4 + length)...])
-            if let message = try? CompanionFraming.decodeBody(Data(body)) { out.append(message) }
+            if let message = try? CompanionFraming.decodeBody(Data(body)) { out.append((message, 4 + length)) }
         }
         return out
     }
