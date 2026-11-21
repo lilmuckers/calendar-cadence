@@ -106,3 +106,20 @@ struct LocationClassifierTests {
     @Test(arguments: ["Microsoft Teams Meeting", "https://zoom.us/j/1", "Zoom", "Google Meet", "", "Remote", "+1 555 123 4567"])
     func virtual(_ s: String) { #expect(!LocationClassifier.isPhysical(s)) }
 }
+
+@Test func trustedKeepsMeetingAndWebLinksOnly() {
+    func check(_ s: String, _ service: MeetingService? = nil, claimed: MeetingService = .zoom) -> MeetingLink? {
+        MeetingLinkDetector.trusted(MeetingLink(service: claimed, url: URL(string: s)!))
+    }
+    #expect(check("https://acme.zoom.us/j/123")?.service == .zoom)
+    #expect(check("https://meet.google.com/abc-defg-hij")?.service == .googleMeet)
+    #expect(check("zoommtg://zoom.us/join?confno=1")?.service == .zoom)
+    #expect(check("msteams:/l/meetup-join/x")?.service == .teams)
+    // The claimed service doesn't stick: it's worked out from the link.
+    #expect(check("https://example.com/room", claimed: .zoom)?.service == .other)
+    #expect(check("file:///Applications/Calculator.app") == nil)
+    #expect(check("file:///Users/me/Downloads/run.command") == nil)
+    #expect(check("x-apple.systempreferences:com.apple.preference.security") == nil)
+    #expect(check("ssh://host") == nil)
+    #expect(check("https:///nohost") == nil)
+}

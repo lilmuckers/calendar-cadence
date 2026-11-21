@@ -280,6 +280,7 @@ final class PhoneState {
             return self.isActive
         }
         notifier.setUp()
+        Keychain.keepOnThisDevice()
         syncGoogle(fetch: false)
         syncMicrosoft(fetch: false)
         syncFeeds(fetch: false)
@@ -705,7 +706,7 @@ final class PhoneState {
             }
             for copy in copies where copy.macID != targetID { link.send(.dismiss(meetingID: copy.meeting.id), to: copy.macID) }
         } else {
-            if let url = meeting.joinLink?.url { UIApplication.shared.open(url) }
+            if let url = meeting.joinLink.flatMap(MeetingLinkDetector.trusted)?.url { UIApplication.shared.open(url) }
             for copy in copies { link.send(.dismiss(meetingID: copy.meeting.id), to: copy.macID) }
         }
         if alerting?.id == meeting.id { alerting = nil }
@@ -1034,6 +1035,15 @@ final class PhoneState {
     /// Pair a Mac (added to the end of the list), or refresh one already paired.
     func pair(_ invite: PairingInvite) { link.pair(invite) }
 
+    /// A pairing link opened from outside the app, waiting for the user to confirm it.
+    var pendingInvite: PairingInvite?
+
+    func confirmPendingPairing() {
+        guard let invite = pendingInvite else { return }
+        pendingInvite = nil
+        pair(invite)
+    }
+
     /// Unpair one Mac: its saved agenda goes with it.
     func unpair(_ macID: String) { link.unpair(macID) }
 
@@ -1044,7 +1054,9 @@ final class PhoneState {
     func open(_ url: URL) -> Bool {
         if spotify.handle(url) { return true }
         if let invite = PairingInvite(url: url) {
-            pair(invite)
+            // Any web page, message or app can open a cadence-pair:// link, so one from outside the
+            // app's own scanner waits for the user to say yes (see RootView).
+            pendingInvite = invite
             return true
         }
         if url.scheme == "cadence-companion", url.host == "join",
