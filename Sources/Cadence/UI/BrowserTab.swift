@@ -9,7 +9,8 @@ struct BrowserTab: View {
     @State private var newContainer = ""
     @State private var newContainerProfile = ""
 
-    private static let nativeServices: [MeetingService] = [.zoom, .teams, .webex, .slack]
+    /// Services Cadence can open in their own app (see `MeetingLink.nativeURL`).
+    private static let nativeServices: [MeetingService] = [.zoom, .teams]
 
     var body: some View {
         @Bindable var state = state
@@ -30,15 +31,17 @@ struct BrowserTab: View {
             }
 
             if store.supportsProfiles {
-                Section("Profiles") {
+                Section {
                     ForEach(store.profiles) { p in
                         LabeledContent(p.title) {
                             Text(p.email ?? (p.container != nil ? "Container" : "Not signed in"))
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    Text("Pick a profile per account or calendar in the Calendars tab, add organizer rules below, or right-click Join → Join in.")
-                        .font(.callout)
+                } header: {
+                    Text("Profiles")
+                } footer: {
+                    Text("Pick a profile per account or calendar in the Calendars tab, add organiser rules below, or right-click Join → Join in.")
                         .foregroundStyle(.secondary)
                 }
 
@@ -59,7 +62,6 @@ struct BrowserTab: View {
                     Text("Native apps")
                 } footer: {
                     Text("When a meeting has a profile assigned, these services open in that profile even though their app is installed. Useful for Teams, whose app can't switch tenant per link.")
-                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -81,8 +83,11 @@ struct BrowserTab: View {
                             .frame(width: 200)
                             Button {
                                 state.prefs.profileRules.domains.removeAll { $0.id == rule.id }
-                            } label: { Image(systemName: "minus.circle") }
-                            .buttonStyle(.borderless)
+                            } label: {
+                                Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Remove rule")
                         }
                     }
                     .onMove { state.prefs.profileRules.domains.move(fromOffsets: $0, toOffset: $1) }
@@ -104,10 +109,9 @@ struct BrowserTab: View {
                         .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty || newDomainProfile.isEmpty)
                     }
                 } header: {
-                    Text("Organizer rules")
+                    Text("Organiser rules")
                 } footer: {
                     Text("Meetings organised by someone at this domain (or a subdomain) open in the chosen profile — handy when client invites land in your main calendar. These beat calendar and account choices; the first matching rule wins.")
-                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -145,8 +149,11 @@ struct BrowserTab: View {
                         .foregroundStyle(.secondary)
                     Button {
                         state.prefs.profileRules.firefoxContainers.removeAll { $0.id == c.id }
-                    } label: { Image(systemName: "minus.circle") }
-                    .buttonStyle(.borderless)
+                    } label: {
+                        Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Remove container")
                 }
             }
             HStack {
@@ -169,7 +176,6 @@ struct BrowserTab: View {
             Text("Firefox containers")
         } footer: {
             Text("Needs the “Open external links in a container” add-on. Each container you add here can be picked like a profile.")
-                .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }

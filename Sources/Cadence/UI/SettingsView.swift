@@ -4,17 +4,19 @@ import SwiftUI
 
 struct SettingsView: View {
     var body: some View {
+        // General first (macOS convention), then where events come from, what happens before
+        // meetings, and the integrations.
         TabView {
+            GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
             AccountsTab().tabItem { Label("Accounts", systemImage: "person.crop.circle") }
             CalendarsTab().tabItem { Label("Calendars", systemImage: "calendar") }
             FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }
             AlertsTab().tabItem { Label("Alerts", systemImage: "bell.badge") }
+            MessagesTab().tabItem { Label("Messages", systemImage: "paperplane") }
             WorkTab().tabItem { Label("Work", systemImage: "briefcase") }
             PhoneTab().tabItem { Label("iPhone", systemImage: "iphone") }
-            MessagesTab().tabItem { Label("Messages", systemImage: "paperplane") }
             BrowserTab().tabItem { Label("Browser", systemImage: "globe") }
             AssistantsTab().tabItem { Label("Assistants", systemImage: "sparkles") }
-            GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
         }
         .frame(width: 680, height: 560)
     }
@@ -43,25 +45,38 @@ private struct CalendarsTab: View {
     }
 
     var body: some View {
+        @Bindable var state = state
         Form {
             if state.access != .granted {
                 Section {
-                    Text("Cadence needs calendar access to read your events.")
-                    Button("Open Privacy Settings", action: state.openPrivacySettings)
+                    LabeledContent("Cadence needs calendar access to read your events.") {
+                        Button("Open Privacy Settings", action: state.openPrivacySettings)
+                    }
                 }
             }
             Section {
-                Text("Switch individual calendars on or off. The bell makes a calendar agenda only: its events still show, but never alert, remind, clash or count as your current or next meeting. Add sources in the Accounts tab.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                Toggle(isOn: Binding(get: { state.prefs.useEventColors }, set: { state.prefs.useEventColors = $0 })) {
+                Toggle(isOn: $state.prefs.useEventColors) {
                     Text("Use event colours")
                     Text("Events coloured individually in Google Calendar (or with a colour in an ICS feed) use that colour instead of their calendar's. Google event colours need the direct Google sign-in; macOS Calendar doesn't pass them on.")
                 }
-                Toggle(isOn: Binding(get: { state.prefs.namedColorsOnly }, set: { state.prefs.namedColorsOnly = $0 })) {
+                Toggle(isOn: $state.prefs.namedColorsOnly) {
                     Text("Only offer named colours")
                     Text("When picking a colour for a Google event, show just the colours you've named in Google Calendar, hiding the stock and unnamed custom ones. Calendars with no named colours still show them all.")
                 }
+            } header: {
+                Text("Colours")
+            }
+            Section {
+                legendRow("paintpalette", "Ask for a colour when you reply to an invite on this calendar")
+                legendRow("bell.slash", "Agenda only: events still show, but never alert, remind, clash or count as your current or next meeting")
+                if state.browsers.supportsProfiles {
+                    legendRow("globe", "Open this calendar's meeting links in a different \(state.browsers.defaultBrowserName) profile")
+                }
+            } header: {
+                Text("Your calendars")
+            } footer: {
+                Text("Switch calendars on or off below; the icons on each row do the rest. Add sources in the Accounts tab.")
+                    .foregroundStyle(.secondary)
             }
             ForEach(grouped, id: \.0) { source, calendars in
                 Section {
@@ -107,6 +122,15 @@ private struct CalendarsTab: View {
         }
         .formStyle(.grouped)
         .onAppear { state.browsers.refresh() }
+    }
+
+    /// What one of the per-calendar row icons does.
+    private func legendRow(_ symbol: String, _ text: String) -> some View {
+        Label {
+            Text(text).font(.callout).foregroundStyle(.secondary)
+        } icon: {
+            Image(systemName: symbol).foregroundStyle(.secondary).frame(width: 18)
+        }
     }
 
     /// A small globe menu per calendar: filled and tinted when the calendar has its own profile.
@@ -173,9 +197,10 @@ private struct FiltersTab: View {
                 Toggle("Events marked as free", isOn: $state.prefs.filters.hideFree)
                 Toggle("Events without a meeting link", isOn: $state.prefs.filters.onlyWithJoinLink)
                 Stepper(value: $state.prefs.filters.minimumDurationMinutes, in: 0...240, step: 5) {
+                    // Reads as "Hide: events shorter than…", like the toggles above.
                     Text(state.prefs.filters.minimumDurationMinutes == 0
-                         ? "Any duration"
-                         : "Shorter than \(state.prefs.filters.minimumDurationMinutes) min")
+                         ? "Short events: off"
+                         : "Events shorter than \(state.prefs.filters.minimumDurationMinutes) min")
                 }
             }
             Section {
@@ -225,41 +250,37 @@ private struct AlertsTab: View {
     var body: some View {
         @Bindable var state = state
         Form {
-            Section("Full-screen alert") {
-                Toggle("Take over the screen before meetings", isOn: $state.prefs.takeoverEnabled)
-                Picker("Show", selection: $state.prefs.takeoverLeadSeconds) {
-                    Text("10 seconds before").tag(10.0)
-                    Text("30 seconds before").tag(30.0)
-                    Text("1 minute before").tag(60.0)
-                    Text("2 minutes before").tag(120.0)
-                    Text("5 minutes before").tag(300.0)
-                }
-                .disabled(!state.prefs.takeoverEnabled)
-                Toggle("Cover all displays", isOn: $state.prefs.takeoverAllScreens)
-                Toggle("Only for meetings with a join link", isOn: $state.prefs.takeoverOnlyWithLink)
-                Toggle("Play sound", isOn: $state.prefs.takeoverSound)
-                Picker(selection: $state.prefs.takeoverAutoDismissMinutes) {
-                    Text("1 minute").tag(1)
-                    Text("2 minutes").tag(2)
-                    Text("5 minutes").tag(5)
-                    Text("10 minutes").tag(10)
-                    Text("Never — stay until I act").tag(0)
-                } label: {
-                    Text("If ignored, close after the start by")
-                    Text("It gets redder and more frantic for the first 3 minutes you're late.")
-                }
-                .disabled(!state.prefs.takeoverEnabled)
-            }
             Section {
-                Toggle("Fade out music for meetings", isOn: $state.prefs.fadeMediaForAlerts)
-                Toggle("Say which meeting it is", isOn: $state.prefs.announceAlerts)
-                    .disabled(!state.prefs.fadeMediaForAlerts)
-                Toggle("Share music with your iPhone", isOn: $state.prefs.shareMediaWithPhone)
-                Button("Test") { state.onTestMediaFade?() }
-            } header: { Text("Music") } footer: {
-                Text("Works with Music and Spotify (macOS asks once to let Cadence control them). The voice is your Spoken Content system voice. Sharing shows this Mac's music on the iPhone's desk display with play, pause and skip.")
+                Toggle("Take over the screen before meetings", isOn: $state.prefs.takeoverEnabled)
+                Group {
+                    Picker("Show", selection: $state.prefs.takeoverLeadSeconds) {
+                        Text("10 seconds before").tag(10.0)
+                        Text("30 seconds before").tag(30.0)
+                        Text("1 minute before").tag(60.0)
+                        Text("2 minutes before").tag(120.0)
+                        Text("5 minutes before").tag(300.0)
+                    }
+                    Toggle("Cover all displays", isOn: $state.prefs.takeoverAllScreens)
+                    Toggle("Only for meetings with a join link", isOn: $state.prefs.takeoverOnlyWithLink)
+                    Toggle("Play sound", isOn: $state.prefs.takeoverSound)
+                    Picker(selection: $state.prefs.takeoverAutoDismissMinutes) {
+                        Text("1 minute after the start").tag(1)
+                        Text("2 minutes after the start").tag(2)
+                        Text("5 minutes after the start").tag(5)
+                        Text("10 minutes after the start").tag(10)
+                        Text("Never — stay until I act").tag(0)
+                    } label: {
+                        Text("If ignored, close")
+                        Text("It gets redder and more frantic for the first 3 minutes you're late.")
+                    }
+                }
+                .disabled(!state.prefs.takeoverEnabled)
+            } header: {
+                Text("Full-screen alert")
+            } footer: {
+                Text("Esc dismisses · Return joins · Snooze re-alerts after a minute.")
+                    .foregroundStyle(.secondary)
             }
-            MediaRemoteSection()
             Section {
                 Picker("While presenting or sharing", selection: $state.prefs.whilePresenting) {
                     ForEach(BusyAlertStyle.allCases, id: \.self) { Text($0.label).tag($0) }
@@ -277,18 +298,79 @@ private struct AlertsTab: View {
                     .foregroundStyle(.secondary)
             }
             Section {
+                Toggle("Fade out music for meetings", isOn: $state.prefs.fadeMediaForAlerts)
+                Toggle("Say which meeting it is", isOn: $state.prefs.announceAlerts)
+                    .disabled(!state.prefs.fadeMediaForAlerts)
+                LabeledContent("Try it") {
+                    Button("Test Fade") { state.onTestMediaFade?() }
+                }
+            } header: { Text("Music") } footer: {
+                Text("Works with Music and Spotify (macOS asks once to let Cadence control them). The voice is your Spoken Content system voice.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                HStack {
+                    Text("Full screen")
+                    Spacer()
+                    Button("Alert") { state.previewAlert() }
+                        .help("Behaves exactly as a real alert would right now")
+                    Button("Late") { state.previewLateAlert() }
+                        .help("A demo meeting that started a minute ago: watch it get redder, faster and angrier")
+                    Button("Meltdown") { state.previewLateAlert(lateBy: 172) }
+                        .help("A demo meeting that's nearly three minutes late: watch it start falling apart")
+                }
+                HStack {
+                    Text("Quieter styles")
+                    Spacer()
+                    Button("Banner") { state.previewAlert(style: .banner) }
+                    Button("Notification") { state.previewAlert(style: .notification) }
+                }
+            } header: {
+                Text("Preview")
+            } footer: {
+                Text("The full-screen preview behaves exactly as a real alert would right now, presenting and call rules included.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
                 Toggle("Heads-up notification", isOn: $state.prefs.headsUpEnabled)
                 Stepper(value: $state.prefs.headsUpMinutes, in: 1...60) {
                     Text("\(state.prefs.headsUpMinutes) min before")
                 }
                 .disabled(!state.prefs.headsUpEnabled)
-                Toggle("\"Leave now\" for in-person meetings", isOn: $state.prefs.leaveEnabled)
-                OffsetsField(offsets: $state.prefs.leaveOffsets)
-                    .disabled(!state.prefs.leaveEnabled)
+                Toggle(isOn: $state.prefs.wrapUpEnabled) {
+                    Text("Wrap-up nudge before meetings end")
+                    Text("Names the next meeting when one starts straight after. For online meetings, only while your mic is still in use.")
+                }
+                Group {
+                    Stepper(value: $state.prefs.wrapUpMinutes, in: 1...30) {
+                        Text("\(state.prefs.wrapUpMinutes) min before the end")
+                    }
+                    Toggle("Only when another meeting follows", isOn: $state.prefs.wrapUpOnlyBackToBack)
+                }
+                .disabled(!state.prefs.wrapUpEnabled)
+            } header: {
+                Text("Reminders")
+            }
+            Section {
+                Toggle("\"Leave now\" reminders", isOn: $state.prefs.leaveEnabled)
+                Group {
+                    OffsetsField(offsets: $state.prefs.leaveOffsets)
+                    Picker("Travel time by", selection: $state.prefs.travelMode) {
+                        ForEach(TravelMode.allCases) { Label($0.label, systemImage: $0.symbol).tag($0) }
+                    }
+                }
+                .disabled(!state.prefs.leaveEnabled)
+            } header: {
+                Text("In-person meetings")
+            } footer: {
+                Text("Uses live travel time and re-checks traffic every 15 minutes. Offsets are minutes before you need to leave; 0 means \"time to leave\". Travel time is also what the agenda's \"leave in…\" hint uses.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
                 Toggle("Ask which meeting to alert for when two clash", isOn: $state.prefs.clashPromptEnabled)
-                LabeledContent("Clash choices") {
+                LabeledContent("Saved choices") {
                     HStack {
-                        Text(state.clashChoices.isEmpty ? "None — right-click a clashing event to choose" : "\(state.clashChoices.count) saved")
+                        Text(state.clashChoices.isEmpty ? "None — right-click a clashing event to choose" : "\(state.clashChoices.count)")
                             .foregroundStyle(.secondary)
                         if !state.clashChoices.isEmpty {
                             Button("Reset") { state.resetClashChoices() }
@@ -296,32 +378,23 @@ private struct AlertsTab: View {
                         }
                     }
                 }
-                Toggle(isOn: $state.prefs.wrapUpEnabled) {
-                    Text("Wrap-up nudge before meetings end")
-                    Text("Names the next meeting when one starts straight after. For online meetings, only while your mic is still in use.")
-                }
-                Stepper(value: $state.prefs.wrapUpMinutes, in: 1...30) {
-                    Text("\(state.prefs.wrapUpMinutes) min before the end")
-                }
-                .disabled(!state.prefs.wrapUpEnabled)
-                Toggle("Only when another meeting follows", isOn: $state.prefs.wrapUpOnlyBackToBack)
-                    .disabled(!state.prefs.wrapUpEnabled)
+            } header: {
+                Text("Clashes")
+            }
+            Section {
                 Toggle("Morning summary", isOn: $state.prefs.summaryEnabled)
                 DatePicker("Send at", selection: summaryTime, displayedComponents: .hourAndMinute)
-                    .disabled(!state.prefs.summaryEnabled)
+                    .disabled(!state.prefs.summaryEnabled && !state.prefs.inviteReviewDaily)
+                Toggle(isOn: $state.prefs.inviteReviewDaily) {
+                    Text("Ask me to RSVP each morning")
+                    Text("At the same time, if anything is waiting for a reply.")
+                }
             } header: {
-                Text("Reminders")
-            } footer: {
-                Text("Leave reminders use live travel time (Settings → General → Travel time by) and re-check traffic every 15 minutes. Offsets are minutes before you need to leave; 0 means \"time to leave\".")
-                    .foregroundStyle(.secondary)
+                Text("Each morning")
             }
             Section {
                 Picker("Look for invites", selection: $state.prefs.inviteHorizon) {
                     ForEach(InviteHorizon.allCases, id: \.self) { Text($0.label).tag($0) }
-                }
-                Toggle(isOn: $state.prefs.inviteReviewDaily) {
-                    Text("Ask me to RSVP each morning")
-                    Text("At the morning summary time, if anything is waiting for a reply.")
                 }
                 Picker("When a new invite arrives", selection: $state.prefs.newInviteAlert) {
                     ForEach(InviteAlertStyle.allCases) { Text($0.label).tag($0) }
@@ -336,20 +409,6 @@ private struct AlertsTab: View {
                 Text("Invitations")
             } footer: {
                 Text("Replies go straight to Google or Microsoft 365 for accounts signed in under Accounts; macOS Calendar invites open in Calendar to reply. Turn on the palette next to a calendar (Calendars tab) to pick a colour while you reply.")
-                    .foregroundStyle(.secondary)
-            }
-            Section {
-                HStack {
-                    Button("Preview Alert") { state.previewAlert() }
-                    Button("Preview Late Alert") { state.previewLateAlert() }
-                        .help("A demo meeting that started a minute ago: watch it get redder, faster and angrier")
-                    Button("Preview Meltdown") { state.previewLateAlert(lateBy: 172) }
-                        .help("A demo meeting that's nearly three minutes late: watch it start falling apart")
-                    Button("Preview Banner") { state.previewAlert(style: .banner) }
-                    Button("Preview Notification") { state.previewAlert(style: .notification) }
-                }
-            } footer: {
-                Text("Preview Alert behaves exactly as a real alert would right now. Esc dismisses · Return joins · Snooze re-alerts after a minute.")
                     .foregroundStyle(.secondary)
             }
         }
@@ -386,23 +445,26 @@ private struct GeneralTab: View {
         Form {
             Section("Countdown panel") {
                 Toggle("Show floating countdown", isOn: $state.prefs.showPanel)
-                Picker("Style", selection: $state.prefs.panelStyle) {
-                    Text("Standard").tag(PanelStyle.standard)
-                    Text("Compact").tag(PanelStyle.compact)
-                    Text("Mini").tag(PanelStyle.mini)
+                Group {
+                    Picker("Style", selection: $state.prefs.panelStyle) {
+                        Text("Standard").tag(PanelStyle.standard)
+                        Text("Compact").tag(PanelStyle.compact)
+                        Text("Mini").tag(PanelStyle.mini)
+                    }
+                    Toggle(isOn: $state.prefs.panelGrow) {
+                        Text("Grow as meetings approach")
+                        Text("One size up 15 minutes before, full size at 5 minutes.")
+                    }
+                    .disabled(state.prefs.panelStyle == .standard)
+                    Picker("Only show when a meeting starts within", selection: $state.prefs.panelWithinMinutes) {
+                        Text("Always show").tag(0)
+                        ForEach([5, 10, 15, 30, 60], id: \.self) { Text($0 == 60 ? "1 hour" : "\($0) minutes").tag($0) }
+                    }
+                    Toggle("Also show during meetings", isOn: $state.prefs.panelShowDuringMeetings)
+                    Toggle("Hide when nothing else is on today", isOn: $state.prefs.panelHidesWhenIdle)
+                        .disabled(state.prefs.panelWithinMinutes > 0)
                 }
-                Toggle(isOn: $state.prefs.panelGrow) {
-                    Text("Grow as meetings approach")
-                    Text("One size up 15 minutes before, full size at 5 minutes.")
-                }
-                .disabled(state.prefs.panelStyle == .standard)
-                Picker("Only show when a meeting starts within", selection: $state.prefs.panelWithinMinutes) {
-                    Text("Always show").tag(0)
-                    ForEach([5, 10, 15, 30, 60], id: \.self) { Text($0 == 60 ? "1 hour" : "\($0) minutes").tag($0) }
-                }
-                Toggle("Also show during meetings", isOn: $state.prefs.panelShowDuringMeetings)
-                Toggle("Hide when nothing else is on today", isOn: $state.prefs.panelHidesWhenIdle)
-                    .disabled(state.prefs.panelWithinMinutes > 0)
+                .disabled(!state.prefs.showPanel)
                 let hidden = state.prefs.panelHiddenMeetings.count + state.prefs.panelHiddenSeries.count
                 LabeledContent("Hidden events") {
                     HStack {
@@ -425,7 +487,7 @@ private struct GeneralTab: View {
                 Toggle("Open it when the meeting starts", isOn: $state.prefs.enrichmentDrawerAutoOpen)
                     .disabled(!state.prefs.showEnrichmentDrawer)
             }
-            Section("Menu bar") {
+            Section {
                 Picker("Show", selection: $state.prefs.menuBarStyle) {
                     ForEach(MenuBarStyle.allCases) { Text($0.label).tag($0) }
                 }
@@ -433,8 +495,6 @@ private struct GeneralTab: View {
                     ForEach([12, 16, 22, 30, 40], id: \.self) { Text("\($0) characters").tag($0) }
                 }
                 .disabled(state.prefs.menuBarStyle != .full)
-                Text("macOS hides menu bar items that don't fit, starting with the leftmost, and apps can't ask to be kept. A narrower style helps; so does ⌘-dragging the Cadence icon to the right, nearer the clock — macOS remembers where you put it.")
-                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Show tomorrow's meetings in the evening", isOn: $state.prefs.tomorrowPreview)
                 Picker("From", selection: $state.prefs.tomorrowFromHour) {
                     ForEach([12, 15, 16, 17, 18, 19, 20, 21], id: \.self) { h in
@@ -442,15 +502,17 @@ private struct GeneralTab: View {
                     }
                 }
                 .disabled(!state.prefs.tomorrowPreview)
+            } header: {
+                Text("Menu bar")
+            } footer: {
+                Text("macOS hides menu bar items that don't fit, starting with the leftmost, and apps can't ask to be kept. A narrower style helps; so does ⌘-dragging the Cadence icon to the right, nearer the clock — macOS remembers where you put it.")
+                    .foregroundStyle(.secondary)
             }
-            Section("Meetings") {
+            Section("Joining meetings") {
                 LabeledContent("Join next meeting") {
                     ShortcutRecorder(spec: $state.prefs.joinHotKey)
                 }
                 Toggle("Open Zoom and Teams in their apps when installed", isOn: $state.prefs.preferNativeApps)
-                Picker("Travel time by", selection: $state.prefs.travelMode) {
-                    ForEach(TravelMode.allCases) { Label($0.label, systemImage: $0.symbol).tag($0) }
-                }
             }
             Section("Startup") {
                 Toggle("Launch at login", isOn: $launchAtLogin)
@@ -490,8 +552,9 @@ private struct OffsetsField: View {
     }
 }
 
-/// Settings → Alerts → Media remote control: the Mac's media keys drive the phone in desk mode.
-private struct MediaRemoteSection: View {
+/// Settings → iPhone → Music: share this Mac's music with the phone, and let the Mac's media keys
+/// drive the phone in desk mode.
+struct PhoneMediaSection: View {
     @Environment(AppState.self) private var state
     @State private var trusted = MediaKeyTap.isTrusted
     @State private var conflicts: [String] = []
@@ -500,6 +563,10 @@ private struct MediaRemoteSection: View {
         @Bindable var state = state
         let on = state.prefs.mediaRemoteControl
         Section {
+            Toggle(isOn: $state.prefs.shareMediaWithPhone) {
+                Text("Share music with your iPhone")
+                Text("Shows this Mac's Music or Spotify on the iPhone's desk display, with play, pause and skip.")
+            }
             Toggle(isOn: Binding(get: { on }, set: { new in
                 state.prefs.mediaRemoteControl = new
                 if new && !MediaKeyTap.isTrusted { MediaKeyTap.requestAccess() }
@@ -540,7 +607,7 @@ private struct MediaRemoteSection: View {
                     .foregroundStyle(.orange)
                     .font(.callout)
             }
-        } header: { Text("Media remote control") } footer: {
+        } header: { Text("Music") } footer: {
             Text("Track, artwork and skip work with Spotify and Apple Music on the iPhone; other apps get play/pause and volume. The mini-player hides while you present, share your screen or are on a call.")
         }
         .task(id: on) {
