@@ -146,7 +146,8 @@ private struct AssistantSetupView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { clients.refresh() }
+        .onAppear { clients.startWatching() }
+        .onDisappear { clients.stopWatching() }
         .alert("Restart \(restartPrompt?.name ?? "")?", isPresented: Binding(get: { restartPrompt != nil }, set: { if !$0 { restartPrompt = nil } }),
                presenting: restartPrompt) { c in
             Button("Restart") { Task { await clients.restart(c) } }
