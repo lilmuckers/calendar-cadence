@@ -93,8 +93,11 @@ struct ConnectionPill: View {
 
     private var text: String {
         let mac = state.link.mac?.displayName ?? "Mac"
+        let others = state.link.connected.count - 1
         switch state.link.status {
-        case .connected: return state.displaying ? "\(mac) · quiet" : mac
+        case .connected:
+            let macs = others > 0 ? "\(mac) +\(others)" : mac
+            return state.displaying ? "\(macs) · quiet" : macs
         case .connecting: return "Connecting to \(mac)…"
         case .searching: return "Looking for \(mac)…"
         case .failed: return "\(mac) unavailable"

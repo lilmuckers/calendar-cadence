@@ -33,7 +33,7 @@ struct PhoneTab: View {
                     }
                     Text("Brings the alert up on this Mac too once the meeting has started and you haven't joined, snoozed or dismissed it on the phone.")
                         .font(.caption).foregroundStyle(.secondary)
-                    Text("Join on the phone joins on this Mac while they're connected.")
+                    Text("Join on the phone joins on this Mac while they're connected. Pair as many iPhones as you like: alerts and prompts go to all of them, and the media keys follow the one that went on display last.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
@@ -90,7 +90,12 @@ private struct StatusLine: View {
     }
 
     private var text: String {
-        if let displaying = hub.phones.first(where: \.displaying) { return "\(displaying.name) is displaying — Mac is quiet" }
+        let others = hub.phones.count - 1
+        let more = others > 0 ? " (+\(others) more connected)" : ""
+        if let displaying = hub.phones.filter(\.displaying).max(by: { $0.since < $1.since }) {
+            return "\(displaying.name) is displaying — Mac is quiet\(more)"
+        }
+        if hub.phones.count > 1 { return "\(hub.phones.count) iPhones connected (not on display)" }
         if let phone = hub.phones.first { return "\(phone.name) connected (not on display)" }
         if let error = hub.lastError { return "Not listening: \(error)" }
         if hub.paired.isEmpty { return "No iPhone paired yet" }

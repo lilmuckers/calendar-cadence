@@ -26,8 +26,13 @@ final class PhoneState {
     private(set) var calendars: [CalendarInfo] = []
     /// This phone's own merged, filtered meetings.
     private(set) var ownMeetings: [Meeting] = []
-    /// The Mac's last snapshot (kept after disconnecting, shown when there's nothing else).
-    private(set) var snapshot: CompanionSnapshot? = PhoneState.loadSnapshot()
+    /// Each paired Mac's last snapshot, by Mac id (kept after disconnecting, shown when there's nothing else).
+    private(set) var snapshots: [String: CompanionSnapshot] = PhoneState.loadSnapshots()
+    /// The Macs' agendas in priority order: the connected Macs while any is, else every paired Mac's
+    /// saved copy. Finds each Mac's own copy of a meeting for Join, Snooze, prompts and enrichments.
+    private(set) var agenda = MultiMacAgenda(agendas: [])
+    /// `agenda` as one snapshot: meetings merged, mutes carried across, settings from the first Mac.
+    private(set) var snapshot: CompanionSnapshot?
     private(set) var calendarAccess: Bool = false
     private(set) var lastRefresh: Date?
 
@@ -46,9 +51,18 @@ final class PhoneState {
     let spotify = SpotifyRemote()
     /// The system media volume, for the Mac's volume keys.
     let volume = PhoneVolume()
-    /// What the Mac is playing (Music or Spotify there), while connected.
+    /// What a Mac is playing (Music or Spotify there), while connected: the first Mac in the list
+    /// that's playing, else the first that has something paused.
     private(set) var macMedia: CompanionMedia?
     private(set) var macArtwork: UIImage?
+    /// The Mac `macMedia` is from, which the desk's media controls drive.
+    private(set) var macMediaSource: String?
+    @ObservationIgnored private var macMediaByMac: [String: CompanionMedia] = [:]
+    @ObservationIgnored private var macArtworkByMac: [String: UIImage] = [:]
+    /// Which Macs each pop-up came from, with the id (meeting or clash key) that Mac knows it by, so
+    /// the same invite or clash from two Macs shows once and the answer reaches both.
+    @ObservationIgnored private var inviteSources: [String: [(macID: String, meetingID: String)]] = [:]
+    @ObservationIgnored private var clashSources: [String: [(macID: String, clash: CompanionClash)]] = [:]
     @ObservationIgnored private var sentMedia: CompanionMedia?
     @ObservationIgnored private var sentVolume: (level: Double, muted: Bool)?
     @ObservationIgnored let audioHandoff = MeetingAudioHandoff()
@@ -71,6 +85,51 @@ final class PhoneState {
 
     private init() {
         prefs = PhonePrefs.load()
+        Self.migrateSnapshot(to: link.macs.first?.id)
+        snapshots = Self.loadSnapshots()
+        rebuildAgenda()
+    }
+
+    /// Rebuilds `agenda` and `snapshot` from the saved snapshots and which Macs are connected.
+    private func rebuildAgenda() {
+        let pool = link.isConnected ? link.connected : link.links
+        let sources = pool.compactMap { l in snapshots[l.mac.id].map { MacAgenda(macID: l.mac.id, snapshot: $0) } }
+        let merged = MultiMacAgenda(agendas: sources)
+        agenda = merged
+        snapshot = sources.first.map { first in
+            var s = first.snapshot
+            guard sources.count > 1 else { return s }
+            s.meetings = merged.meetings
+            s.suppressedIDs = merged.suppressedIDs
+            s.agendaOnlyIDs = merged.agendaOnlyIDs
+            s.generatedAt = sources.map(\.snapshot.generatedAt).min() ?? s.generatedAt
+            return s
+        }
+    }
+
+    /// The Macs changed (connected, dropped, paired, unpaired or reordered).
+    private func linksChanged() {
+        let paired = Set(link.macs.map(\.id))
+        if snapshots.keys.contains(where: { !paired.contains($0) }) {
+            snapshots = snapshots.filter { paired.contains($0.key) }
+            Self.saveSnapshots(snapshots)
+        }
+        rebuildAgenda()
+        // A Mac that just connected hears what's playing here and the volume.
+        sentMedia = nil
+        sentVolume = nil
+        updateMacMedia()
+        planner.prune(keeping: meetings + ownMeetings)
+        updateLiveActivity()
+        updateWidgets()
+    }
+
+    private func updateMacMedia() {
+        let order = link.connected.map(\.mac.id)
+        let source = order.first { macMediaByMac[$0]?.isPlaying == true } ?? order.first { macMediaByMac[$0] != nil }
+        macMediaSource = source
+        macMedia = source.flatMap { macMediaByMac[$0] }
+        macArtwork = source.flatMap { macArtworkByMac[$0] }
     }
 
     // MARK: - Source of truth
@@ -210,14 +269,9 @@ final class PhoneState {
         }
         #endif
         eventKit.onChange = { [weak self] in self?.refresh() }
-        link.onMessage = { [weak self] in self?.handle($0) }
-        link.onDisconnected = { [weak self] in
-            self?.macMedia = nil
-            self?.sentMedia = nil
-            self?.sentVolume = nil
-            self?.invitePrompts = []
-            self?.clashPrompts = []
-        }
+        link.onMessage = { [weak self] id, message in self?.handle(message, from: id) }
+        link.onDisconnected = { [weak self] id in self?.macDisconnected(id) }
+        link.onLinksChanged = { [weak self] in self?.linksChanged() }
         desk.onChange = { [weak self] in self?.displayChanged() }
         notifier.onJoin = { [weak self] id in self?.join(id: id) }
         notifier.isForegroundSuppressed = { [weak self] in
@@ -320,42 +374,75 @@ final class PhoneState {
 
     // MARK: - Mac link
 
-    private func handle(_ message: CompanionMessage) {
+    private func handle(_ message: CompanionMessage, from macID: String) {
         switch message {
         case .welcome:
             break // the Mac decides alerts while connected; the planner keeps what's fired for later
         case .snapshot(let snap):
-            snapshot = snap
-            Self.saveSnapshot(snap)
-            planner.prune(keeping: snap.meetings + ownMeetings)
+            snapshots[macID] = snap
+            Self.saveSnapshots(snapshots)
+            rebuildAgenda()
+            planner.prune(keeping: meetings + ownMeetings)
             updateLiveActivity()
             updateWidgets()
         case .alert(let meeting):
             // Remembered, so it doesn't fire a second time if the link drops before the meeting starts.
             planner.markFired(meeting)
+            // Several Macs alerting for the same meeting: one alert is enough.
+            if let alerting, alerting.id == meeting.id || MeetingDeduplicator.isSameMeeting(alerting, meeting) { break }
             present(meeting)
         case .dismissAlert(let id):
-            if alerting?.id == id { alerting = nil }
+            guard let alerting else { break }
+            let theirs = snapshots[macID]?.meetings.first { $0.id == id }
+            if alerting.id == id || theirs.map({ MeetingDeduplicator.isSameMeeting($0, alerting) }) == true { self.alerting = nil }
         case .invitePrompt(let invites):
-            let fresh = invites.filter { i in !invitePrompts.contains { $0.meeting.id == i.meeting.id } }
-            guard !fresh.isEmpty else { break }
-            invitePrompts += fresh
-            haptic(.success)
+            var fresh = false
+            for invite in invites {
+                if let shown = invitePrompts.first(where: { $0.meeting.id == invite.meeting.id
+                    || MeetingDeduplicator.isSameMeeting($0.meeting, invite.meeting) }) {
+                    var sources = inviteSources[shown.meeting.id] ?? []
+                    if !sources.contains(where: { $0.macID == macID }) { sources.append((macID, invite.meeting.id)) }
+                    inviteSources[shown.meeting.id] = sources
+                } else {
+                    invitePrompts.append(invite)
+                    inviteSources[invite.meeting.id] = [(macID, invite.meeting.id)]
+                    fresh = true
+                }
+            }
+            if fresh { haptic(.success) }
         case .inviteHandled(let id):
-            invitePrompts.removeAll { $0.meeting.id == id }
+            // Answered on that Mac (or another of its phones): close it, whichever Mac it came from.
+            let handled = invitePrompts.filter { prompt in
+                (inviteSources[prompt.meeting.id] ?? []).contains { $0.macID == macID && $0.meetingID == id }
+            }
+            for prompt in handled { inviteSources[prompt.meeting.id] = nil }
+            invitePrompts.removeAll { p in handled.contains { $0.meeting.id == p.meeting.id } }
         case .clashPrompt(let clash):
-            guard !clashPrompts.contains(where: { $0.key == clash.key }) else { break }
+            if let shown = clashPrompts.first(where: { Self.sameClash($0, clash) }) {
+                var sources = clashSources[shown.key] ?? []
+                if !sources.contains(where: { $0.macID == macID }) { sources.append((macID, clash)) }
+                clashSources[shown.key] = sources
+                break
+            }
             clashPrompts.append(clash)
+            clashSources[clash.key] = [(macID, clash)]
             haptic(.warning)
         case .clashHandled(let key):
-            clashPrompts.removeAll { $0.key == key }
+            let handled = clashPrompts.filter { prompt in
+                (clashSources[prompt.key] ?? []).contains { $0.macID == macID && $0.clash.key == key }
+            }
+            for prompt in handled { clashSources[prompt.key] = nil }
+            clashPrompts.removeAll { p in handled.contains { $0.key == p.key } }
         case .media(let media):
-            if let art = media?.artwork { macArtwork = UIImage(data: art) }
-            else if media?.trackID != macMedia?.trackID { macArtwork = nil }
-            macMedia = media
+            if let art = media?.artwork { macArtworkByMac[macID] = UIImage(data: art) }
+            else if media?.trackID != macMediaByMac[macID]?.trackID { macArtworkByMac[macID] = nil }
+            macMediaByMac[macID] = media
+            updateMacMedia()
         case .mediaCommand(let command):
             applyMediaCommand(command)
         case .reminder(let reminder):
+            // The same heads-up from two Macs: show it once.
+            if let banner, banner.title == reminder.title, banner.body == reminder.body { break }
             banner = reminder
             haptic(.warning)
             let key = reminder.key
@@ -367,24 +454,55 @@ final class PhoneState {
         }
     }
 
-    private static let snapshotKey = "Cadence.companion.snapshot"
+    /// A Mac's link dropped: it takes back its pop-ups and stops being a media source.
+    private func macDisconnected(_ macID: String) {
+        macMediaByMac[macID] = nil
+        macArtworkByMac[macID] = nil
+        for (key, sources) in inviteSources { inviteSources[key] = sources.filter { $0.macID != macID } }
+        for (key, sources) in clashSources { clashSources[key] = sources.filter { $0.macID != macID } }
+        invitePrompts.removeAll { inviteSources[$0.meeting.id]?.isEmpty ?? true }
+        clashPrompts.removeAll { clashSources[$0.key]?.isEmpty ?? true }
+        inviteSources = inviteSources.filter { !$0.value.isEmpty }
+        clashSources = clashSources.filter { !$0.value.isEmpty }
+        updateMacMedia()
+    }
 
-    /// Optimistic change to the mirrored enrichments (the Mac's next snapshot replaces it).
-    func updateSnapshotEnrichments(_ body: (inout EnrichmentBook) -> Void) {
-        guard var snap = snapshot else { return }
+    /// Two Macs' prompts for the same double-booking: the same meetings, in any order.
+    private static func sameClash(_ a: CompanionClash, _ b: CompanionClash) -> Bool {
+        a.key == b.key || (a.meetings.count == b.meetings.count
+            && a.meetings.allSatisfy { m in b.meetings.contains { MeetingDeduplicator.isSameMeeting($0, m) } })
+    }
+
+    private static let snapshotsKey = "Cadence.companion.snapshots"
+    /// Before several Macs: the one Mac's snapshot.
+    private static let legacySnapshotKey = "Cadence.companion.snapshot"
+
+    /// Optimistic change to one Mac's mirrored enrichments (its next snapshot replaces it).
+    func updateSnapshotEnrichments(macID: String, _ body: (inout EnrichmentBook) -> Void) {
+        guard var snap = snapshots[macID] else { return }
         var book = snap.enrichments ?? EnrichmentBook()
         body(&book)
         snap.enrichments = book
-        snapshot = snap
+        snapshots[macID] = snap
+        rebuildAgenda()
     }
 
-    private static func loadSnapshot() -> CompanionSnapshot? {
-        guard let data = UserDefaults.standard.data(forKey: snapshotKey) else { return nil }
-        return try? JSONDecoder().decode(CompanionSnapshot.self, from: data)
+    private static func migrateSnapshot(to macID: String?) {
+        let defaults = UserDefaults.standard
+        guard let data = defaults.data(forKey: legacySnapshotKey) else { return }
+        defaults.removeObject(forKey: legacySnapshotKey)
+        guard let macID, defaults.data(forKey: snapshotsKey) == nil,
+              let snap = try? JSONDecoder().decode(CompanionSnapshot.self, from: data) else { return }
+        saveSnapshots([macID: snap])
     }
 
-    private static func saveSnapshot(_ snap: CompanionSnapshot) {
-        if let data = try? JSONEncoder().encode(snap) { UserDefaults.standard.set(data, forKey: snapshotKey) }
+    private static func loadSnapshots() -> [String: CompanionSnapshot] {
+        guard let data = UserDefaults.standard.data(forKey: snapshotsKey) else { return [:] }
+        return (try? JSONDecoder().decode([String: CompanionSnapshot].self, from: data)) ?? [:]
+    }
+
+    private static func saveSnapshots(_ snaps: [String: CompanionSnapshot]) {
+        if let data = try? JSONEncoder().encode(snaps) { UserDefaults.standard.set(data, forKey: snapshotsKey) }
     }
 
     // MARK: - Tick & alerts
@@ -422,7 +540,7 @@ final class PhoneState {
         let current = (level: volume.level, muted: volume.muted)
         if let sent = sentVolume, abs(sent.level - current.level) < 0.001, sent.muted == current.muted { return }
         sentVolume = current
-        link.send(.volume(level: current.level, muted: current.muted))
+        link.broadcast(.volume(level: current.level, muted: current.muted))
     }
 
     /// Tells the Mac when what's playing here changes, so its media keys and Now Playing follow.
@@ -432,7 +550,7 @@ final class PhoneState {
         guard current != sentMedia else { return }
         let newTrack = current?.trackID != sentMedia?.trackID
         sentMedia = current
-        link.send(.media(newTrack ? phoneMedia(includeArtwork: true) : current))
+        link.broadcast(.media(newTrack ? phoneMedia(includeArtwork: true) : current))
     }
 
     private func phoneMedia(includeArtwork: Bool) -> CompanionMedia? {
@@ -476,10 +594,12 @@ final class PhoneState {
 
     /// Desk controls aimed at the Mac's player.
     func controlMac(_ command: MediaCommand) {
-        link.send(.mediaCommand(command))
+        guard let source = macMediaSource else { return }
+        link.send(.mediaCommand(command), to: source)
         if var m = macMedia, command == .togglePlayPause || command == .play || command == .pause {
             m.isPlaying = command == .togglePlayPause ? !m.isPlaying : command == .play
             macMedia = m
+            macMediaByMac[source] = m
         }
     }
 
@@ -557,13 +677,36 @@ final class PhoneState {
 
     // MARK: - Actions
 
-    /// Join: on the Mac while connected, otherwise on this phone.
+    /// The connected Mac Join opens `meeting` on (see `MacJoinRouting`), or nil for this phone.
+    func joinMac(for meeting: Meeting) -> MacLink? {
+        let connected = link.connected
+        guard !connected.isEmpty else { return nil }
+        let target = MacJoinRouting.target(
+            sources: agenda.copies(of: meeting).map(\.macID), connected: connected.map(\.mac.id),
+            canTakeLinks: Set(connected.filter { $0.supports(.joinMeeting) }.map(\.mac.id)),
+            link: meeting.joinLink, preferPriorityMac: prefs.joinOnPriorityMac)
+        return target.flatMap { link.link($0) }
+    }
+
+    /// "Join on Work laptop", or nil when Join opens on this phone.
+    func joinMacName(for meeting: Meeting) -> String? { joinMac(for: meeting)?.mac.displayName }
+
+    /// Join: on a connected Mac (the first in the list that has the meeting, or the first Mac for a
+    /// web link when the user prefers that), otherwise on this phone. Other Macs that have it close
+    /// their alert.
     func join(_ meeting: Meeting) {
-        switch JoinDestination.choose(connectedToMac: link.isConnected) {
-        case .mac:
-            link.send(.join(meetingID: meeting.id))
-        case .phone:
+        let copies = link.isConnected ? agenda.copies(of: meeting) : []
+        if let target = joinMac(for: meeting) {
+            let targetID = target.mac.id
+            if let own = copies.first(where: { $0.macID == targetID }) {
+                target.send(.join(meetingID: own.meeting.id))
+            } else {
+                target.send(.joinMeeting(meeting))
+            }
+            for copy in copies where copy.macID != targetID { link.send(.dismiss(meetingID: copy.meeting.id), to: copy.macID) }
+        } else {
             if let url = meeting.joinLink?.url { UIApplication.shared.open(url) }
+            for copy in copies { link.send(.dismiss(meetingID: copy.meeting.id), to: copy.macID) }
         }
         if alerting?.id == meeting.id { alerting = nil }
     }
@@ -572,7 +715,7 @@ final class PhoneState {
     /// back after the app wakes up, then falls back to joining on the phone.
     func join(id: String) {
         Task {
-            for _ in 0..<20 where !link.isConnected && link.mac != nil && link.status != .unpaired {
+            for _ in 0..<20 where !link.isConnected && !link.links.isEmpty && link.status != .unpaired {
                 try? await Task.sleep(for: .milliseconds(100))
             }
             guard let meeting = meeting(id: id) else { return }
@@ -581,12 +724,13 @@ final class PhoneState {
     }
 
     func meeting(id: String) -> Meeting? {
-        meetings.first { $0.id == id } ?? ownMeetings.first { $0.id == id } ?? snapshot?.meetings.first { $0.id == id }
+        meetings.first { $0.id == id } ?? ownMeetings.first { $0.id == id } ?? agenda.meeting(id: id)
+            ?? link.macs.lazy.compactMap { [snapshots] in snapshots[$0.id]?.meetings.first { $0.id == id } }.first
     }
 
     func snooze(_ meeting: Meeting, seconds: TimeInterval = 60) {
         if link.isConnected {
-            link.send(.snooze(meetingID: meeting.id, seconds: seconds))
+            for copy in agenda.copies(of: meeting) { link.send(.snooze(meetingID: copy.meeting.id, seconds: seconds), to: copy.macID) }
         } else {
             planner.snooze(meeting, until: Date().addingTimeInterval(seconds))
         }
@@ -594,20 +738,43 @@ final class PhoneState {
     }
 
     /// Answer an invite pop-up. nil reply = open it in Calendar on the Mac.
+    /// The answer goes to one Mac (the first in the list that sent it, so it's sent once); any
+    /// other Mac that sent the same invite just closes its pop-up.
     func answer(_ invite: CompanionInvite, _ reply: RSVP?) {
-        link.send(.rsvp(meetingID: invite.meeting.id, reply: reply))
-        invitePrompts.removeAll { $0.meeting.id == invite.meeting.id }
+        let sources = orderedInviteSources(invite)
+        if let first = sources.first { link.send(.rsvp(meetingID: first.meetingID, reply: reply), to: first.macID) }
+        for other in sources.dropFirst() { link.send(.inviteLater(meetingID: other.meetingID), to: other.macID) }
+        closeInvite(invite)
     }
 
     /// Close an invite pop-up without answering.
     func later(_ invite: CompanionInvite) {
-        link.send(.inviteLater(meetingID: invite.meeting.id))
+        for source in orderedInviteSources(invite) { link.send(.inviteLater(meetingID: source.meetingID), to: source.macID) }
+        closeInvite(invite)
+    }
+
+    private func orderedInviteSources(_ invite: CompanionInvite) -> [(macID: String, meetingID: String)] {
+        let sources = inviteSources[invite.meeting.id] ?? []
+        return link.macs.compactMap { mac in sources.first { $0.macID == mac.id } }
+    }
+
+    private func closeInvite(_ invite: CompanionInvite) {
+        inviteSources[invite.meeting.id] = nil
         invitePrompts.removeAll { $0.meeting.id == invite.meeting.id }
     }
 
-    /// Settle a clash pop-up: a meeting id, "all", or nil for "decide later".
+    /// Settle a clash pop-up: a meeting id, "all", or nil for "decide later". Each Mac that raised it
+    /// hears the choice in its own meeting ids.
     func resolve(_ clash: CompanionClash, choice: String?) {
-        link.send(.resolveClash(key: clash.key, choice: choice))
+        let chosen = choice.flatMap { id in clash.meetings.first { $0.id == id } }
+        for source in clashSources[clash.key] ?? [] {
+            var theirs = choice
+            if let chosen {
+                theirs = source.clash.meetings.first { $0.id == chosen.id || MeetingDeduplicator.isSameMeeting($0, chosen) }?.id ?? choice
+            }
+            link.send(.resolveClash(key: source.clash.key, choice: theirs), to: source.macID)
+        }
+        clashSources[clash.key] = nil
         clashPrompts.removeAll { $0.key == clash.key }
     }
 
@@ -678,7 +845,9 @@ final class PhoneState {
     #endif
 
     func dismissAlert() {
-        if let alerting, link.isConnected { link.send(.dismiss(meetingID: alerting.id)) }
+        if let alerting, link.isConnected {
+            for copy in agenda.copies(of: alerting) { link.send(.dismiss(meetingID: copy.meeting.id), to: copy.macID) }
+        }
         alerting = nil
     }
 
@@ -767,7 +936,7 @@ final class PhoneState {
             let after = laterToday.first { $0.start >= f.meeting.start && $0.id != f.meeting.id }
             // Same as the Mac's menu bar: the mood (and the icon's colour) follow the next meeting to start.
             let moodMeeting = f.live ? after : f.meeting
-            liveActivity.show(f.meeting, live: f.live, next: after, onMac: link.isConnected ? link.mac?.displayName : nil,
+            liveActivity.show(f.meeting, live: f.live, next: after, onMac: joinMacName(for: f.meeting),
                               countdownFrom: f.live ? now : countdownFrom, moodMeeting: moodMeeting)
         } else if isActive {
             // Back in the app with nothing close: drop an early one; it'll come back when it's due.
@@ -860,6 +1029,14 @@ final class PhoneState {
         syncMicrosoft(fetch: false)
     }
 
+    // MARK: - Macs
+
+    /// Pair a Mac (added to the end of the list), or refresh one already paired.
+    func pair(_ invite: PairingInvite) { link.pair(invite) }
+
+    /// Unpair one Mac: its saved agenda goes with it.
+    func unpair(_ macID: String) { link.unpair(macID) }
+
     // MARK: - URLs
 
     /// cadence-pair://… (scanned QR or pasted link) and cadence-companion://join?id=… (Live Activity).
@@ -867,12 +1044,7 @@ final class PhoneState {
     func open(_ url: URL) -> Bool {
         if spotify.handle(url) { return true }
         if let invite = PairingInvite(url: url) {
-            // A different Mac: its agenda replaces the old one's when it connects; don't show the old one meanwhile.
-            if invite.macID != link.mac?.id {
-                snapshot = nil
-                UserDefaults.standard.removeObject(forKey: Self.snapshotKey)
-            }
-            link.pair(invite)
+            pair(invite)
             return true
         }
         if url.scheme == "cadence-companion", url.host == "join",
