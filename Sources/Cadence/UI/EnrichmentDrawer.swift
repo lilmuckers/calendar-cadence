@@ -182,7 +182,7 @@ struct EnrichmentDrawerView: View {
 
     private func drawer(_ m: Meeting) -> some View {
         let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
-        let live = m.isInProgress(at: state.now)
+        let live = m.isInProgress(at: state.clock.now)
         return VStack(alignment: .leading, spacing: 12) {
             Button(action: toggle) {
                 Capsule().fill(.white.opacity(0.3)).frame(width: 40, height: 5).frame(maxWidth: .infinity).padding(.top, 2)
@@ -191,8 +191,8 @@ struct EnrichmentDrawerView: View {
             .buttonStyle(.plain)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(live ? "ENDS IN \(CountdownFormatter.clock(m.end.timeIntervalSince(state.now)))"
-                              : "STARTS IN \(CountdownFormatter.clock(m.start.timeIntervalSince(state.now)))")
+                    Text(live ? "ENDS IN \(CountdownFormatter.clock(m.end.timeIntervalSince(state.clock.now)))"
+                              : "STARTS IN \(CountdownFormatter.clock(m.start.timeIntervalSince(state.clock.now)))")
                         .font(.system(size: 10, weight: .heavy).monospacedDigit()).kerning(1.2)
                         .foregroundStyle(m.tint)
                     Text(m.title).font(.system(size: 17, weight: .bold, design: .rounded)).lineLimit(1)
@@ -207,7 +207,7 @@ struct EnrichmentDrawerView: View {
                 .help("Close (Esc)")
             }
             EnrichmentPanel(meeting: m, enrichments: state.enrichments(for: m), state: { state.enrichmentState($0, m) },
-                            now: state.now) { action in
+                            now: state.clock.now) { action in
                 state.applyEnrichment(action, meetingID: m.id)
             }
         }

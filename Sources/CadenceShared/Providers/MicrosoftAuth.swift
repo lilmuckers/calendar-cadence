@@ -287,7 +287,7 @@ final class MicrosoftAuth {
         allowed.remove(charactersIn: "&=+")
         req.httpBody = form.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: allowed) ?? $0.value)" }
             .joined(separator: "&").data(using: .utf8)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await HTTP.session.data(for: req)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             let body = String(data: data, encoding: .utf8) ?? "HTTP error"
             if form["grant_type"] == "refresh_token", body.contains("invalid_grant") { throw TokenError.invalidGrant }

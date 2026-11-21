@@ -53,7 +53,7 @@ final class ICSProvider: CalendarProvider {
         do {
             var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
             request.setValue("text/calendar", forHTTPHeaderField: "Accept")
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await HTTP.session.data(for: request)
             if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
                 throw URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"])
             }
@@ -61,7 +61,9 @@ final class ICSProvider: CalendarProvider {
             guard text.contains("BEGIN:VCALENDAR") else {
                 throw URLError(.cannotParseResponse, userInfo: [NSLocalizedDescriptionKey: "Not an iCalendar feed"])
             }
-            events = ICSParser.parse(text)
+            // Shown windows start today at the earliest; keep a day of slack for time zones.
+            let cutoff = Calendar.current.startOfDay(for: Date()).addingTimeInterval(-86_400)
+            events = ICSParser.relevant(ICSParser.parse(text), from: cutoff)
             lastError = nil
         } catch {
             lastError = error.localizedDescription

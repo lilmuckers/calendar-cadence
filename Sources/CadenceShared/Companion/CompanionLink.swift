@@ -52,11 +52,23 @@ final class CompanionChannel {
             MainActor.assumeIsolated { self?.handle(state) }
         }
         connection.start(queue: .main)
+        // A connection stuck in the TLS handshake (a peer that went away mid-way, or one without the
+        // key) never reaches .ready, so the heartbeat never starts; close it rather than keep it forever.
+        handshakeDeadline = Timer.scheduledTimer(withTimeInterval: CompanionService.timeout, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.pinger == nil else { return }
+                self.close(URLError(.timedOut))
+            }
+        }
     }
+
+    private var handshakeDeadline: Timer?
 
     private func handle(_ state: NWConnection.State) {
         switch state {
         case .ready:
+            handshakeDeadline?.invalidate()
+            handshakeDeadline = nil
             lastHeard = Date()
             receive()
             pinger = Timer.scheduledTimer(withTimeInterval: CompanionService.pingInterval, repeats: true) { [weak self] _ in
@@ -112,6 +124,9 @@ final class CompanionChannel {
         guard !closed else { return }
         closed = true
         pinger?.invalidate()
+        pinger = nil
+        handshakeDeadline?.invalidate()
+        handshakeDeadline = nil
         connection.stateUpdateHandler = nil
         connection.cancel()
         onClose?(error)

@@ -174,6 +174,18 @@ public enum ICSParser {
     }
 
     /// Expand recurring events and apply overrides/exclusions into Meetings within the window.
+    /// The events that can still show up from `cutoff` on: anything recurring (unless its series
+    /// ended before then), anything ending after it, and overrides of occurrences after it.
+    /// Feeds often carry years of history; there's no point holding it in memory.
+    public static func relevant(_ events: [ICSEvent], from cutoff: Date) -> [ICSEvent] {
+        events.filter { e in
+            if let rule = e.rrule { return rule.until.map { $0 >= cutoff } ?? true }
+            if e.end > cutoff { return true }
+            if let rid = e.recurrenceID { return rid >= cutoff }
+            return false
+        }
+    }
+
     public static func meetings(from events: [ICSEvent], calendar: CalendarInfo, window: Range<Date>) -> [Meeting] {
         let overrides = Dictionary(grouping: events.filter { $0.recurrenceID != nil }, by: \.uid)
         var result: [Meeting] = []

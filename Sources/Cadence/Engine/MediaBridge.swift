@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import CadenceCore
 import MediaPlayer
+import Observation
 
 /// Media across the Mac and a connected iPhone:
 /// - What Music or Spotify is playing here goes to the phone, whose desk controls drive it.
@@ -42,11 +43,28 @@ final class MediaBridge {
         keys.onKey = { [weak self] key in self?.remoteKey(key.command) }
         hud.send = { [weak self] command in self?.sendToPhone(command) }
 
-        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.poll() }
+        followConnection()
+    }
+
+    /// Polls every 2 seconds only while a phone is connected: with none there's nothing to share
+    /// and the media keys are left alone, so the Mac shouldn't wake up for it.
+    private func followConnection() {
+        let connected = withObservationTracking { hub.isConnected } onChange: { [weak self] in
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.followConnection() } }
         }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+        if connected, timer == nil {
+            let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.poll() }
+            }
+            timer.tolerance = 0.3
+            RunLoop.main.add(timer, forMode: .common)
+            self.timer = timer
+            poll()
+        } else if !connected, let timer {
+            timer.invalidate()
+            self.timer = nil
+            poll() // one last pass releases the key tap and hides the mini-player
+        }
     }
 
     private var sharing: Bool { state.prefs.shareMediaWithPhone }
