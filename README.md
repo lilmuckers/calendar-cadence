@@ -134,6 +134,8 @@ Put your iPhone on a MagSafe stand and it becomes a desk display for your calend
 
 **Pairing.** On the Mac open **Settings → iPhone → Show Pairing Code** and scan it with the iPhone app (or with the Camera app, or copy the link across). The code carries a random 256-bit key that both devices then use for an encrypted (TLS pre-shared-key) connection, found over Bonjour on your Wi-Fi or directly between the devices when they're not on the same network. **Forget All iPhones** rotates the key.
 
+**Several Macs and iPhones.** Pair as many iPhones with a Mac as you like: alerts and prompts go to all of them, and the Mac's media keys follow the one that went on display last. An iPhone can pair with several Macs too (*Settings → Mac → Pair another Mac*). It merges their agendas, so a meeting on both shows once, and Join opens it on the highest Mac in the list that has it (tap **Edit** to drag them into order). A meeting only one Mac has opens on that Mac, unless you turn on **Open web links on the first Mac**: then any meeting with a plain web link opens on your top Mac instead.
+
 **Building the iPhone app.** Open `iOS/CadenceCompanion.xcodeproj` in Xcode (it shares `Sources/CadenceCore` and `Sources/CadenceShared` with the Mac app). Copy `iOS/Config/Local.xcconfig.example` to `iOS/Config/Local.xcconfig` and set your `DEVELOPMENT_TEAM` and bundle ID. `scripts/ios-build.sh` builds for the Simulator.
 
 To sign in to Google on the phone, create a second OAuth client of type **iOS** (bundle ID as above) and put the part before `.apps.googleusercontent.com` in `GOOGLE_IOS_CLIENT_PREFIX`. For Microsoft, add the redirect URI `msauth.<your bundle ID>://auth` under *Authentication → iOS / macOS* in the same app registration and set `MICROSOFT_CLIENT_ID`.

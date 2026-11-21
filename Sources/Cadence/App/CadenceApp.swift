@@ -116,6 +116,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             router.closeAlert(for: id)
         }
         hub.onDismiss = { id in router.closeAlert(for: id) }
+        // Another Mac's meeting, sent here because this Mac is first in the phone's list: open its
+        // link here (the Mac's own copy, if it has one, so its browser-profile rules apply).
+        hub.onJoinMeeting = { [weak self] meeting in
+            guard let self else { return }
+            let own = self.state.meetings.first { MeetingDeduplicator.isSameMeeting($0, meeting) }
+            self.state.join(own ?? meeting)
+            if let own { router.closeAlert(for: own.id) }
+        }
         hub.onEnrichmentAction = { [weak self] id, action in self?.state.applyEnrichment(action, meetingID: id) }
         if state.prefs.companionEnabled { hub.start() }
         var enabled = state.prefs.companionEnabled

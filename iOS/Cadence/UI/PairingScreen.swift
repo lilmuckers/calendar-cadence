@@ -68,7 +68,7 @@ struct PairingScreen: View {
             error = "That isn't a Cadence pairing link."
             return
         }
-        state.link.pair(invite)
+        state.pair(invite)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismiss()
     }

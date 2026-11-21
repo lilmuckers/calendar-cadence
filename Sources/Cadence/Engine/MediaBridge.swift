@@ -126,7 +126,7 @@ final class MediaBridge {
 
     /// Sends a key (or a mini-player click) to the phone, and shows the change straight away.
     private func sendToPhone(_ command: MediaCommand) {
-        hub.broadcast(.mediaCommand(command))
+        hub.sendToRemotePhone(.mediaCommand(command))
         let model = hud.model
         switch command {
         case .volumeUp:
@@ -157,7 +157,7 @@ final class MediaBridge {
             hud.hide()
             return
         }
-        model.phoneName = hub.phones.first?.name ?? "iPhone"
+        model.phoneName = hub.remotePhone?.name ?? "iPhone"
         let ready = MediaRemoteGate.phoneReady(gateInput, now: Date())
         guard prefs.mediaRemoteControl, prefs.mediaHUD != .never, ready || hud.isVisible else {
             if hud.isVisible { hud.hide() }

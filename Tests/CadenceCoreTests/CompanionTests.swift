@@ -22,6 +22,8 @@ struct CompanionProtocolTests {
         .dismiss(meetingID: "a"),
         .welcome(macID: "m", macName: "Mac"),
         .address(hosts: ["192.168.0.21"], port: 62166),
+        .features(["joinMeeting"]),
+        .joinMeeting(meeting()),
         .rsvp(meetingID: "m1", reply: .accept),
         .rsvp(meetingID: "m1", reply: nil),
         .inviteLater(meetingID: "m1"),

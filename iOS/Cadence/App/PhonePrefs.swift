@@ -51,6 +51,10 @@ struct PhonePrefs: Codable, Equatable {
     /// Working hours and breaks, used when not connected to the Mac (the Mac's win while it is).
     var workSchedule = WorkSchedule()
 
+    /// Paired with several Macs: a meeting only one Mac has, with a link any browser opens, joins on
+    /// the first Mac in the list rather than the one it came from.
+    var joinOnPriorityMac = false
+
     private static let key = "Cadence.phone.preferences.v1"
 
     static func load() -> PhonePrefs {
@@ -94,5 +98,6 @@ extension PhonePrefs {
         widgetShowsTomorrow = v(.widgetShowsTomorrow, d.widgetShowsTomorrow)
         widgetTomorrowHour = v(.widgetTomorrowHour, d.widgetTomorrowHour)
         workSchedule = v(.workSchedule, d.workSchedule)
+        joinOnPriorityMac = v(.joinOnPriorityMac, d.joinOnPriorityMac)
     }
 }

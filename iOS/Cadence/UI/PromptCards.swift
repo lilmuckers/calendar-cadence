@@ -292,7 +292,7 @@ private struct ReminderStrip: View {
         }
         if let id = reminder.joinMeetingID {
             HStack {
-                Pill(title: state.link.isConnected ? "Join on Mac" : "Join", symbol: "video.fill", primary: true) {
+                Pill(title: state.meeting(id: id).flatMap(state.joinMacName(for:)).map { "Join on \($0)" } ?? "Join", symbol: "video.fill", primary: true) {
                     state.join(id: id)
                     state.banner = nil
                 }
