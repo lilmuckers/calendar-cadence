@@ -17,6 +17,17 @@ struct CadenceApp: App {
         Settings {
             SettingsView().environment(delegate.state)
         }
+
+        Window("About Cadence", id: "about") {
+            AboutView()
+                .frame(width: 440)
+                .fixedSize(horizontal: false, vertical: true)
+                .ignoresSafeArea()
+                .background(.background)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 }
 

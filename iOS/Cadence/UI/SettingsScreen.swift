@@ -159,6 +159,28 @@ struct SettingsScreen: View {
                     Toggle("Hide free", isOn: $state.prefs.filters.hideFree)
                     Toggle("Only events with a join link", isOn: $state.prefs.filters.onlyWithJoinLink)
                 }
+                Section {
+                    NavigationLink {
+                        ScrollView { AboutView() }
+                            .background(Color(.systemBackground))
+                            .navigationTitle("About")
+                            .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("About Cadence")
+                                Text(AboutView.version).font(.caption).foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "face.smiling")
+                                .foregroundStyle(.white)
+                                .frame(width: 28, height: 28)
+                                .background(LinearGradient(colors: [AboutMascot.pink, AboutMascot.orange],
+                                                           startPoint: .topLeading, endPoint: .bottomTrailing),
+                                            in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        }
+                    }
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
