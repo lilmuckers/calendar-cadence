@@ -132,6 +132,21 @@ public enum MeetingLinkDetector {
         return nil
     }
 
+    /// `link` checked the way calendar links are: a known meeting service's link (with its service
+    /// worked out again here), else a plain web link. Anything else (`file:`, other apps' schemes) is
+    /// nil. For links that arrive from another device rather than from a calendar.
+    public static func trusted(_ link: MeetingLink) -> MeetingLink? {
+        let url = link.url
+        let s = url.absoluteString
+        let range = NSRange(s.startIndex..., in: s)
+        if let rule = rules.first(where: { $0.regex.firstMatch(in: s, range: range) != nil }) {
+            return MeetingLink(service: rule.service, url: url)
+        }
+        guard let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http",
+              url.host?.isEmpty == false else { return nil }
+        return MeetingLink(service: .other, url: url)
+    }
+
     public static func firstMeetingLink(in text: String) -> MeetingLink? {
         for candidate in extractURLs(from: text) {
             let s = candidate.absoluteString

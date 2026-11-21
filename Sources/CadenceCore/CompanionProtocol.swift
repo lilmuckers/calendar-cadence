@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Bonjour service the Mac advertises and the iPhone browses for.
@@ -10,6 +11,39 @@ public enum CompanionService {
     /// A side that hears nothing for this long treats the link as gone.
     public static let timeout: TimeInterval = 15
     public static let pingInterval: TimeInterval = 5
+}
+
+/// Each paired phone has its own 256-bit key, named by a random key id, so one phone can be
+/// forgotten without the others re-pairing, and a pairing code works once. The Mac's listener holds
+/// every phone's key; TLS picks the one whose identity the phone offers. The phone then proves in its
+/// hello which key it used: an HMAC of this TLS session's exporter secret, so the proof can't be
+/// replayed on another connection.
+public enum CompanionKeys {
+    /// The TLS identity of the one key older Macs shared with every phone.
+    public static let legacyIdentity = "cadence"
+    /// Exporter label for the hello proof (RFC 5705 keying material from the TLS session).
+    public static let exporterLabel = "EXPORTER-cadence-hello"
+    public static let exporterLength = 32
+    /// How long an unused pairing code keeps working.
+    public static let inviteLifetime: TimeInterval = 15 * 60
+
+    /// The TLS identity for `keyID` (nil = the legacy shared key).
+    public static func identity(for keyID: String?) -> String {
+        keyID.map { "cadence.\($0)" } ?? legacyIdentity
+    }
+
+    public static func newKeyID() -> String {
+        var g = SystemRandomNumberGenerator()
+        return PairingInvite.base64URL(Data((0..<12).map { _ in UInt8.random(in: .min ... .max, using: &g) }))
+    }
+
+    public static func proof(key: Data, binding: Data) -> Data {
+        Data(HMAC<SHA256>.authenticationCode(for: binding, using: SymmetricKey(data: key)))
+    }
+
+    public static func verify(_ proof: Data, key: Data, binding: Data) -> Bool {
+        HMAC<SHA256>.isValidAuthenticationCode(proof, authenticating: binding, using: SymmetricKey(data: key))
+    }
 }
 
 /// Optional abilities a Mac announces with `CompanionMessage.features`, so a phone only sends what
@@ -29,14 +63,20 @@ public struct CompanionHello: Codable, Equatable, Sendable {
     public var deviceModel: String?
     /// The phone is in the foreground, in desk mode: the Mac should go quiet.
     public var displaying: Bool
+    /// Which of the Mac's keys this phone holds (`CompanionKeys`), and proof that this connection
+    /// was made with it. Nil from older phones, which only know the shared key.
+    public var keyID: String?
+    public var proof: Data?
 
     public init(protocolVersion: Int = CompanionService.protocolVersion, deviceID: String, deviceName: String,
-                deviceModel: String? = nil, displaying: Bool) {
+                deviceModel: String? = nil, displaying: Bool, keyID: String? = nil, proof: Data? = nil) {
         self.protocolVersion = protocolVersion
         self.deviceID = deviceID
         self.deviceName = deviceName
         self.deviceModel = deviceModel
         self.displaying = displaying
+        self.keyID = keyID
+        self.proof = proof
     }
 
     /// What the Mac shows for this phone.
@@ -218,6 +258,9 @@ public enum CompanionMessage: Codable, Equatable, Sendable {
     /// What this Mac understands beyond protocol 1 (`CompanionFeature` raw values), sent after
     /// `welcome`. Older Macs never send it; older phones skip it.
     case features([String])
+    /// This phone's own key from now on, replacing the shared key older Macs gave every phone.
+    /// Sent over the encrypted link; the phone uses it from its next connection. Older phones skip it.
+    case rekey(keyID: String, key: Data)
     case snapshot(CompanionSnapshot)
     /// The full-screen alert for this meeting is due now.
     case alert(Meeting)

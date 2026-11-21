@@ -3,11 +3,15 @@ import CadenceCore
 import Network
 import Observation
 
-/// A phone that has paired with this Mac (it knows the link key).
+/// A phone that has paired with this Mac.
 struct PairedPhone: Codable, Identifiable, Equatable {
     var id: String
     var name: String
     var lastSeen: Date
+    /// Its own key (`CompanionKeys`); nil while it still uses the key older builds shared with every phone.
+    var keyID: String? = nil
+    /// A key sent to it with `rekey` that it hasn't connected with yet.
+    var offeredKeyID: String? = nil
 }
 
 /// A phone connected right now.
@@ -80,6 +84,13 @@ final class CompanionHub {
     @ObservationIgnored var onPhonesGone: (() -> Void)?
 
     @ObservationIgnored private var listener: NWListener?
+    /// Waiting for the old listener to let go of the port before starting one with the new keys.
+    @ObservationIgnored private var restarting = false
+    /// The pairing code on show: its key works once, until `CompanionKeys.inviteLifetime`.
+    @ObservationIgnored private var pending: (keyID: String, key: Data, expires: Date)?
+    @ObservationIgnored private var pendingExpiry: Timer?
+    /// The key id of the pairing code on show, nil once it's used, cancelled or expired.
+    private(set) var pendingKeyID: String?
     @ObservationIgnored private var channels: [ObjectIdentifier: (channel: CompanionChannel, phoneID: String?)] = [:]
     @ObservationIgnored private var refresher: Timer?
     @ObservationIgnored private var retry: Timer?
@@ -88,15 +99,16 @@ final class CompanionHub {
 
     /// Starts listening if a phone has ever been paired (or a pairing invite is showing).
     func start() {
-        guard listener == nil, let key = CompanionIdentity.storedKey() else { return }
+        let keys = listenerKeys()
+        guard listener == nil, !restarting, !keys.isEmpty else { return }
         do {
             // A fixed port, so the address in the pairing code keeps working across launches.
             let port = NWEndpoint.Port(rawValue: Self.port) ?? .any
             let listener: NWListener
-            if let fixed = try? NWListener(using: CompanionNetwork.parameters(key: key), on: port) {
+            if let fixed = try? NWListener(using: CompanionNetwork.parameters(keys: keys), on: port) {
                 listener = fixed
             } else {
-                listener = try NWListener(using: CompanionNetwork.parameters(key: key))
+                listener = try NWListener(using: CompanionNetwork.parameters(keys: keys))
             }
             var txt = NWTXTRecord()
             txt[CompanionService.macIDKey] = macID
@@ -118,7 +130,43 @@ final class CompanionHub {
         }
     }
 
+    /// The set of keys changed: start a listener that holds the new set. Connections already made
+    /// carry on; the new listener waits for the old one to free the port (binding it straight away fails).
+    private func restartListener() {
+        guard let old = listener else { return }
+        listener = nil
+        restarting = true
+        old.stateUpdateHandler = { [weak self] state in
+            MainActor.assumeIsolated {
+                guard let self, case .cancelled = state, self.restarting else { return }
+                self.restarting = false
+                self.listening = false
+                self.start()
+            }
+        }
+        old.cancel()
+    }
+
+    /// Every key a phone may connect with: each paired phone's (and any it was just sent), the
+    /// pairing code on show, and the old shared key while a phone still uses it.
+    private func listenerKeys() -> [(identity: String, key: Data)] {
+        var out: [(identity: String, key: Data)] = []
+        if let legacy = CompanionIdentity.storedKey() { out.append((CompanionKeys.legacyIdentity, legacy)) }
+        for phone in paired {
+            for keyID in [phone.keyID, phone.offeredKeyID].compactMap({ $0 }) {
+                if let key = Self.phoneKey(keyID) { out.append((CompanionKeys.identity(for: keyID), key)) }
+            }
+        }
+        if let pending, pending.expires > Date() { out.append((CompanionKeys.identity(for: pending.keyID), pending.key)) }
+        return out
+    }
+
+    private static func keyAccount(_ keyID: String) -> String { "companion.phoneKey.\(keyID)" }
+    private static func phoneKey(_ keyID: String) -> Data? { CompanionIdentity.storedKey(keyAccount(keyID)) }
+    private static func storePhoneKey(_ key: Data?, _ keyID: String) { CompanionIdentity.store(key: key, keyAccount(keyID)) }
+
     func stop() {
+        restarting = false
         for (_, entry) in channels { entry.channel.send(.bye(reason: "stopped")); entry.channel.close() }
         channels = [:]
         phones = []
@@ -161,15 +209,31 @@ final class CompanionHub {
 
     // MARK: Pairing
 
-    /// The invite to show as a QR code. Creates the link key on first use and starts listening.
+    /// A new pairing code to show as a QR code: a fresh key for one phone, which stops working once a
+    /// phone pairs with it, a newer code is shown, it's cancelled or `CompanionKeys.inviteLifetime` passes.
     func invite() -> PairingInvite {
-        let key = CompanionIdentity.storedKey() ?? {
-            let k = PairingInvite.newKey()
-            CompanionIdentity.store(key: k)
-            return k
-        }()
-        start()
-        return PairingInvite(macID: macID, macName: macName, key: key, hosts: Self.lanAddresses(), port: Self.port)
+        let keyID = CompanionKeys.newKeyID()
+        let key = PairingInvite.newKey()
+        setPending((keyID, key, Date().addingTimeInterval(CompanionKeys.inviteLifetime)))
+        pendingExpiry = Timer.scheduledTimer(withTimeInterval: CompanionKeys.inviteLifetime, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.cancelInvite() }
+        }
+        if listener == nil { start() } else { restartListener() }
+        return PairingInvite(macID: macID, macName: macName, key: key, keyID: keyID, hosts: Self.lanAddresses(), port: Self.port)
+    }
+
+    /// The pairing code was closed without being used: its key stops working.
+    func cancelInvite() {
+        guard pending != nil else { return }
+        setPending(nil)
+        restartListener()
+    }
+
+    private func setPending(_ value: (keyID: String, key: Data, expires: Date)?) {
+        pendingExpiry?.invalidate()
+        pendingExpiry = nil
+        pending = value
+        pendingKeyID = value?.keyID
     }
 
     /// The port the listener binds to: the one it used last time, else a random one from the dynamic range.
@@ -199,10 +263,29 @@ final class CompanionHub {
         return out
     }
 
-    /// Unpairs every phone by rotating the link key (phones keep nothing that still works).
+    /// Unpairs one phone: its key is deleted, so it can't connect again until it's paired anew. A
+    /// phone still on the old shared key takes that key with it (any other phone still on it re-pairs).
+    func forget(_ phoneID: String) {
+        guard let phone = paired.first(where: { $0.id == phoneID }) else { return }
+        for keyID in [phone.keyID, phone.offeredKeyID].compactMap({ $0 }) { Self.storePhoneKey(nil, keyID) }
+        if phone.keyID == nil { CompanionIdentity.store(key: nil) }
+        paired.removeAll { $0.id == phoneID }
+        savePaired()
+        for (_, entry) in channels where entry.phoneID == phoneID {
+            entry.channel.send(.bye(reason: "This iPhone was unpaired on the Mac."))
+            entry.channel.close()
+        }
+        if listenerKeys().isEmpty { stop() } else { restartListener() }
+    }
+
+    /// Unpairs every phone: every key goes, so phones keep nothing that still works.
     func forgetAllPhones() {
         stop()
         CompanionIdentity.store(key: nil)
+        for phone in paired {
+            for keyID in [phone.keyID, phone.offeredKeyID].compactMap({ $0 }) { Self.storePhoneKey(nil, keyID) }
+        }
+        setPending(nil)
         paired = []
         savePaired()
     }
@@ -235,6 +318,8 @@ final class CompanionHub {
 
     private func handle(_ message: CompanionMessage, from id: ObjectIdentifier) {
         guard let entry = channels[id] else { return }
+        // Nothing counts until the phone has said who it is and proved which key it holds.
+        if entry.phoneID == nil { guard case .hello = message else { return } }
         switch message {
         case .hello(let hello):
             guard hello.protocolVersion == CompanionService.protocolVersion else {
@@ -242,6 +327,16 @@ final class CompanionHub {
                 entry.channel.close()
                 return
             }
+            if let bound = entry.phoneID, bound != hello.deviceID {
+                entry.channel.close()
+                return
+            }
+            guard let match = authenticate(hello, on: entry.channel) else {
+                entry.channel.send(.bye(reason: "This iPhone isn't paired with this Mac any more. Pair it again."))
+                entry.channel.close()
+                return
+            }
+            let keysChanged = settleKey(match, for: hello, on: entry.channel)
             channels[id]?.phoneID = hello.deviceID
             // A repeat hello (the phone was renamed) keeps its place in the media-key queue.
             let known = phones.first { $0.id == hello.deviceID }
@@ -263,6 +358,7 @@ final class CompanionHub {
             if let snapshot = snapshot?() { entry.channel.send(.snapshot(snapshot)) }
             if let media = macMedia?() { entry.channel.send(.media(media)) }
             onPhoneConnected?()
+            if keysChanged { restartListener() }
         case .displayState(let displaying):
             guard let phoneID = entry.phoneID, let i = phones.firstIndex(where: { $0.id == phoneID }) else { return }
             if displaying, !phones[i].displaying { phones[i].since = Date() }
@@ -302,6 +398,93 @@ final class CompanionHub {
         default:
             break
         }
+    }
+
+    private enum KeyMatch {
+        /// The old shared key; `proven` false for older phones that send no proof.
+        case legacy(proven: Bool)
+        /// A paired phone's own key (or one it was sent with `rekey`).
+        case own(String)
+        /// The pairing code on show.
+        case invite(String, Data)
+    }
+
+    /// Which key this phone connected with, checked against the proof in its hello. Nil = not one of ours.
+    private func authenticate(_ hello: CompanionHello, on channel: CompanionChannel) -> KeyMatch? {
+        guard let proof = hello.proof else {
+            // An older phone, which only knows the shared key. TLS already proved it holds one of the
+            // listener's keys; without the shared key it can't be one of these.
+            return CompanionIdentity.storedKey() == nil ? nil : .legacy(proven: false)
+        }
+        guard let binding = channel.sessionBinding() else { return nil }
+        guard let keyID = hello.keyID else {
+            guard let legacy = CompanionIdentity.storedKey(), CompanionKeys.verify(proof, key: legacy, binding: binding) else { return nil }
+            return .legacy(proven: true)
+        }
+        if let pending, pending.keyID == keyID {
+            guard pending.expires > Date(), CompanionKeys.verify(proof, key: pending.key, binding: binding) else { return nil }
+            return .invite(keyID, pending.key)
+        }
+        guard paired.contains(where: { $0.keyID == keyID || $0.offeredKeyID == keyID }),
+              let key = Self.phoneKey(keyID), CompanionKeys.verify(proof, key: key, binding: binding) else { return nil }
+        return .own(keyID)
+    }
+
+    /// Records which key `hello`'s phone now uses: a pairing code becomes its own key (and is used
+    /// up), a phone on the shared key is sent one of its own, and the shared key goes once no phone
+    /// needs it. Returns whether the listener's set of keys changed.
+    private func settleKey(_ match: KeyMatch, for hello: CompanionHello, on channel: CompanionChannel) -> Bool {
+        var changed = false
+        func entryIndex() -> Int {
+            if let i = paired.firstIndex(where: { $0.id == hello.deviceID }) { return i }
+            paired.append(PairedPhone(id: hello.deviceID, name: hello.label, lastSeen: Date()))
+            return paired.count - 1
+        }
+        func retire(_ keyID: String?) {
+            guard let keyID else { return }
+            Self.storePhoneKey(nil, keyID)
+            changed = true
+        }
+        switch match {
+        case .invite(let keyID, let key):
+            // Re-pairing a phone: its old key goes.
+            Self.storePhoneKey(key, keyID)
+            let i = entryIndex()
+            if paired[i].keyID != keyID { retire(paired[i].keyID) }
+            retire(paired[i].offeredKeyID)
+            paired[i].keyID = keyID
+            paired[i].offeredKeyID = nil
+            setPending(nil)
+        case .own(let keyID):
+            guard let i = paired.firstIndex(where: { $0.keyID == keyID || $0.offeredKeyID == keyID }) else { return false }
+            // Reinstalled apps get a new device id but keep their Keychain key.
+            paired[i].id = hello.deviceID
+            if paired[i].offeredKeyID == keyID {
+                retire(paired[i].keyID)
+                paired[i].keyID = keyID
+                paired[i].offeredKeyID = nil
+            }
+        case .legacy(let proven):
+            let i = entryIndex()
+            if proven {
+                // Give it a key of its own; it switches on its next connection.
+                let keyID = paired[i].offeredKeyID ?? CompanionKeys.newKeyID()
+                let key = Self.phoneKey(keyID) ?? {
+                    let k = PairingInvite.newKey()
+                    Self.storePhoneKey(k, keyID)
+                    changed = true
+                    return k
+                }()
+                paired[i].offeredKeyID = keyID
+                channel.send(.rekey(keyID: keyID, key: key))
+            }
+        }
+        // Nobody on the shared key any more: it stops working.
+        if CompanionIdentity.storedKey() != nil, paired.allSatisfy({ $0.keyID != nil }) {
+            CompanionIdentity.store(key: nil)
+            changed = true
+        }
+        return changed
     }
 
     private func upsertPhone(_ phone: ConnectedPhone) {

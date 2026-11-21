@@ -190,3 +190,50 @@ struct PairingTests {
         #expect(PairingInvite(string: "cadence-pair://pair?k=" + PairingInvite.base64URL(PairingInvite.newKey())) == nil)
     }
 }
+
+@Suite("Per-phone keys")
+struct CompanionKeyTests {
+    @Test func inviteCarriesKeyID() throws {
+        let invite = PairingInvite(macID: "mac", macName: "Mac", key: PairingInvite.newKey(), keyID: "abc123")
+        let back = try #require(PairingInvite(url: invite.url))
+        #expect(back.keyID == "abc123")
+        #expect(back.key == invite.key)
+        // Codes from older Macs have no key id: the shared key.
+        let old = PairingInvite(macID: "mac", macName: "Mac", key: invite.key)
+        #expect(PairingInvite(url: old.url)?.keyID == nil)
+    }
+
+    @Test func identities() {
+        #expect(CompanionKeys.identity(for: nil) == "cadence")
+        #expect(CompanionKeys.identity(for: "k1") == "cadence.k1")
+        #expect(CompanionKeys.newKeyID() != CompanionKeys.newKeyID())
+    }
+
+    @Test func proofBindsKeyAndSession() {
+        let key = PairingInvite.newKey(), other = PairingInvite.newKey()
+        let session = Data(repeating: 7, count: 32), otherSession = Data(repeating: 8, count: 32)
+        let proof = CompanionKeys.proof(key: key, binding: session)
+        #expect(CompanionKeys.verify(proof, key: key, binding: session))
+        #expect(!CompanionKeys.verify(proof, key: other, binding: session))
+        // Replayed on another connection.
+        #expect(!CompanionKeys.verify(proof, key: key, binding: otherSession))
+        #expect(!CompanionKeys.verify(Data(), key: key, binding: session))
+    }
+
+    @Test func rekeyAndProofTravel() throws {
+        let key = PairingInvite.newKey()
+        let rekey = CompanionMessage.rekey(keyID: "k1", key: key)
+        var decoder = CompanionFrameDecoder()
+        #expect(try decoder.append(CompanionFraming.encode(rekey)) == [rekey])
+        let hello = CompanionMessage.hello(CompanionHello(deviceID: "p", deviceName: "iPhone", displaying: false,
+                                                          keyID: "k1", proof: Data([1, 2, 3])))
+        #expect(try decoder.append(CompanionFraming.encode(hello)) == [hello])
+    }
+
+    @Test func olderHelloStillDecodes() throws {
+        let json = #"{"hello":{"_0":{"protocolVersion":1,"deviceID":"p","deviceName":"iPhone","displaying":true}}}"#
+        let message = try CompanionFraming.decodeBody(Data(json.utf8))
+        guard case .hello(let hello) = message else { Issue.record("not a hello"); return }
+        #expect(hello.keyID == nil && hello.proof == nil)
+    }
+}

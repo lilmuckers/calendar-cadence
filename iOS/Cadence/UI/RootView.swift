@@ -30,6 +30,20 @@ struct RootView: View {
         .animation(Theme.spring, value: state.alerting?.id)
         .sheet(isPresented: $showSettings) { SettingsScreen() }
         .sheet(isPresented: $showPairing) { PairingScreen() }
+        .alert(pairingTitle, isPresented: pairingAsked, presenting: state.pendingInvite) { _ in
+            Button("Pair") { state.confirmPendingPairing() }
+            Button("Cancel", role: .cancel) { state.pendingInvite = nil }
+        } message: { _ in
+            Text("Only pair with a Mac you own. It will send this iPhone its calendar and alerts, and see what's playing here.")
+        }
+    }
+
+    private var pairingTitle: String {
+        "Pair with \(state.pendingInvite?.macName ?? "this Mac")?"
+    }
+
+    private var pairingAsked: Binding<Bool> {
+        Binding(get: { state.pendingInvite != nil }, set: { if !$0 { state.pendingInvite = nil } })
     }
 }
 

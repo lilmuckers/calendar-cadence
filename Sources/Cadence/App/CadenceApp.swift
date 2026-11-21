@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
+        Keychain.keepOnThisDevice()
         let panel = CountdownPanelController(state: state)
         let router = AlertRouter(state: state)
         self.panel = panel
@@ -139,7 +140,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hub.onJoinMeeting = { [weak self] meeting in
             guard let self else { return }
             let own = self.state.meetings.first { MeetingDeduplicator.isSameMeeting($0, meeting) }
-            self.state.join(own ?? meeting)
+            // A meeting this Mac doesn't have: open its link only if it's a meeting or web link,
+            // the same as links from calendars (never a file or another app's URL scheme).
+            var theirs = meeting
+            theirs.joinLink = meeting.joinLink.flatMap(MeetingLinkDetector.trusted)
+            guard let target = own ?? (theirs.joinLink == nil ? nil : theirs) else { return }
+            self.state.join(target)
             if let own { router.closeAlert(for: own.id) }
         }
         hub.onEnrichmentAction = { [weak self] id, action in self?.state.applyEnrichment(action, meetingID: id) }

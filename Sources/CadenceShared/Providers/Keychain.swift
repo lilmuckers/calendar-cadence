@@ -18,6 +18,17 @@ enum Keychain {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Moves every item saved by older builds (accessible after first unlock, backed up) to this
+    /// device only. Cheap and idempotent; run once at launch.
+    static func keepOnThisDevice() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+        ]
+        let attributes: [String: Any] = [kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+        SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+    }
+
     static func set(_ value: String?, for account: String) {
         let base: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -28,12 +39,15 @@ enum Keychain {
             SecItemDelete(base as CFDictionary)
             return
         }
-        let status = SecItemUpdate(base as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        // This device only: tokens and link keys stay out of backups restored onto another device
+        // (an update also moves items saved before this onto it).
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+        ]
+        let status = SecItemUpdate(base as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {
-            var add = base
-            add[kSecValueData as String] = data
-            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-            SecItemAdd(add as CFDictionary, nil)
+            SecItemAdd(base.merging(attributes) { $1 } as CFDictionary, nil)
         }
     }
 }
