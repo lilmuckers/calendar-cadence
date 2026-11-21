@@ -34,6 +34,8 @@ struct PairedMac: Codable, Equatable, Identifiable {
 
     /// Where this Mac's link key lives in the Keychain (each Mac has its own).
     var keyAccount: String { CompanionClient.keyAccount(for: id) }
+    /// Which of the Mac's keys that is (`CompanionKeys`); nil = the key older Macs shared with every phone.
+    var keyID: String? = nil
 }
 
 /// The phone's links to every Mac it paired with, highest priority first. Each Mac has its own
@@ -158,7 +160,8 @@ final class CompanionClient {
         existing?.stop()
         var book = existing?.mac.book() ?? CompanionAddressBook()
         book.learn(hosts: invite.hosts, port: invite.port, now: Date(), worked: false)
-        let mac = PairedMac(id: invite.macID, name: invite.macName, nickname: existing?.mac.nickname, addresses: book)
+        let mac = PairedMac(id: invite.macID, name: invite.macName, nickname: existing?.mac.nickname, addresses: book,
+                            keyID: invite.keyID)
         CompanionIdentity.store(key: invite.key, mac.keyAccount)
         if let existing {
             existing.replace(mac)
@@ -212,7 +215,7 @@ final class CompanionClient {
         helloResend = Timer.scheduledTimer(withTimeInterval: 1, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                for link in self.connected { link.send(.hello(self.hello)) }
+                for link in self.connected { link.sendHello() }
             }
         }
     }
@@ -342,7 +345,7 @@ final class MacLink: Identifiable {
         running = true
         guard browser == nil else { return }
         let browser = NWBrowser(for: .bonjour(type: CompanionService.type, domain: nil),
-                                using: CompanionNetwork.parameters(key: key))
+                                using: CompanionNetwork.parameters(key: key, keyID: mac.keyID))
         browser.browseResultsChangedHandler = { [weak self] results, _ in
             MainActor.assumeIsolated { self?.found(results) }
         }
@@ -464,7 +467,7 @@ final class MacLink: Identifiable {
     private func connect(_ endpoint: NWEndpoint, direct: (host: String, port: UInt16)? = nil) {
         guard let key, running else { return }
         status = .connecting
-        let channel = CompanionChannel(connection: NWConnection(to: endpoint, using: CompanionNetwork.parameters(key: key)))
+        let channel = CompanionChannel(connection: NWConnection(to: endpoint, using: CompanionNetwork.parameters(key: key, keyID: mac.keyID)))
         self.channel = channel
         dialTimeout?.invalidate()
         dialling = direct
@@ -477,8 +480,8 @@ final class MacLink: Identifiable {
             }
         }
         channel.onReady = { [weak self, weak channel] in
-            guard let self, let channel, let hello = self.hello?() else { return }
-            channel.send(.hello(hello))
+            guard let self, let channel else { return }
+            self.sendHello(on: channel)
         }
         channel.onMessage = { [weak self] message in self?.handle(message) }
         channel.onClose = { [weak self, weak channel] error in
@@ -535,6 +538,12 @@ final class MacLink: Identifiable {
             status = .connected
         case .features(let list):
             features = Set(list)
+        case .rekey(let keyID, let key):
+            // A key of this phone's own, in place of the one the Mac shared with every phone; used
+            // from the next connection (this one carries on with the old one).
+            guard key.count == PairingInvite.keyLength, !keyID.isEmpty else { return }
+            CompanionIdentity.store(key: key, mac.keyAccount)
+            update { $0.keyID = keyID }
         case .address(let hosts, let port):
             // Where the Mac is on the network we're connected over: keep it alongside the others,
             // and count it as working now.
@@ -553,6 +562,19 @@ final class MacLink: Identifiable {
     }
 
     func send(_ message: CompanionMessage) { channel?.send(message) }
+
+    /// Says hello again (the phone was renamed).
+    func sendHello() {
+        if let channel { sendHello(on: channel) }
+    }
+
+    /// Hello, with which of the Mac's keys this is and proof that this TLS session was made with it.
+    private func sendHello(on channel: CompanionChannel) {
+        guard var hello = hello?(), let key, let binding = channel.sessionBinding() else { return }
+        hello.keyID = mac.keyID
+        hello.proof = CompanionKeys.proof(key: key, binding: binding)
+        channel.send(.hello(hello))
+    }
 
     private static func describe(_ error: Error) -> String {
         if let nw = error as? NWError, case .tls = nw {

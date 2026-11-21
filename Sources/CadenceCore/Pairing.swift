@@ -4,7 +4,7 @@ import Foundation
 ///
 /// The link carries the Mac's 256-bit link key itself, so there's no guessable short code: whoever can
 /// see the Mac's screen can pair, nobody sniffing the network can. Both sides then use the key as a
-/// TLS pre-shared key. Forgetting paired phones rotates the key.
+/// TLS pre-shared key. Each code is a fresh key for one phone (`keyID`) and works once.
 public struct PairingInvite: Equatable, Sendable {
     public static let scheme = "cadence-pair"
     public static let keyLength = 32
@@ -12,16 +12,19 @@ public struct PairingInvite: Equatable, Sendable {
     public var macID: String
     public var macName: String
     public var key: Data
+    /// Which key this is (`CompanionKeys`). Nil from older Macs, whose one key every phone shares.
+    public var keyID: String?
     /// The Mac's LAN addresses and listening port, so the phone can dial it directly when Bonjour
     /// can't find it (networks or security software that drop multicast DNS). Optional: older invites
     /// don't carry them.
     public var hosts: [String]
     public var port: UInt16?
 
-    public init(macID: String, macName: String, key: Data, hosts: [String] = [], port: UInt16? = nil) {
+    public init(macID: String, macName: String, key: Data, keyID: String? = nil, hosts: [String] = [], port: UInt16? = nil) {
         self.macID = macID
         self.macName = macName
         self.key = key
+        self.keyID = keyID
         self.hosts = hosts
         self.port = port
     }
@@ -35,7 +38,7 @@ public struct PairingInvite: Equatable, Sendable {
             .init(name: "id", value: macID),
             .init(name: "name", value: macName),
             .init(name: "k", value: Self.base64URL(key)),
-        ] + hosts.map { .init(name: "h", value: $0) } + (port.map { [.init(name: "p", value: String($0))] } ?? [])
+        ] + (keyID.map { [.init(name: "i", value: $0)] } ?? []) + hosts.map { .init(name: "h", value: $0) } + (port.map { [.init(name: "p", value: String($0))] } ?? [])
         return c.url!
     }
 
@@ -45,7 +48,7 @@ public struct PairingInvite: Equatable, Sendable {
         func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
         guard let id = value("id"), !id.isEmpty,
               let k = value("k").flatMap(Self.data(base64URL:)), k.count == Self.keyLength else { return nil }
-        self.init(macID: id, macName: value("name") ?? "Mac", key: k,
+        self.init(macID: id, macName: value("name") ?? "Mac", key: k, keyID: value("i").flatMap { $0.isEmpty ? nil : $0 },
                   hosts: items.filter { $0.name == "h" }.compactMap(\.value).filter { !$0.isEmpty },
                   port: value("p").flatMap(UInt16.init).flatMap { $0 == 0 ? nil : $0 })
     }

@@ -8,6 +8,7 @@ struct PhoneTab: View {
     @Environment(AppState.self) private var state
     @State private var invite: PairingInvite?
     @State private var confirmForget = false
+    @State private var forgetting: PairedPhone?
 
     var body: some View {
         @Bindable var state = state
@@ -42,7 +43,10 @@ struct PhoneTab: View {
 
                 Section {
                     if let invite {
-                        PairingCard(invite: invite) { self.invite = nil }
+                        PairingCard(invite: invite) {
+                            self.invite = nil
+                            hub.cancelInvite()
+                        }
                     } else {
                         LabeledContent("Pair an iPhone") {
                             Button("Show Pairing Code…") { invite = hub.invite() }
@@ -51,10 +55,14 @@ struct PhoneTab: View {
                     if !hub.paired.isEmpty {
                         ForEach(hub.paired) { phone in
                             LabeledContent {
-                                Text(hub.phones.contains { $0.id == phone.id }
-                                     ? "Connected"
-                                     : "Last seen \(phone.lastSeen.formatted(.relative(presentation: .named)))")
-                                    .foregroundStyle(.secondary)
+                                HStack(spacing: 10) {
+                                    Text(hub.phones.contains { $0.id == phone.id }
+                                         ? "Connected"
+                                         : "Last seen \(phone.lastSeen.formatted(.relative(presentation: .named)))")
+                                        .foregroundStyle(.secondary)
+                                    Button("Forget…") { forgetting = phone }
+                                        .controlSize(.small)
+                                }
                             } label: {
                                 Label(phone.name, systemImage: "iphone")
                             }
@@ -70,6 +78,17 @@ struct PhoneTab: View {
             }
         }
         .formStyle(.grouped)
+        // A code works once: close it when a phone pairs with it (or it expires).
+        .onChange(of: state.companion.pendingKeyID) { _, keyID in if keyID == nil { invite = nil } }
+        .confirmationDialog("Forget \(forgetting?.name ?? "this iPhone")?",
+                            isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } }),
+                            presenting: forgetting) { phone in
+            Button("Forget", role: .destructive) { state.companion.forget(phone.id) }
+        } message: { phone in
+            Text(phone.keyID == nil
+                 ? "It disconnects now and needs a new code to pair again. It still uses the key every iPhone shared before this version, so any other iPhone that hasn't connected since the update needs a new code too."
+                 : "It disconnects now and needs a new code to pair again. Other iPhones stay paired.")
+        }
         .confirmationDialog("Forget every paired iPhone?", isPresented: $confirmForget) {
             Button("Forget All", role: .destructive) {
                 invite = nil
@@ -129,7 +148,7 @@ private struct PairingCard: View {
                 Text("Scan with Cadence on your iPhone").font(.headline)
                 Text("Open Cadence on the phone → Pair with Mac → Scan. Or copy the link and paste it there.")
                     .font(.callout).foregroundStyle(.secondary)
-                Text("Anyone who can see this code can pair, so close it when you're done.")
+                Text("Anyone who can see this code can pair, so close it when you're done. It works once, for 15 minutes.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button("Copy Link") {

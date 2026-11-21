@@ -3,15 +3,23 @@ import Foundation
 import Network
 import Security
 
-/// Network parameters shared by the Mac's listener and the phone's connection: TCP + TLS 1.2 with a
-/// pre-shared key (the 32-byte link key from pairing), peer-to-peer allowed so the link also works
+/// Network parameters shared by the Mac's listener and the phone's connection: TCP + TLS 1.2 with
+/// pre-shared keys (32-byte link keys from pairing), peer-to-peer allowed so the link also works
 /// over AWDL when the two aren't on the same Wi-Fi.
 enum CompanionNetwork {
-    static func parameters(key: Data) -> NWParameters {
+    /// One key, for a phone dialling its Mac (`keyID` nil = the legacy shared key).
+    static func parameters(key: Data, keyID: String?) -> NWParameters {
+        parameters(keys: [(CompanionKeys.identity(for: keyID), key)])
+    }
+
+    /// Every phone's key, for the Mac's listener: TLS uses the one whose identity the phone offers.
+    static func parameters(keys: [(identity: String, key: Data)]) -> NWParameters {
         let tls = NWProtocolTLS.Options()
-        let psk = key.withUnsafeBytes { DispatchData(bytes: $0) }
-        let identity = Data("cadence".utf8).withUnsafeBytes { DispatchData(bytes: $0) }
-        sec_protocol_options_add_pre_shared_key(tls.securityProtocolOptions, psk as __DispatchData, identity as __DispatchData)
+        for (identity, key) in keys {
+            let psk = key.withUnsafeBytes { DispatchData(bytes: $0) }
+            let id = Data(identity.utf8).withUnsafeBytes { DispatchData(bytes: $0) }
+            sec_protocol_options_add_pre_shared_key(tls.securityProtocolOptions, psk as __DispatchData, id as __DispatchData)
+        }
         sec_protocol_options_append_tls_ciphersuite(
             tls.securityProtocolOptions, tls_ciphersuite_t(rawValue: UInt16(TLS_PSK_WITH_AES_128_GCM_SHA256))!)
         sec_protocol_options_set_max_tls_protocol_version(tls.securityProtocolOptions, .TLSv12)
@@ -81,6 +89,16 @@ final class CompanionChannel {
         } else {
             send(.ping)
         }
+    }
+
+    /// Keying material unique to this TLS session (both ends get the same bytes), which the hello
+    /// proof signs. Nil before the handshake finishes.
+    func sessionBinding() -> Data? {
+        guard let meta = connection.metadata(definition: NWProtocolTLS.definition) as? NWProtocolTLS.Metadata,
+              let secret = sec_protocol_metadata_create_secret(
+                  meta.securityProtocolMetadata, CompanionKeys.exporterLabel.utf8.count,
+                  CompanionKeys.exporterLabel, CompanionKeys.exporterLength) else { return nil }
+        return Data(secret as DispatchData)
     }
 
     func send(_ message: CompanionMessage) {
