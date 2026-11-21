@@ -78,6 +78,8 @@ public enum SettingsArchive {
 
         var merged = try jsonObject(current)
         for (key, value) in incoming { merged[key] = value }
+        // JSONSerialization raises (rather than throws) on values JSON can't hold.
+        guard JSONSerialization.isValidJSONObject(merged) else { throw ArchiveError.badValue("a value can't be read") }
         let data = try JSONSerialization.data(withJSONObject: merged)
         do {
             let settings = try JSONDecoder().decode(T.self, from: data)

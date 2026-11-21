@@ -142,12 +142,20 @@ public enum YAML {
         return value
     }
 
+    /// How deeply collections may nest. Settings files need a handful of levels; the cap keeps a
+    /// hostile file from recursing until the stack runs out.
+    static let maxDepth = 64
+
     private struct Parser {
         var lines: [Line]
         var index = 0
+        var depth = 0
 
         mutating func node(indent: Int) throws -> Any {
             let line = lines[index]
+            depth += 1
+            defer { depth -= 1 }
+            guard depth <= YAML.maxDepth else { throw ParseError(line: line.number, message: "Nested too deeply") }
             if isSequenceItem(line.text) { return try sequence(indent: indent) }
             if splitKey(line.text) != nil { return try mapping(indent: indent) }
             index += 1
@@ -293,14 +301,16 @@ public enum YAML {
         let isInt = s.range(of: #"^[-+]?[0-9]+$"#, options: .regularExpression) != nil
         if isInt, let i = Int(s) { return NSNumber(value: i) }
         let isFloat = s.range(of: #"^[-+]?([0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)([eE][-+]?[0-9]+)?$"#, options: .regularExpression) != nil
-        if isFloat, let d = Double(s) { return NSNumber(value: d) }
+        // "1e999" overflows to infinity, which JSON can't hold (writing it raises an exception): leave it a string.
+        if isFloat, let d = Double(s), d.isFinite { return NSNumber(value: d) }
         return nil
     }
 
     /// One scalar or one-line flow collection.
-    private static func value(_ text: String, line: Int) throws -> Any {
+    private static func value(_ text: String, line: Int, depth: Int = 0) throws -> Any {
         let s = text.trimmingCharacters(in: .whitespaces)
         guard let first = s.first else { return NSNull() }
+        if first == "[" || first == "{", depth >= maxDepth { throw ParseError(line: line, message: "Nested too deeply") }
         switch first {
         case "\"":
             guard let end = closingQuote(Array(s), from: 0), end == s.count - 1 else {
@@ -318,13 +328,13 @@ public enum YAML {
             return String(s.dropFirst().dropLast()).replacingOccurrences(of: "''", with: "'")
         case "[":
             guard s.last == "]" else { throw ParseError(line: line, message: "Unclosed [") }
-            return try flowItems(String(s.dropFirst().dropLast()), line: line).map { try value($0, line: line) }
+            return try flowItems(String(s.dropFirst().dropLast()), line: line).map { try value($0, line: line, depth: depth + 1) }
         case "{":
             guard s.last == "}" else { throw ParseError(line: line, message: "Unclosed {") }
             var dict: [String: Any] = [:]
             for item in try flowItems(String(s.dropFirst().dropLast()), line: line) {
                 guard let (k, v) = splitKey(item) else { throw ParseError(line: line, message: "Expected \"key: value\" in {…}") }
-                dict[try keyName(k, line: line)] = v.isEmpty ? NSNull() : try value(v, line: line)
+                dict[try keyName(k, line: line)] = v.isEmpty ? NSNull() : try value(v, line: line, depth: depth + 1)
             }
             return dict
         case "&", "*", "!", "|", ">", "@", "`":

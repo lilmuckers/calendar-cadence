@@ -166,4 +166,21 @@ struct SettingsArchiveTests {
             try SettingsArchive.read(text, over: Sample())
         }
     }
+
+    /// A number too big for a Double became infinity, and writing infinity as JSON raised an
+    /// exception that took the whole app down on import.
+    @Test func hugeNumbersDoNotCrashTheImport() throws {
+        #expect(try YAML.decode("x: 1e999") as? [String: String] == ["x": "1e999"])
+        let text = "format: cadence-settings\nversion: 1\nsettings:\n  lead: 1e999\n"
+        #expect(throws: SettingsArchive.ArchiveError.self) { try SettingsArchive.read(text, over: Sample()) }
+    }
+
+    @Test func refusesDeepNesting() {
+        let flow = "x: " + String(repeating: "[", count: 10_000) + String(repeating: "]", count: 10_000)
+        #expect(throws: YAML.ParseError.self) { try YAML.decode(flow) }
+        let block = (0..<200).map { String(repeating: " ", count: $0) + "k:" }.joined(separator: "\n")
+        #expect(throws: YAML.ParseError.self) { try YAML.decode(block) }
+        let fine = "a:\n  b:\n    c: [[1, {d: [2]}]]"
+        #expect(throws: Never.self) { try YAML.decode(fine) }
+    }
 }
