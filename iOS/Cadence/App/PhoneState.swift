@@ -79,6 +79,7 @@ final class PhoneState {
 
     @ObservationIgnored private var planner = AlertPlanner()
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var lastGlanceUpdate = Date.distantPast
     @ObservationIgnored private var lastRemoteRefresh: Date?
     @ObservationIgnored private var isActive = false
     @ObservationIgnored private var started = false
@@ -291,6 +292,7 @@ final class PhoneState {
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
+        timer.tolerance = 0.1
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }
@@ -518,7 +520,12 @@ final class PhoneState {
         if let alerting, !alerting.id.hasPrefix("preview"), let closeAt = autoDismissDate(for: alerting), now > closeAt {
             self.alerting = nil
         }
-        if Int(now.timeIntervalSince1970) % 30 == 0 { updateLiveActivity(); updateWidgets() }
+        // Every 30 s. Checked by elapsed time: a drifting 1 s timer can step over an exact :00 / :30.
+        if now.timeIntervalSince(lastGlanceUpdate) >= 30 || now < lastGlanceUpdate {
+            lastGlanceUpdate = now
+            updateLiveActivity()
+            updateWidgets()
+        }
         if isActive && (displaying || link.isConnected) {
             nowPlaying.poll()
             // Something's playing that isn't Music: if it's Spotify, pick up its track quietly.
