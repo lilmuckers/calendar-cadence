@@ -4,8 +4,9 @@ import Foundation
 ///
 /// Since iOS 16 an app only sees the phone's own name ("Pat's iPhone") with a special entitlement
 /// from Apple; otherwise `UIDevice.current.name` is just "iPhone". So the phone also sends its
-/// hardware model ("iPhone17,1"), and the user can give it a name in the phone's Settings. The Mac
-/// shows that name, or the real device name when it gets one, and otherwise the model ("iPhone 16 Pro").
+/// hardware model ("iPhone16,1"), and the user can give it a name in the phone's Settings. The Mac
+/// shows that name, or the real device name when it gets one, with the model after it
+/// ("Forever In A Pocket (iPhone 15 Pro)"), and otherwise just the model ("iPhone 15 Pro").
 public enum CompanionDeviceName {
     /// The generic names iOS hands out instead of the user's device name.
     static let generic: Set<String> = ["iphone", "ipad", "ipod touch", ""]
@@ -18,8 +19,11 @@ public enum CompanionDeviceName {
     /// "iPhone17,1", or nil from older phones).
     public static func label(name: String, model: String?) -> String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !isGeneric(trimmed) { return trimmed }
-        return model.map(marketingName) ?? (trimmed.isEmpty ? "iPhone" : trimmed)
+        let modelName = model.map(marketingName)
+        guard !isGeneric(trimmed) else { return modelName ?? (trimmed.isEmpty ? "iPhone" : trimmed) }
+        // A name that already says the model ("Pat's iPhone 15 Pro") doesn't need it twice.
+        guard let modelName, !trimmed.localizedCaseInsensitiveContains(modelName) else { return trimmed }
+        return "\(trimmed) (\(modelName))"
     }
 
     /// "iPhone17,1" → "iPhone 16 Pro". Unknown identifiers fall back to the family ("iPhone", "iPad").

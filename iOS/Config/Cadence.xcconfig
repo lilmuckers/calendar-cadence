@@ -9,6 +9,8 @@ CURRENT_PROJECT_VERSION = 1
 CADENCE_BUNDLE_ID = com.cadence.companion
 // Free Personal Teams can't sign the Time Sensitive Notifications capability:
 // set this to Config/Cadence-PersonalTeam.entitlements in Local.xcconfig.
+// Paid account with Apple's user-assigned device name entitlement granted? Set it to
+// Config/Cadence-DeviceName.entitlements and the Macs show the phone's own name.
 CADENCE_ENTITLEMENTS = Config/Cadence.entitlements
 
 // Google "iOS" OAuth client: the part before ".apps.googleusercontent.com".

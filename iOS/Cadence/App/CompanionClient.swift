@@ -101,7 +101,8 @@ final class CompanionClient {
     @ObservationIgnored private var running = false
 
     /// What this phone is called on the Macs. Blank = what iOS reports, which since iOS 16 is just
-    /// "iPhone" (the Mac then shows the model, e.g. "iPhone 16 Pro").
+    /// "iPhone" (the Mac then shows the model, e.g. "iPhone 15 Pro") unless the app has Apple's
+    /// user-assigned device name entitlement (Config/Cadence-DeviceName.entitlements).
     private(set) var deviceName: String = UserDefaults.standard.string(forKey: CompanionClient.deviceNameKey) ?? ""
 
     /// The name the Mac shows when the user hasn't set one.
