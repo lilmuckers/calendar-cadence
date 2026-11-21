@@ -56,6 +56,7 @@ struct MenuBarLabel: View {
 struct MenuBarView: View {
     @Environment(AppState.self) private var state
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
     @State private var expanded: String?
 
     var body: some View {
@@ -216,6 +217,10 @@ struct MenuBarView: View {
             IconButton(symbol: "gearshape", help: "Settings") {
                 NSApp.activate(ignoringOtherApps: true)
                 openSettings()
+            }
+            IconButton(symbol: "info.circle", help: "About Cadence") {
+                NSApp.activate(ignoringOtherApps: true)
+                openWindow(id: "about")
             }
             IconButton(symbol: "power", help: "Quit Cadence") { NSApp.terminate(nil) }
         }
