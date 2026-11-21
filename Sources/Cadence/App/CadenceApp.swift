@@ -20,6 +20,7 @@ struct CadenceApp: App {
 
         Window("About Cadence", id: "about") {
             AboutView()
+                .trackingWindowVisibility()
                 .frame(width: 440)
                 .fixedSize(horizontal: false, vertical: true)
                 .ignoresSafeArea()

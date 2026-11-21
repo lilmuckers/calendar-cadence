@@ -18,6 +18,12 @@ struct AboutView: View {
     @State private var pokes = 0
     @State private var physics = GooglyPhysics()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if os(macOS)
+    /// The About window stays alive once closed or hidden; stop drawing frames for it then.
+    @Environment(\.windowVisible) private var visible
+    #else
+    private let visible = true
+    #endif
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,7 +39,8 @@ struct AboutView: View {
             let size = geo.size
             let side = min(size.width, size.height) * 0.72
             let center = CGPoint(x: size.width / 2, y: size.height * 0.52)
-            TimelineView(.animation) { timeline in
+            // 60 fps is plenty for springs and a slow sunburst (ProMotion would otherwise draw 120).
+            TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !visible)) { timeline in
                 let t = timeline.date.timeIntervalSinceReferenceDate
                 let _ = physics.step(toward: target, at: timeline.date, jitter: mood == .panicking && !reduceMotion ? 1 : 0)
                 Canvas { ctx, canvasSize in
