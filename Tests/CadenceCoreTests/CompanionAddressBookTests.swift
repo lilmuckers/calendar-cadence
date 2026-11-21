@@ -88,8 +88,17 @@ struct CompanionAddressBookTests {
 
 @Suite("Companion device name")
 struct CompanionDeviceNameTests {
-    @Test func realNameWins() {
-        #expect(CompanionDeviceName.label(name: "Pat's iPhone", model: "iPhone17,1") == "Pat's iPhone")
+    @Test func realNameComesWithModel() {
+        #expect(CompanionDeviceName.label(name: "Forever In A Pocket", model: "iPhone16,1") == "Forever In A Pocket (iPhone 15 Pro)")
+        #expect(CompanionDeviceName.label(name: "Pocket", model: "iPhone99,9") == "Pocket (iPhone)")
+    }
+
+    @Test func nameAlreadyNamingModelIsNotRepeated() {
+        #expect(CompanionDeviceName.label(name: "Pat's iPhone 15 Pro", model: "iPhone16,1") == "Pat's iPhone 15 Pro")
+    }
+
+    @Test func realNameWithoutModelStandsAlone() {
+        #expect(CompanionDeviceName.label(name: "Pat's iPhone", model: nil) == "Pat's iPhone")
     }
 
     @Test func genericNameFallsBackToModel() {
