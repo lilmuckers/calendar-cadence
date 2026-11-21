@@ -490,6 +490,7 @@ private struct MacDetailScreen: View {
     let link: MacLink
     @State private var nickname = ""
     @State private var confirmUnpair = false
+    @AppStorage("Cadence.companion.showLinkTraffic") private var advanced = false
 
     var body: some View {
         Form {
@@ -513,6 +514,14 @@ private struct MacDetailScreen: View {
                     Text("Can't reach this Mac. Make sure Cadence is open on it and you're on the same Wi-Fi, or scan its pairing code again (Pair another Mac).")
                         .font(.callout).foregroundStyle(.secondary)
                 }
+            }
+            Section {
+                Toggle("Advanced", isOn: $advanced.animation())
+            } footer: {
+                Text("Shows what goes over the link with this Mac: data used and each type of message over time.")
+            }
+            if advanced {
+                LinkTrafficSections(traffic: state.link.traffic.traffic(for: link.mac.id), peer: link.mac.displayName)
             }
             Section {
                 Button("Unpair", role: .destructive) { confirmUnpair = true }

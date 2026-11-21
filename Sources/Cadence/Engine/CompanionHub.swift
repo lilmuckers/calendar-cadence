@@ -92,6 +92,11 @@ final class CompanionHub {
     /// The key id of the pairing code on show, nil once it's used, cancelled or expired.
     private(set) var pendingKeyID: String?
     @ObservationIgnored private var channels: [ObjectIdentifier: (channel: CompanionChannel, phoneID: String?)] = [:]
+    /// What's gone over the link with each phone since Cadence opened (Settings → iPhone → Advanced).
+    let traffic = LinkTrafficStore()
+    /// Traffic on a channel before its phone has said who it is; it joins that phone's log after
+    /// the hello, or is dropped if the hello fails.
+    @ObservationIgnored private var unclaimedTraffic: [ObjectIdentifier: [(kind: String, direction: LinkDirection, bytes: Int, at: Date)]] = [:]
     @ObservationIgnored private var refresher: Timer?
     @ObservationIgnored private var retry: Timer?
 
@@ -275,6 +280,7 @@ final class CompanionHub {
             entry.channel.send(.bye(reason: "This iPhone was unpaired on the Mac."))
             entry.channel.close()
         }
+        traffic.reset(phoneID)
         if listenerKeys().isEmpty { stop() } else { restartListener() }
     }
 
@@ -301,10 +307,19 @@ final class CompanionHub {
         let id = ObjectIdentifier(channel)
         channels[id] = (channel, nil)
         channel.onMessage = { [weak self] message in self?.handle(message, from: id) }
+        channel.onTraffic = { [weak self] message, direction, bytes in
+            guard let self else { return }
+            if let phoneID = self.channels[id]?.phoneID {
+                self.traffic.record(kind: message.kind, direction, bytes: bytes, peer: phoneID)
+            } else {
+                self.unclaimedTraffic[id, default: []].append((message.kind, direction, bytes, Date()))
+            }
+        }
         channel.onClose = { [weak self] _ in
             guard let self else { return }
             let phoneID = self.channels[id]?.phoneID
             self.channels[id] = nil
+            self.unclaimedTraffic[id] = nil
             if let phoneID, !self.channels.values.contains(where: { $0.phoneID == phoneID }) {
                 self.phones.removeAll { $0.id == phoneID }
                 self.phoneMedia[phoneID] = nil
@@ -338,6 +353,9 @@ final class CompanionHub {
             }
             let keysChanged = settleKey(match, for: hello, on: entry.channel)
             channels[id]?.phoneID = hello.deviceID
+            for event in unclaimedTraffic.removeValue(forKey: id) ?? [] {
+                traffic.record(kind: event.kind, event.direction, bytes: event.bytes, at: event.at, peer: hello.deviceID)
+            }
             // A repeat hello (the phone was renamed) keeps its place in the media-key queue.
             let known = phones.first { $0.id == hello.deviceID }
             upsertPhone(ConnectedPhone(id: hello.deviceID, name: hello.label, displaying: hello.displaying,
