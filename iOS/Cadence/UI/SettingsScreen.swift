@@ -1,163 +1,42 @@
 import CadenceCore
 import SwiftUI
 
+/// Settings: the paired Macs up top, then one page per area, as in the iPhone's own Settings.
 struct SettingsScreen: View {
     @Environment(PhoneState.self) private var state
     @Environment(\.dismiss) private var dismiss
     @State private var showPairing = false
-    @State private var authError: String?
-    @State private var newFeedURL = ""
     @State private var deviceName = ""
 
     var body: some View {
-        @Bindable var state = state
         NavigationStack {
             Form {
                 macSection
-                accountsSection
-                Section("Subscribed calendars (ICS)") {
-                    ForEach(state.prefs.icsFeeds) { feed in
-                        Text(feed.name).lineLimit(1)
+                Section {
+                    NavigationLink { CalendarsScreen() } label: {
+                        row("Calendars", icon: "calendar", tint: .red, value: calendarsSummary)
                     }
-                    .onDelete { state.prefs.icsFeeds.remove(atOffsets: $0) }
-                    HStack {
-                        TextField("webcal:// or https:// link", text: $newFeedURL)
-                            .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-                        Button("Add") { addFeed() }.disabled(newFeedURL.isEmpty)
+                    NavigationLink { AlertsScreen(close: dismiss) } label: {
+                        row("Alerts & Notifications", icon: "bell.badge.fill", tint: .orange,
+                            value: state.prefs.takeoverEnabled ? nil : "Off")
                     }
-                }
-                if !state.calendars.isEmpty {
-                    Section("Show calendars") {
-                        ForEach(state.calendars) { cal in
-                            Toggle(isOn: Binding(get: { state.isCalendarEnabled(cal.id) },
-                                                 set: { state.setCalendar(cal.id, enabled: $0) })) {
-                                Label { Text(cal.title); Text(cal.sourceTitle) } icon: {
-                                    Circle().fill(Color(cal.color)).frame(width: 10, height: 10)
-                                }
-                            }
-                        }
-                    }
-                    Section {
-                        ForEach(state.calendars.filter { state.isCalendarEnabled($0.id) }) { cal in
-                            Toggle(isOn: Binding(get: { state.isCalendarAgendaOnly(cal.id) },
-                                                 set: { state.setCalendar(cal.id, agendaOnly: $0) })) {
-                                Label { Text(cal.title); Text(cal.sourceTitle) } icon: {
-                                    Circle().fill(Color(cal.color)).frame(width: 10, height: 10)
-                                }
-                            }
-                        }
-                    } header: {
-                        Text("Agenda only")
-                    } footer: {
-                        Text("Shown in the agenda, but never alert, notify or count as your next meeting. Handy for long room bookings. Calendars from the Mac follow its settings.")
+                    NavigationLink { WorkHoursScreen() } label: {
+                        row("Working Hours & Breaks", icon: "briefcase.fill", tint: .brown,
+                            value: state.schedule.enabled ? (state.scheduleFromMac != nil ? "From Mac" : "On") : "Off")
                     }
                 }
                 Section {
-                    Toggle("Full-screen alert", isOn: $state.prefs.takeoverEnabled)
-                    Picker("Alert", selection: $state.prefs.takeoverLeadSeconds) {
-                        ForEach([0.0, 15, 30, 60, 120, 300], id: \.self) { s in
-                            Text(s == 0 ? "At start" : s < 60 ? "\(Int(s)) seconds before" : "\(Int(s) / 60) min before").tag(s)
-                        }
+                    NavigationLink { DeskScreen() } label: {
+                        row("Desk Mode", icon: "iphone.gen3.radiowaves.left.and.right", tint: .indigo,
+                            value: state.prefs.deskWhenCharging ? "While charging" : "Manual")
                     }
-                    Toggle("Only meetings with a join link", isOn: $state.prefs.takeoverOnlyWithLink)
-                    Toggle("Sound", isOn: $state.prefs.alertSound)
-                    Picker("If ignored, close after", selection: $state.prefs.takeoverAutoDismissMinutes) {
-                        ForEach([1, 2, 5, 10], id: \.self) { Text("\($0) min").tag($0) }
-                        Text("Never").tag(0)
+                    NavigationLink { MediaScreen() } label: {
+                        row("Music & Media", icon: "music.note", tint: .pink, value: state.prefs.mediaApp.name)
                     }
-                    Button("Preview alert") { dismiss(); state.previewAlert() }
-                    Button("Preview meltdown") { dismiss(); state.previewLateAlert() }
-                } header: { Text("Alerts") } footer: {
-                    Text("Once a meeting has started the alert gets redder and more insistent for the first 3 minutes, then starts falling apart (not with Reduce Motion). While connected, the Mac decides when alerts fire and when they close, using its own settings.")
-                }
-                Section {
-                    NavigationLink {
-                        WorkHoursScreen()
-                    } label: {
-                        LabeledContent("Working hours & breaks",
-                                       value: state.schedule.enabled ? (state.scheduleFromMac != nil ? "From Mac" : "On") : "Off")
+                    NavigationLink { LockScreenScreen() } label: {
+                        row("Lock Screen & Widgets", icon: "platter.filled.bottom.iphone", tint: .blue,
+                            value: state.prefs.liveActivityEnabled ? nil : "Live Activity off")
                     }
-                } footer: {
-                    Text("Gives the desk display its moments: before work, focus time, breaks and the end of the day.")
-                }
-                Section("Notifications when Cadence isn't open") {
-                    Toggle("Notify me", isOn: $state.prefs.backgroundNotifications)
-                    Toggle("Heads-up", isOn: $state.prefs.headsUpEnabled)
-                    Stepper("\(state.prefs.headsUpMinutes) min before", value: $state.prefs.headsUpMinutes, in: 1...30)
-                        .disabled(!state.prefs.headsUpEnabled)
-                    Toggle("Wrap-up before meetings end", isOn: $state.prefs.wrapUpEnabled)
-                }
-                Section {
-                    Toggle("Turn on while charging", isOn: $state.prefs.deskWhenCharging)
-                    Toggle("Dim when nothing's close", isOn: $state.prefs.deskDimWhenIdle)
-                    Toggle("Meeting notes button", isOn: $state.prefs.deskEnrichments)
-                    Toggle("Open notes when a meeting starts", isOn: $state.prefs.deskEnrichmentsAutoOpen)
-                        .disabled(!state.prefs.deskEnrichments)
-                } header: { Text("Desk mode") } footer: {
-                    Text("Put your iPhone on a MagSafe stand or charger and Cadence becomes a desk clock for your meetings. While it's showing and connected, your Mac stays quiet.")
-                }
-                Section {
-                    Toggle("Media controls", isOn: $state.prefs.deskMediaControls)
-                    Picker("Media app", selection: $state.prefs.mediaApp) {
-                        ForEach(MediaApp.allCases) { app in
-                            Label { Text(app.name) } icon: { MediaLogo(app: app, size: 22) }.tag(app)
-                        }
-                    }
-                    if state.prefs.mediaApp == .spotify {
-                        NavigationLink {
-                            SpotifySetupScreen()
-                        } label: {
-                            LabeledContent("Spotify app", value: state.spotify.customClientID != nil ? "Your own"
-                                           : state.spotify.isAvailable ? "Built-in" : "Not set up")
-                        }
-                    }
-                    if state.prefs.mediaApp == .spotify && state.spotify.isAvailable {
-                        if state.spotify.connected {
-                            LabeledContent("Spotify", value: "Connected")
-                        } else {
-                            Button(state.spotify.needsAuthorization ? "Connect Spotify" : "Reconnect Spotify") { state.spotify.authorize() }
-                        }
-                        if let error = state.spotify.lastError {
-                            Text(error).font(.footnote).foregroundStyle(.red)
-                        }
-                        if !state.spotify.needsAuthorization {
-                            Button("Disconnect Spotify", role: .destructive) { state.spotify.signOut() }
-                        }
-                    }
-                    Toggle("Fade out for meetings", isOn: $state.prefs.pauseMediaForAlerts)
-                    Toggle("Announce the meeting", isOn: $state.prefs.announceAlerts)
-                        .disabled(!state.prefs.pauseMediaForAlerts)
-                    Button("Test the hand-off") { state.testAudioHandoff() }
-                } header: { Text("Media") } footer: {
-                    Text("Landscape desk mode shows what's playing in the corner, or a button for your media app. Track details and skip work for Apple Music and, once set up and connected, Spotify (with your own free Spotify developer app; connecting opens Spotify for a moment to approve); other apps show that they're playing and can be paused. When connected, it shows and controls the Mac's Music or Spotify too (and, if you turn it on in Cadence on the Mac, the Mac's media keys control this iPhone's music).\n\nWhen an alert comes up with music playing here, Cadence fades it out, says which meeting it is, then lets go of the audio so your headphones can switch to the Mac. Siri's own voice isn't available to apps: for a better voice, download an Enhanced or Premium one in Settings → Accessibility → Spoken Content → Voices.")
-                }
-                Section {
-                    Toggle("Live Activity", isOn: $state.prefs.liveActivityEnabled)
-                    Picker("Count down from", selection: $state.prefs.liveActivityLeadMinutes) {
-                        ForEach([10, 15, 30, 60, 120], id: \.self) { Text($0 >= 60 ? "\($0 / 60) h before" : "\($0) min before").tag($0) }
-                    }
-                    .disabled(!state.prefs.liveActivityEnabled)
-                } header: { Text("Dynamic Island, Lock Screen & StandBy") } footer: {
-                    Text("A countdown to your next meeting in the Dynamic Island and on the Lock Screen, with a Join button. Before then it shows when the meeting starts.")
-                }
-                Section {
-                    Toggle("Show tomorrow's first meeting", isOn: $state.prefs.widgetShowsTomorrow)
-                    Picker("From", selection: $state.prefs.widgetTomorrowHour) {
-                        ForEach(Array(12...23), id: \.self) { hour in
-                            Text(Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date())!
-                                .formatted(date: .omitted, time: .shortened)).tag(hour)
-                        }
-                    }
-                    .disabled(!state.prefs.widgetShowsTomorrow)
-                } header: { Text("Widgets") } footer: {
-                    Text("Once today's meetings are over, the Home Screen and Lock Screen widgets show when your first meeting tomorrow is, from this time on.")
-                }
-                Section("Filters") {
-                    Toggle("Hide all-day events", isOn: $state.prefs.filters.hideAllDay)
-                    Toggle("Hide declined", isOn: $state.prefs.filters.hideDeclined)
-                    Toggle("Hide tentative", isOn: $state.prefs.filters.hideTentative)
-                    Toggle("Hide free", isOn: $state.prefs.filters.hideFree)
-                    Toggle("Only events with a join link", isOn: $state.prefs.filters.onlyWithJoinLink)
                 }
                 Section {
                     NavigationLink {
@@ -172,12 +51,9 @@ struct SettingsScreen: View {
                                 Text(AboutView.version).font(.caption).foregroundStyle(.secondary)
                             }
                         } icon: {
-                            Image(systemName: "face.smiling")
-                                .foregroundStyle(.white)
-                                .frame(width: 28, height: 28)
-                                .background(LinearGradient(colors: [AboutMascot.pink, AboutMascot.orange],
-                                                           startPoint: .topLeading, endPoint: .bottomTrailing),
-                                            in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                            SettingsIcon(systemName: "face.smiling",
+                                         fill: LinearGradient(colors: [AboutMascot.pink, AboutMascot.orange],
+                                                              startPoint: .topLeading, endPoint: .bottomTrailing))
                         }
                     }
                 }
@@ -186,11 +62,25 @@ struct SettingsScreen: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .sheet(isPresented: $showPairing) { PairingScreen() }
-            .alert("Sign-in failed", isPresented: Binding(get: { authError != nil }, set: { if !$0 { authError = nil } })) {
-                Button("OK") {}
-            } message: { Text(authError ?? "") }
-
         }
+    }
+
+    private func row(_ title: String, icon: String, tint: Color, value: String?) -> some View {
+        LabeledContent {
+            if let value { Text(value) }
+        } label: {
+            Label { Text(title) } icon: { SettingsIcon(systemName: icon, fill: tint) }
+        }
+    }
+
+    /// "Mac · 2 accounts", "iPhone Calendar", or nothing set up yet.
+    private var calendarsSummary: String? {
+        var parts: [String] = []
+        if state.link.mac != nil { parts.append("Mac") }
+        if state.calendarAccess { parts.append("iPhone") }
+        let accounts = state.googleAuth.accounts.count + state.microsoftAuth.accounts.count + state.prefs.icsFeeds.count
+        if accounts > 0 { parts.append(accounts == 1 ? "1 account" : "\(accounts) accounts") }
+        return parts.isEmpty ? "None" : parts.joined(separator: " · ")
     }
 
     @ViewBuilder private var macSection: some View {
@@ -202,14 +92,14 @@ struct SettingsScreen: View {
                         MacDetailScreen(link: mac)
                     } label: {
                         LabeledContent {
-                            Text(Self.statusText(mac.status)).font(.caption).foregroundStyle(.secondary)
+                            Text(mac.status.label).font(.caption).foregroundStyle(.secondary)
                         } label: {
                             Label(mac.mac.displayName, systemImage: "laptopcomputer")
                         }
                     }
                 }
                 .onMove { state.link.move(fromOffsets: $0, toOffset: $1) }
-                Button("Pair another Mac") { showPairing = true }
+                Button("Pair Another Mac") { showPairing = true }
                 if state.link.links.count > 1 {
                     Toggle(isOn: $state.prefs.joinOnPriorityMac) {
                         Text("Open web links on \(state.link.macs.first?.displayName ?? "the first Mac")")
@@ -225,7 +115,7 @@ struct SettingsScreen: View {
                 .onAppear { deviceName = state.link.deviceName }
                 .onChange(of: deviceName) { state.link.renameDevice(deviceName) }
             } else {
-                Button("Pair with Cadence on your Mac") { showPairing = true }
+                Button("Pair with Cadence on Your Mac") { showPairing = true }
             }
         } header: {
             HStack {
@@ -239,13 +129,30 @@ struct SettingsScreen: View {
             Text(state.link.links.isEmpty
                  ? "Paired and on the same Wi-Fi (or nearby), the phone shows the Mac's meetings and Join opens the meeting on the Mac."
                  : state.link.links.count > 1
-                 ? "Drag to set priority (Edit): a meeting more than one connected Mac has opens on the highest. This iPhone: what the Macs call this phone. The phone keeps a copy of each Mac's agenda so it carries on without them."
-                 : "This iPhone: what the Mac calls this phone; blank uses the device's own name. Pair another Mac to have meetings from both. The phone remembers the Mac's address on each network it pairs or connects on, for a week after it last worked, and keeps a copy of the Mac's agenda so it carries on without the Mac.")
+                 ? "Tap Edit to drag the Macs into order: a meeting more than one Mac has opens on the highest that's connected. This iPhone is what the Macs call this phone."
+                 : "This iPhone is what the Mac calls this phone; leave it blank for the device's own name. The phone keeps a copy of the Mac's agenda, so it carries on when the Mac is out of reach.")
         }
     }
+}
 
-    static func statusText(_ status: CompanionClient.Status) -> String {
-        switch status {
+/// A tinted rounded square behind a white symbol, like the rows in the iPhone's Settings.
+private struct SettingsIcon<Fill: ShapeStyle>: View {
+    let systemName: String
+    let fill: Fill
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 28, height: 28)
+            .background(fill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    }
+}
+
+extension CompanionClient.Status {
+    /// The short status shown next to a Mac's name.
+    var label: String {
+        switch self {
         case .connected: "Connected"
         case .connecting: "Connecting…"
         case .searching: "Looking…"
@@ -254,13 +161,80 @@ struct SettingsScreen: View {
         case .unpaired: "Pair again"
         }
     }
+}
+
+// MARK: - Calendars
+
+/// Where meetings come from (accounts and ICS links), which calendars count, and what's filtered out.
+private struct CalendarsScreen: View {
+    @Environment(PhoneState.self) private var state
+    @State private var authError: String?
+    @State private var newFeedURL = ""
+
+    private enum Visibility: Hashable { case show, agendaOnly, hide }
+
+    var body: some View {
+        @Bindable var state = state
+        Form {
+            accountsSection
+            Section {
+                ForEach(state.prefs.icsFeeds) { feed in
+                    Label {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(feed.name).lineLimit(1)
+                            Text(feed.url).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        }
+                    } icon: { Circle().fill(Color(feed.color)).frame(width: 10, height: 10) }
+                }
+                .onDelete { state.prefs.icsFeeds.remove(atOffsets: $0) }
+                HStack {
+                    TextField("webcal:// or https:// link", text: $newFeedURL)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                        .submitLabel(.done)
+                        .onSubmit { if feedIsValid { addFeed() } }
+                    Button("Add") { addFeed() }.disabled(!feedIsValid)
+                }
+            } header: { Text("Subscribed calendars (ICS)") } footer: {
+                Text("Any iCalendar link: Google's \"Secret address in iCal format\", Outlook's published ICS, iCloud public calendars, sports and holiday feeds. Swipe to remove one.")
+            }
+            if !state.calendars.isEmpty {
+                Section {
+                    ForEach(state.calendars) { cal in
+                        Picker(selection: visibility(cal.id)) {
+                            Text("Show").tag(Visibility.show)
+                            Text("Agenda only").tag(Visibility.agendaOnly)
+                            Text("Hide").tag(Visibility.hide)
+                        } label: {
+                            Label { Text(cal.title); Text(cal.sourceTitle) } icon: {
+                                Circle().fill(Color(cal.color)).frame(width: 10, height: 10)
+                            }
+                        }
+                    }
+                } header: { Text("Calendars") } footer: {
+                    Text("Agenda only: shown in the agenda, but never alerts, notifies or counts as your next meeting. Handy for long room bookings. Calendars from the Mac follow its settings.")
+                }
+            }
+            Section("Filters") {
+                Toggle("Hide all-day events", isOn: $state.prefs.filters.hideAllDay)
+                Toggle("Hide declined", isOn: $state.prefs.filters.hideDeclined)
+                Toggle("Hide tentative", isOn: $state.prefs.filters.hideTentative)
+                Toggle("Hide free", isOn: $state.prefs.filters.hideFree)
+                Toggle("Only events with a join link", isOn: $state.prefs.filters.onlyWithJoinLink)
+            }
+        }
+        .navigationTitle("Calendars")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Sign-in failed", isPresented: Binding(get: { authError != nil }, set: { if !$0 { authError = nil } })) {
+            Button("OK") {}
+        } message: { Text(authError ?? "") }
+    }
 
     @ViewBuilder private var accountsSection: some View {
         Section {
             if state.calendarAccess {
                 Label("iPhone Calendar", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
             } else {
-                Button(state.calendarAccessDenied ? "Allow calendar access in Settings" : "Use iPhone Calendar accounts") {
+                Button(state.calendarAccessDenied ? "Allow Calendar Access in Settings" : "Use iPhone Calendar Accounts") {
                     if state.calendarAccessDenied {
                         if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                     } else {
@@ -278,13 +252,13 @@ struct SettingsScreen: View {
                     state.microsoftSignOut(account)
                 }
             }
-            Button("Sign in with Google") { signIn { try await state.googleSignIn() } }
+            Button("Sign In with Google") { signIn { try await state.googleSignIn() } }
                 .disabled(state.googleAuth.credentials == nil)
-            Button("Sign in with Microsoft") { signIn { try await state.microsoftSignIn() } }
+            Button("Sign In with Microsoft") { signIn { try await state.microsoftSignIn() } }
                 .disabled(state.microsoftAuth.clientID == nil)
-        } header: { Text("Calendars on this iPhone") } footer: {
+        } header: { Text("Accounts on this iPhone") } footer: {
             if state.link.mac != nil {
-                Text("Optional while paired: the phone gets everything from the Mac and keeps today's and tomorrow's agenda when it can't reach it.")
+                Text("Optional while paired: the phone gets everything from the Mac, and keeps today's and tomorrow's agenda when it can't reach it.")
             }
         }
     }
@@ -300,17 +274,212 @@ struct SettingsScreen: View {
         }
     }
 
+    private func visibility(_ id: String) -> Binding<Visibility> {
+        Binding {
+            !state.isCalendarEnabled(id) ? .hide : state.isCalendarAgendaOnly(id) ? .agendaOnly : .show
+        } set: { value in
+            state.setCalendar(id, enabled: value != .hide)
+            state.setCalendar(id, agendaOnly: value == .agendaOnly)
+        }
+    }
+
     private func signIn(_ work: @escaping () async throws -> Void) {
         Task {
             do { try await work() } catch { authError = error.localizedDescription }
         }
     }
 
+    private var trimmedFeedURL: String { newFeedURL.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var feedIsValid: Bool {
+        let u = trimmedFeedURL.lowercased()
+        return (u.hasPrefix("https://") || u.hasPrefix("http://") || u.hasPrefix("webcal://")) && URL(string: trimmedFeedURL)?.host != nil
+    }
+
     private func addFeed() {
-        let raw = newFeedURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let name = URL(string: raw)?.host ?? "Calendar"
-        state.prefs.icsFeeds.append(ICSFeed(name: name, url: raw, color: RGBAColor(red: 0.4, green: 0.6, blue: 0.95)))
+        let raw = trimmedFeedURL
+        guard feedIsValid, !state.prefs.icsFeeds.contains(where: { $0.url == raw }) else { newFeedURL = ""; return }
+        let color = ICSFeed.palette[state.prefs.icsFeeds.count % ICSFeed.palette.count]
+        state.prefs.icsFeeds.append(ICSFeed(name: URL(string: raw)?.host ?? "Calendar", url: raw, color: color))
         newFeedURL = ""
+    }
+}
+
+// MARK: - Alerts & notifications
+
+private struct AlertsScreen: View {
+    @Environment(PhoneState.self) private var state
+    /// Closes the whole Settings sheet, so a preview isn't hidden behind it.
+    let close: DismissAction
+
+    var body: some View {
+        @Bindable var state = state
+        Form {
+            Section {
+                Toggle("Full-screen alert", isOn: $state.prefs.takeoverEnabled)
+                Group {
+                    Picker("Alert", selection: $state.prefs.takeoverLeadSeconds) {
+                        ForEach([0.0, 15, 30, 60, 120, 300], id: \.self) { s in
+                            Text(s == 0 ? "At start" : s < 60 ? "\(Int(s)) seconds before" : "\(Int(s) / 60) min before").tag(s)
+                        }
+                    }
+                    Toggle("Only meetings with a join link", isOn: $state.prefs.takeoverOnlyWithLink)
+                    Toggle("Sound", isOn: $state.prefs.alertSound)
+                    Picker("If ignored, close after", selection: $state.prefs.takeoverAutoDismissMinutes) {
+                        ForEach([1, 2, 5, 10], id: \.self) { Text("\($0) min").tag($0) }
+                        Text("Never").tag(0)
+                    }
+                }
+                .disabled(!state.prefs.takeoverEnabled)
+            } header: { Text("Full-screen alert") } footer: {
+                Text(state.usingMac
+                     ? "Connected to your Mac: it decides when alerts come up and when they close, using its own settings. These apply when it's out of reach."
+                     : "Once a meeting has started the alert gets redder and more insistent for 3 minutes, then starts falling apart (not with Reduce Motion).")
+            }
+            Section {
+                Button("Preview Alert") { close(); state.previewAlert() }
+                Button("Preview Meltdown") { close(); state.previewLateAlert() }
+            }
+            Section {
+                Toggle("Notify me", isOn: $state.prefs.backgroundNotifications)
+                Group {
+                    Toggle("Heads-up before meetings", isOn: $state.prefs.headsUpEnabled)
+                    if state.prefs.headsUpEnabled {
+                        Stepper("\(state.prefs.headsUpMinutes) min before the start", value: $state.prefs.headsUpMinutes, in: 1...30)
+                    }
+                    Toggle("Wrap-up before meetings end", isOn: $state.prefs.wrapUpEnabled)
+                    if state.prefs.wrapUpEnabled {
+                        Stepper("\(state.prefs.wrapUpMinutes) min before the end", value: $state.prefs.wrapUpMinutes, in: 1...15)
+                    }
+                }
+                .disabled(!state.prefs.backgroundNotifications)
+            } header: { Text("When Cadence isn't open") } footer: {
+                Text("Notifications are scheduled ahead, so they arrive with Cadence closed: the alert above, plus an optional heads-up and a nudge to wrap up.")
+            }
+        }
+        .navigationTitle("Alerts & Notifications")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Desk mode
+
+private struct DeskScreen: View {
+    @Environment(PhoneState.self) private var state
+
+    var body: some View {
+        @Bindable var state = state
+        Form {
+            Section {
+                Toggle("Turn on while charging", isOn: $state.prefs.deskWhenCharging)
+                Toggle("Dim when nothing's close", isOn: $state.prefs.deskDimWhenIdle)
+            } footer: {
+                Text("Put your iPhone on a MagSafe stand or charger and Cadence becomes a desk clock for your meetings. While it's showing and connected, your Mac stays quiet.")
+            }
+            Section {
+                Toggle("Meeting notes button", isOn: $state.prefs.deskEnrichments)
+                Toggle("Open notes when a meeting starts", isOn: $state.prefs.deskEnrichmentsAutoOpen)
+                    .disabled(!state.prefs.deskEnrichments)
+            } header: { Text("Meeting notes") } footer: {
+                Text("Notes, checklists and agendas an assistant attached to the meeting.")
+            }
+            Section {
+                Toggle("Media controls", isOn: $state.prefs.deskMediaControls)
+            } footer: {
+                Text("Landscape desk mode shows what's playing in the corner, or a button for your media app (Music & Media).")
+            }
+        }
+        .navigationTitle("Desk Mode")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Music & media
+
+private struct MediaScreen: View {
+    @Environment(PhoneState.self) private var state
+
+    var body: some View {
+        @Bindable var state = state
+        Form {
+            Section {
+                Picker("Media app", selection: $state.prefs.mediaApp) {
+                    ForEach(MediaApp.allCases) { app in
+                        Label { Text(app.name) } icon: { MediaLogo(app: app, size: 22) }.tag(app)
+                    }
+                }
+                if state.prefs.mediaApp == .spotify {
+                    NavigationLink {
+                        SpotifySetupScreen()
+                    } label: {
+                        LabeledContent("Spotify app", value: state.spotify.customClientID != nil ? "Your own"
+                                       : state.spotify.isAvailable ? "Built-in" : "Not set up")
+                    }
+                    if state.spotify.isAvailable {
+                        if state.spotify.connected {
+                            LabeledContent("Spotify", value: "Connected")
+                        } else {
+                            Button(state.spotify.needsAuthorization ? "Connect Spotify" : "Reconnect Spotify") { state.spotify.authorize() }
+                        }
+                        if let error = state.spotify.lastError {
+                            Text(error).font(.footnote).foregroundStyle(.red)
+                        }
+                        if !state.spotify.needsAuthorization {
+                            Button("Disconnect Spotify", role: .destructive) { state.spotify.signOut() }
+                        }
+                    }
+                }
+            } footer: {
+                Text(state.prefs.mediaApp == .spotify
+                     ? "Track details and skip need your own free Spotify developer app; connecting opens Spotify for a moment to approve."
+                     : "Apple Music shows track details and skip; other apps show that they're playing and can be paused. While connected, the desk also shows and controls the Mac's Music or Spotify.")
+            }
+            Section {
+                Toggle("Fade out for meetings", isOn: $state.prefs.pauseMediaForAlerts)
+                Toggle("Announce the meeting", isOn: $state.prefs.announceAlerts)
+                    .disabled(!state.prefs.pauseMediaForAlerts)
+                Button("Test the Hand-off") { state.testAudioHandoff() }
+            } header: { Text("Meeting hand-off") } footer: {
+                Text("When an alert comes up with music playing here, Cadence fades it out, says which meeting it is, then lets go of the audio so your headphones can switch to the Mac.\n\nSiri's own voice isn't available to apps. For a better one, download an Enhanced or Premium voice in Settings → Accessibility → Spoken Content → Voices.")
+            }
+        }
+        .navigationTitle("Music & Media")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Lock Screen & widgets
+
+private struct LockScreenScreen: View {
+    @Environment(PhoneState.self) private var state
+
+    var body: some View {
+        @Bindable var state = state
+        Form {
+            Section {
+                Toggle("Live Activity", isOn: $state.prefs.liveActivityEnabled)
+                Picker("Count down from", selection: $state.prefs.liveActivityLeadMinutes) {
+                    ForEach([10, 15, 30, 60, 120], id: \.self) { Text($0 >= 60 ? "\($0 / 60) h before" : "\($0) min before").tag($0) }
+                }
+                .disabled(!state.prefs.liveActivityEnabled)
+            } header: { Text("Dynamic Island, Lock Screen & StandBy") } footer: {
+                Text("A countdown to your next meeting with a Join button. Before the countdown starts it shows when the meeting begins.")
+            }
+            Section {
+                Toggle("Show tomorrow's first meeting", isOn: $state.prefs.widgetShowsTomorrow)
+                Picker("From", selection: $state.prefs.widgetTomorrowHour) {
+                    ForEach(Array(12...23), id: \.self) { hour in
+                        Text(Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date())!
+                            .formatted(date: .omitted, time: .shortened)).tag(hour)
+                    }
+                }
+                .disabled(!state.prefs.widgetShowsTomorrow)
+            } header: { Text("Widgets") } footer: {
+                Text("Once today's meetings are over, the Home Screen and Lock Screen widgets show your first meeting tomorrow, from this time on.")
+            }
+        }
+        .navigationTitle("Lock Screen & Widgets")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -363,7 +532,7 @@ private struct MacDetailScreen: View {
 
     private var status: String {
         if case .failed(let why) = link.status { return why }
-        return SettingsScreen.statusText(link.status)
+        return link.status.label
     }
 }
 
