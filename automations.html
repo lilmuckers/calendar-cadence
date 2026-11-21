@@ -50,6 +50,7 @@
         <span class="badge">Claude Code</span>
         <span class="badge">Cursor</span>
         <span class="badge">Windsurf</span>
+        <span class="badge">Gemini CLI</span>
         <span class="badge">Any local MCP app</span>
       </div>
       <div class="hero-links">
@@ -68,6 +69,7 @@
           <button type="button" role="tab" id="tab-code" aria-controls="panel-code" aria-selected="false" tabindex="-1">Claude Code</button>
           <button type="button" role="tab" id="tab-cursor" aria-controls="panel-cursor" aria-selected="false" tabindex="-1">Cursor</button>
           <button type="button" role="tab" id="tab-windsurf" aria-controls="panel-windsurf" aria-selected="false" tabindex="-1">Windsurf</button>
+          <button type="button" role="tab" id="tab-gemini" aria-controls="panel-gemini" aria-selected="false" tabindex="-1">Gemini CLI</button>
           <button type="button" role="tab" id="tab-other" aria-controls="panel-other" aria-selected="false" tabindex="-1">Other apps</button>
         </div>
 
@@ -136,6 +138,30 @@
           </ol>
         </div>
 
+        <div class="tab-panel" role="tabpanel" id="panel-gemini" aria-labelledby="tab-gemini" hidden>
+          <ol class="steps">
+            <li>Install <a href="https://github.com/google-gemini/gemini-cli">Gemini CLI</a>, then add Cadence for every folder you work in:</li>
+          </ol>
+          <div class="snippet"><pre id="snip-gemini"><code>gemini mcp add --scope user cadence /Applications/Cadence.app/Contents/MacOS/cadence-mcp</code></pre><button type="button" class="btn small" data-copy="snip-gemini">Copy</button></div>
+          <p class="fine">Or add it to <code>~/.gemini/settings.json</code> yourself:</p>
+          <div class="snippet"><pre id="snip-gemini-json"><code>{
+  "mcpServers": {
+    "cadence": {
+      "command": "/Applications/Cadence.app/Contents/MacOS/cadence-mcp",
+      "args": []
+    }
+  }
+}</code></pre><button type="button" class="btn small" data-copy="snip-gemini-json">Copy</button></div>
+          <ol class="steps" start="2">
+            <li>Start <code>gemini</code> and type <code>/mcp</code>: <strong>cadence</strong> should be listed with its tools. Then paste a prompt from the catalog.</li>
+            <li>Gemini CLI asks before it runs each tool. Cadence still shows its own confirmation card for anything that changes your calendar.</li>
+            <li>For <strong>Scheduled</strong> prompts, run Gemini CLI from your own scheduler (cron, launchd or Shortcuts) with <code>gemini -p "…"</code>. Unattended runs can't stop to ask, so check Gemini CLI's docs for allowing Cadence's read-only tools first. <strong>Runs in the background</strong> prompts loop while the session stays open.</li>
+          </ol>
+          <div class="callout warn"><strong>What about the Gemini desktop app?</strong>
+            <p>As of November 2026, the Gemini app's custom connectors take a <em>remote</em> server URL, and Cadence only runs on your Mac, with no network port. So use Gemini CLI. Don't put Cadence on a public URL with a tunnel: that would open your calendar, and actions like replying to invites, to the internet.</p>
+          </div>
+        </div>
+
         <div class="tab-panel" role="tabpanel" id="panel-other" aria-labelledby="tab-other" hidden>
           <ol class="steps">
             <li>Cadence works with any app that can start a <strong>local (stdio) MCP server</strong>. Most use the same JSON as Claude; look for "MCP servers" in your app's settings or docs and add:</li>
@@ -151,7 +177,7 @@
           <ol class="steps" start="2">
             <li>Every prompt in the catalog starts with <em>"Using the Cadence tools…"</em> and names the tools it needs, so it doesn't depend on Claude.</li>
           </ol>
-          <p class="fine">Apps that can only connect to <em>remote</em> MCP servers over the internet can't reach Cadence. That's by design: Cadence never opens a network port, and your calendar stays on your Mac.</p>
+          <p class="fine">Apps that can only connect to <em>remote</em> MCP servers over the internet can't reach Cadence, and that includes the Gemini desktop app (use <a href="#setup" data-tab="tab-gemini">Gemini CLI</a> instead). That's by design: Cadence never opens a network port, and your calendar stays on your Mac.</p>
         </div>
       </div>
     </section>
@@ -263,6 +289,6 @@
       </nav>
     </div>
   </footer>
-  <script src="automations.js?v=2"></script>
+  <script src="automations.js?v=3"></script>
 </body>
 </html>

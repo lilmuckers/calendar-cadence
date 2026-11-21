@@ -321,6 +321,68 @@ Repeat until I tell you to stop:
 Don't send anything or join anything yourself.`,
   },
   {
+    id: "panel-declutter",
+    emoji: "🧹",
+    title: "Declutter the countdown",
+    category: "day",
+    trigger: "demand",
+    summary: "Spots the holds, FYIs and all-hands you never actually attend, and offers to hide them from Cadence's floating countdown.",
+    tools: ["get_agenda", "hide_from_panel"],
+    prompt: `Using the Cadence tools, help me tidy up which meetings Cadence counts down to.
+
+1. Call get_agenda for today and tomorrow.
+2. Pick out meetings I probably don't need a countdown for: placeholders and holds ("Hold", "Block", "OOO", "Focus"), FYI or optional events, big broadcasts with lots of attendees, and anything with no join link and no location that looks like a reminder rather than a meeting.
+3. Show them as a short list with a one-line reason each, and say which ones are recurring.
+4. Wait for me to choose. For each one I pick, call hide_from_panel with its meeting_id, and all_occurrences true only if I say "every time". Cadence will ask me to confirm each one.
+
+Never hide anything I haven't picked. Hiding only removes it from the countdown; it stays in my calendar.`,
+  },
+  {
+    id: "meeting-load",
+    emoji: "📊",
+    title: "Meeting load check",
+    category: "day",
+    trigger: "schedule",
+    when: "Weekdays, 17:00",
+    summary: "How much of tomorrow is meetings, your longest stretch without a gap, and how much focus time is left, pinned as numbers on tomorrow's first meeting.",
+    tools: ["get_agenda", "find_free_time", "add_enrichment"],
+    kinds: ["stats"],
+    prompt: `Using the Cadence tools, size up tomorrow.
+
+1. Call find_free_time with duration_minutes 15 for tomorrow. Note the working_hours it reports and the free slots.
+2. Call get_agenda for tomorrow (skip declined meetings).
+3. Work out:
+   - hours in meetings, and that as a percentage of my working hours;
+   - number of meetings;
+   - my longest run of meetings with less than 10 minutes between them;
+   - total free time in slots of 60 minutes or more ("focus time left").
+4. Tell me in two sentences, and say plainly if tomorrow looks overloaded (more than 70% in meetings, or a run longer than 3 hours).
+5. Call add_enrichment on tomorrow's first meeting with kind "stats", id "meeting-load" and title "Tomorrow at a glance", with items for each number. Use up_is_good false for meeting hours and the longest run, and true for focus time left.
+
+Don't change any meetings.`,
+  },
+  {
+    id: "change-watcher",
+    emoji: "🔔",
+    title: "Last-minute change watcher",
+    category: "invites",
+    trigger: "loop",
+    summary: "Keeps an eye on today: tells you when a meeting moves, gets cancelled or a new clash appears, and what that does to the rest of your day.",
+    tools: ["wait_for_event", "get_agenda", "list_clashes", "find_free_time"],
+    prompt: `Using the Cadence tools, watch my calendar for changes for the rest of today.
+
+Repeat until I tell you to stop:
+1. Call wait_for_event with timeout_seconds 300 (all event types). If nothing comes back, go round again.
+2. Ignore routine events (meetings starting, ending or about to start, and presenting or call status).
+3. When a meeting is moved, cancelled or changed, a new invite arrives, or a new clash appears:
+   - call get_agenda for today and say in one line what changed and when;
+   - call list_clashes and mention any overlap it creates;
+   - if a meeting was cancelled, call find_free_time with duration_minutes 30 for today and say if that opened up a useful gap.
+4. Keep each update to three lines at most.
+
+Only tell me about things. Don't reply to invites, hide meetings or change anything.`,
+  },
+  {
     id: "co-pilot",
     emoji: "🛰️",
     title: "Meeting co-pilot",
@@ -542,6 +604,12 @@ function setupTabs() {
         t.tabIndex = on ? 0 : -1;
         document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
       }
+      // Keep the chosen tab visible when the row scrolls sideways on a phone.
+      const row = tab.parentElement;
+      const left = tab.offsetLeft - row.offsetLeft, right = left + tab.offsetWidth;
+      if (left < row.scrollLeft || right > row.scrollLeft + row.clientWidth) {
+        row.scrollTo({ left: Math.max(0, left - 8), behavior: "smooth" });
+      }
     });
     tab.addEventListener("keydown", (e) => {
       if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
@@ -550,6 +618,9 @@ function setupTabs() {
       next.click();
       next.focus();
     });
+  }
+  for (const link of document.querySelectorAll("a[data-tab]")) {
+    link.addEventListener("click", () => document.getElementById(link.dataset.tab)?.click());
   }
   for (const button of document.querySelectorAll("[data-copy]")) {
     button.addEventListener("click", () => copyText(document.getElementById(button.dataset.copy).textContent.trim(), button));
