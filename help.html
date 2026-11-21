@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cadence help: Spotify, Google, Microsoft and other setup guides</title>
+  <meta name="description" content="Step-by-step guides for Cadence's trickier settings: your own Spotify app, your own Google or Microsoft sign-in, calendar feeds, browser profiles, working hours, pairing several Macs and iPhones, media keys and AI assistants.">
+  <link rel="canonical" href="https://cadence.patrick-mckinley.com/help.html">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Cadence">
+  <meta property="og:title" content="Cadence help">
+  <meta property="og:description" content="Step-by-step guides for Cadence's trickier settings: your own Spotify app, Google and Microsoft sign-in, pairing, media keys and more.">
+  <meta property="og:url" content="https://cadence.patrick-mckinley.com/help.html">
+  <meta property="og:image" content="https://cadence.patrick-mckinley.com/assets/og-help.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The Cadence app icon beside the words: Help and setup guides, Spotify, Google, Microsoft, pairing and more.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Cadence help">
+  <meta name="twitter:description" content="Step-by-step guides for Cadence's trickier settings.">
+  <meta name="twitter:image" content="https://cadence.patrick-mckinley.com/assets/og-help.jpg">
+  <link rel="stylesheet" href="style.css?v=8">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="assets/icon-192.png" alt="">Cadence</a>
+      <nav>
+        <a class="nav-features" href="./#features">Features</a>
+        <a href="automations.html">Automations</a>
+        <a href="help.html" aria-current="page">Help</a>
+        <a href="privacy.html">Privacy</a>
+        <a class="nav-gh" href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap help">
+    <div class="help-hero">
+      <p class="eyebrow">Help &amp; setup guides</p>
+      <h1>The fiddly bits, step by step</h1>
+      <p class="tagline">Most of Cadence works the moment you grant calendar access. These guides cover the settings that need a little more: a developer app of your own, a feed link to find, or a permission to grant.</p>
+    </div>
+
+    <div class="help-layout">
+      <nav class="help-toc" aria-label="On this page">
+        <p class="toc-title">On this page</p>
+        <a href="#spotify">🎵 Spotify on iPhone</a>
+        <a href="#google">🟦 Your own Google client</a>
+        <a href="#microsoft">🟧 Your own Microsoft app</a>
+        <a href="#feeds">🔗 Calendar feeds (ICS)</a>
+        <a href="#running-late">⏰ Running-late messages</a>
+        <a href="#browser">🧭 Browser profiles</a>
+        <a href="#work">☕ Working hours &amp; breaks</a>
+        <a href="#pairing">📱 Several Macs and iPhones</a>
+        <a href="#media-keys">⏯️ Mac media keys</a>
+        <a href="#assistants">🤖 AI assistants</a>
+        <a href="#trouble">🩹 Troubleshooting</a>
+      </nav>
+
+      <div class="help-body">
+
+        <article class="guide" id="spotify">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">🎵</span>
+            <div><h2>Spotify on the iPhone: bring your own Client ID</h2>
+            <p class="guide-meta"><span>iPhone</span><span>About 3 minutes</span><span>Free</span></p></div>
+          </header>
+          <p>To show and control Spotify on the desk display, Cadence talks to the Spotify app through Spotify's App Remote SDK, which needs a <em>Client ID</em> from a Spotify developer app. Spotify only lets a new developer app work for the people its owner adds, so one app can't be shared with everyone. Instead you make your own. It's free and you only do it once.</p>
+          <ol class="steps">
+            <li>On the iPhone, open Cadence's <em>Settings → Media</em>, pick <strong>Spotify</strong> as your media app, and tap <strong>Spotify app</strong>. Keep this screen open: it has the two values you'll paste below, each with a copy button.</li>
+            <li>Open the <a href="https://developer.spotify.com/dashboard">Spotify Developer Dashboard</a>, sign in with your Spotify account and choose <strong>Create app</strong>. Any name and description will do, like <em>My Cadence</em>.</li>
+            <li>Under <strong>Redirect URIs</strong>, add:
+              <div class="snippet"><pre id="c-spotify-redirect"><code>cadence-companion://spotify-callback</code></pre><button type="button" class="btn small" data-copy="c-spotify-redirect">Copy</button></div>
+            </li>
+            <li>Under <strong>Which API/SDKs are you planning to use?</strong>, tick <strong>iOS</strong> and add the <strong>Bundle ID</strong> shown on Cadence's Spotify app screen.</li>
+            <li>Save, open the app's <strong>Settings</strong> page in the dashboard and copy its <strong>Client ID</strong> (32 letters and numbers).</li>
+            <li>Paste it into the <strong>Client ID</strong> field in Cadence and tap <strong>Save</strong>. Then tap <strong>Connect</strong> on the desk display: Spotify opens for a moment to ask you to approve, then hands you back.</li>
+          </ol>
+          <div class="callout"><strong>Good to know</strong>
+            <ul>
+              <li>There's no Client Secret. The Client ID isn't a secret, and it stays on your iPhone.</li>
+              <li>Your new app stays in Spotify's <em>development mode</em>, which is fine: it works for the account that made it. To use it on someone else's account, add them under <strong>User Management</strong> in the dashboard.</li>
+              <li>The Spotify app has to be installed on the phone, and running, for the desk display to connect.</li>
+              <li>Saving a different Client ID signs you out of Spotify in Cadence. Connect again afterwards.</li>
+              <li>Apple Music needs none of this: just allow access to your music when the phone asks.</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="guide" id="google">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">🟦</span>
+            <div><h2>Google Calendar: your own OAuth client</h2>
+            <p class="guide-meta"><span>Mac</span><span>About 5 minutes</span><span>Optional</span></p></div>
+          </header>
+          <p>If <strong>Sign in with Google</strong> works in your copy of Cadence, you don't need this. It's for building Cadence yourself, or for signing in through a Google Cloud project you control (for example, if your company only allows its own apps).</p>
+          <ol class="steps">
+            <li>In <a href="https://console.cloud.google.com/">Google Cloud Console</a>, <strong>create a project</strong> (project picker → <em>New project</em>, for example <em>Cadence</em>) and select it.</li>
+            <li><strong>Enable the API:</strong> <em>APIs &amp; Services → Library →</em> <strong>Google Calendar API</strong> → <strong>Enable</strong>.</li>
+            <li><strong>Consent screen:</strong> <em>Google Auth Platform → Get started</em>. App name <em>Cadence</em>, your email as the support contact, then pick an <strong>Audience</strong>:
+              <ul>
+                <li><strong>Internal</strong> for Google Workspace accounts in your own domain. Simplest: no test users, and sign-ins don't expire.</li>
+                <li><strong>External</strong> for personal <code>@gmail.com</code> accounts or more than one domain. Read the warning below.</li>
+              </ul>
+            </li>
+            <li><em>(Optional)</em> <strong>Data Access → Add or remove scopes</strong>: add <code>calendar.readonly</code> and <code>calendar.events</code>. Cadence asks for both anyway; adding them makes the consent screen accurate.</li>
+            <li><strong>Create the client:</strong> <em>Clients → Create client</em>, type <strong>Desktop app</strong>. Copy the <strong>Client ID</strong> and <strong>Client secret</strong>. You don't need a redirect URI.</li>
+            <li>In Cadence on the Mac, open <em>Settings → Accounts → Use my own OAuth client…</em>, paste both values, then click <strong>Sign in with Google</strong>. The browser tab says <em>"Cadence is connected"</em> when it's done.</li>
+          </ol>
+          <div class="callout warn"><strong>External apps expire sign-ins after 7 days</strong>
+            <p>New External apps start in <em>Testing</em> mode: you must add every account under <em>Audience → Test users</em> (or sign-in fails with <em>"Access blocked"</em>), and Google drops the sign-in after a week, so Cadence shows <strong>Reconnect</strong>. To stop that, click <strong>Publish app</strong> under <em>Audience</em>. You don't need Google's verification for personal use. Sign-in then warns <em>"Google hasn't verified this app"</em>: choose <strong>Advanced → Go to Cadence (unsafe)</strong>. That's expected, because the app is your own.</p>
+          </div>
+        </article>
+
+        <article class="guide" id="microsoft">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">🟧</span>
+            <div><h2>Microsoft 365: your own app registration</h2>
+            <p class="guide-meta"><span>Mac</span><span>About 3 minutes</span><span>Optional</span></p></div>
+          </header>
+          <p>Again, only if <strong>Sign in with Microsoft</strong> doesn't work out of the box, or your organisation wants its own registration.</p>
+          <ol class="steps">
+            <li>In the <a href="https://entra.microsoft.com/">Microsoft Entra admin center</a> (or Azure portal → <em>App registrations</em>), choose <strong>New registration</strong>. Name it <em>Cadence</em>. For account types, pick <strong>Accounts in any organizational directory and personal Microsoft accounts</strong>, or just your organisation.</li>
+            <li><strong>Redirect URI:</strong> platform <strong>Public client/native (mobile &amp; desktop)</strong>, with:
+              <div class="snippet"><pre id="c-ms-redirect"><code>http://localhost</code></pre><button type="button" class="btn small" data-copy="c-ms-redirect">Copy</button></div>
+              Microsoft accepts any port on localhost, and Cadence picks one when you sign in.</li>
+            <li><strong>Register</strong> and copy the <strong>Application (client) ID</strong>. There's no secret: Cadence signs in with PKCE.</li>
+            <li><em>(Optional)</em> <strong>API permissions → Add → Microsoft Graph → Delegated:</strong> <code>Calendars.ReadWrite</code>, <code>MailboxSettings.Read</code>, <code>User.Read</code>, <code>offline_access</code>. Some organisations need an admin to approve these first.</li>
+            <li>Paste the ID into Cadence's <em>Settings → Accounts → Use my own app registration…</em> and sign in.</li>
+          </ol>
+          <p class="fine"><code>Calendars.ReadWrite</code> is only used to send your invite replies. Cadence never creates, edits or deletes events. <code>MailboxSettings.Read</code> reads your Outlook category colours.</p>
+        </article>
+
+        <article class="guide" id="feeds">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">🔗</span>
+            <div><h2>Calendar feeds (ICS / webcal)</h2>
+            <p class="guide-meta"><span>Mac and iPhone</span><span>1 minute</span></p></div>
+          </header>
+          <p>Any calendar with an iCalendar link can go straight into Cadence: team rotas, holidays, sports fixtures, or a calendar you can't sign in to directly. On the Mac it's <em>Settings → Accounts → Subscribed calendars</em>; paste the link and you're done.</p>
+          <ul class="steps plain">
+            <li><strong>Google Calendar:</strong> on the web, open <em>Settings → Settings for my calendars →</em> your calendar <em>→ Integrate calendar</em> and copy the <strong>Secret address in iCal format</strong>.</li>
+            <li><strong>Outlook:</strong> <em>Settings → Calendar → Shared calendars → Publish a calendar</em>, pick the calendar and <em>Can view all details</em>, then copy the <strong>ICS</strong> link.</li>
+            <li><strong>Everything else:</strong> look for "Subscribe", "Export", "iCal" or a <code>webcal://</code> link. Both <code>webcal://</code> and <code>https://</code> work.</li>
+          </ul>
+          <p class="fine">Treat secret addresses like passwords: anyone with the link can read the calendar. Feeds are read-only, so you can't reply to invites from them; sign in to Google or Microsoft directly for that.</p>
+        </article>
+
+        <article class="guide" id="running-late">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">⏰</span>
+            <div><h2>Running-late messages</h2>
+            <p class="guide-meta"><span>Mac</span><span>2 minutes</span></p></div>
+          </header>
+          <p>Once a meeting has started, the alert can send a quick "running late" message from you. It's off until you allow it, account by account.</p>
+          <ol class="steps">
+            <li>In <em>Settings → Accounts</em>, turn on running-late messages for a Google or Microsoft account. Cadence asks for the extra permissions it needs to send mail and chat messages (see the <a href="privacy.html">privacy policy</a> for exactly which).</li>
+            <li>To use Slack, connect your workspace in the same place. Messages are sent as you, not as a bot.</li>
+            <li>Add <strong>domain rules</strong> to pick a channel by who's in the meeting, like <em>@client.com → Slack</em>. Without a rule, Cadence tries the meeting's own chat first (Teams meeting chat, Google Chat for Meet, the Slack huddle's channel), then email.</li>
+            <li>Edit the suggested messages if you like. Cadence picks one based on what came before: wrapping up the last meeting, a breather between back-to-backs, or just running behind.</li>
+          </ol>
+        </article>
+
+        <article class="guide" id="browser">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">🧭</span>
+            <div><h2>Opening meetings in the right browser profile</h2>
+            <p class="guide-meta"><span>Mac</span><span>2 minutes</span></p></div>
+          </header>
+          <p>Signed in to different Google or Microsoft accounts in different browser profiles? Cadence can open each meeting in the right one. It works with Chrome, Edge, Brave, Vivaldi and Firefox (including Firefox containers) as your default browser.</p>
+          <ul class="steps plain">
+            <li><strong>Per account or calendar:</strong> <em>Settings → Calendars</em>, then pick a profile next to each one. Cadence matches profiles to your accounts by email where it can.</li>
+            <li><strong>By organiser:</strong> <em>Settings → Browser</em>, then add rules like <em>@client.com → Client profile</em>.</li>
+            <li><strong>One meeting or series:</strong> right-click <strong>Join → Join in</strong>.</li>
+            <li><strong>Apps vs. browser:</strong> choose per service whether an assigned profile beats the Zoom or Teams app.</li>
+          </ul>
+          <p class="fine">With Safari as your default browser, links open as usual.</p>
+        </article>
+
+        <article class="guide" id="work">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">☕</span>
+            <div><h2>Working hours and breaks</h2>
+            <p class="guide-meta"><span>Mac and iPhone</span><span>2 minutes</span></p></div>
+          </header>
+          <p>Set your hours for each weekday and the breaks you want kept clear (lunch, a walk, the school run) in <em>Settings → Work</em> on the Mac. Each of these defences can be switched on or off:</p>
+          <ul class="steps plain">
+            <li><strong>Invites</strong> that land on a break, outside your hours or on a day off say so on the invite card, the notification and the iPhone pop-up.</li>
+            <li><strong>Assistants</strong> only get free time inside your hours, with breaks kept out of <code>find_free_time</code>.</li>
+            <li><strong>A nudge</strong> when a break starts, and a warning five minutes before if your current meeting is going to run into it.</li>
+            <li><strong>A meeting booked over a break</strong> asks you, like a double-booking: keep the break (the meeting won't alert) or give it up for the day.</li>
+          </ul>
+          <p class="fine">The iPhone uses the Mac's schedule while they're paired, or its own (<em>Settings → Working hours &amp; breaks</em>) when it's on its own.</p>
+        </article>
+
+        <article class="guide" id="pairing">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">📱</span>
+            <div><h2>Pairing, and several Macs or iPhones</h2>
+            <p class="guide-meta"><span>Mac and iPhone</span><span>1 minute each</span></p></div>
+          </header>
+          <ol class="steps">
+            <li>On the Mac, open <em>Settings → iPhone → Show Pairing Code</em>.</li>
+            <li>Scan it with Cadence on the iPhone, or with the Camera app, or copy the link across.</li>
+            <li>That's it. They find each other on your Wi-Fi, or directly when you're not on the same network.</li>
+          </ol>
+          <ul class="steps plain">
+            <li><strong>More iPhones on one Mac:</strong> pair each one the same way. Alerts and prompts go to all of them, and the Mac's media keys follow whichever went on display last.</li>
+            <li><strong>One iPhone, several Macs:</strong> on the phone, <em>Settings → Mac → Pair another Mac</em>. Agendas are merged, so a meeting on both Macs shows once.</li>
+            <li><strong>Which Mac opens Join:</strong> the highest one in the list that has the meeting. Tap <strong>Edit</strong> to drag them into order. Turn on <strong>Open web links on the first Mac</strong> to send any plain web link to your top Mac, even if only another Mac has the meeting.</li>
+            <li><strong>Starting over:</strong> <em>Forget All iPhones</em> on the Mac changes the key, so every phone has to pair again.</li>
+          </ul>
+        </article>
+
+        <article class="guide" id="media-keys">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">⏯️</span>
+            <div><h2>Let the Mac's media keys control the phone</h2>
+            <p class="guide-meta"><span>Mac</span><span>1 minute</span><span>Optional</span></p></div>
+          </header>
+          <ol class="steps">
+            <li>On the Mac, turn on <em>Settings → Alerts → Media remote control</em>.</li>
+            <li>macOS asks for <strong>Accessibility</strong> access. Allow Cadence in <em>System Settings → Privacy &amp; Security → Accessibility</em>. Cadence only watches the media keys, never your typing.</li>
+            <li>Choose when the mini-player shows: never, on key presses, or always.</li>
+          </ol>
+          <p class="fine">The keys only go to the phone while it shows the desk display. They stay with the Mac during calls, when the phone hasn't been heard from for a few seconds, and (adjustable, or off) once the phone has been paused for 30 seconds. If another app also grabs the media keys, Settings lists it so you can see what's getting in the way.</p>
+        </article>
+
+        <article class="guide" id="assistants">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">🤖</span>
+            <div><h2>AI assistants</h2>
+            <p class="guide-meta"><span>Mac</span><span>1 minute</span></p></div>
+          </header>
+          <ol class="steps">
+            <li>Open <em>Settings → Assistants</em>. Cadence finds Claude, Claude Code, Cursor and Windsurf on your Mac and shows whether each is set up.</li>
+            <li>Click <strong>Install</strong>, then let Cadence restart the app so it picks up the new server. If Cadence isn't in your Applications folder, it offers to move itself there first so the path keeps working.</li>
+            <li>Try a prompt from the <a href="automations.html">automation catalog</a>.</li>
+          </ol>
+          <ul class="steps plain">
+            <li><strong>Approvals:</strong> every action shows an Allow / Deny card. Turn on auto-approval for specific actions in the same tab.</li>
+            <li><strong>Notes on meetings:</strong> switch assistant attachments off here if you'd rather not have them. On the Mac, the Notes button lives in <em>Settings → General</em>; on the iPhone, in <em>Settings → Desk mode</em>.</li>
+            <li><strong>Activity:</strong> see every call from the last 30 days, filter by assistant, or clear it.</li>
+          </ul>
+        </article>
+
+        <article class="guide" id="trouble">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">🩹</span>
+            <div><h2>Troubleshooting</h2></div>
+          </header>
+          <dl class="faq">
+            <dt>Google says <em>"Access blocked"</em>.</dt>
+            <dd>Your own client is in Testing mode and the account isn't a test user. Add it under <em>Audience → Test users</em>, or publish the app (see <a href="#google">Google</a>).</dd>
+            <dt>A Google account keeps asking me to reconnect every week.</dt>
+            <dd>Same cause: Testing-mode sign-ins last 7 days. Publish the app.</dd>
+            <dt>macOS keeps asking Cadence for Keychain access.</dt>
+            <dd>This happens after rebuilding Cadence yourself. Choose <strong>Always Allow</strong>.</dd>
+            <dt>Spotify won't connect on the desk display.</dt>
+            <dd>Check that the Spotify app is installed and has been opened, that your developer app has the exact redirect URI and the Bundle ID from Cadence's screen, and that you're signed in to Spotify with the account that made the app (or one added under User Management).</dd>
+            <dt>Invite replies or colours don't work for an older account.</dt>
+            <dd>Accounts connected before replies existed are read-only. Click <strong>Reconnect</strong> in <em>Settings → Accounts</em>.</dd>
+            <dt>My assistant can't see Cadence.</dt>
+            <dd>Restart the assistant app after installing. If you've moved Cadence since, install again so the path is right. Apps that only connect to remote MCP servers can't reach it; it never opens a network port.</dd>
+            <dt>The iPhone can't find the Mac.</dt>
+            <dd>Make sure Cadence is running on the Mac and that the phone allowed <strong>Local Network</strong> access (<em>iPhone Settings → Privacy &amp; Security → Local Network</em>).</dd>
+          </dl>
+          <p class="fine">Still stuck? <a href="https://github.com/lilmuckers/calendar-cadence/issues">Open an issue on GitHub</a>.</p>
+        </article>
+
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Patrick McKinley</span>
+      <nav>
+        <a href="./">Home</a>
+        <a href="automations.html">Automations</a>
+        <a href="help.html">Help</a>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+  <script>
+    for (const button of document.querySelectorAll("[data-copy]")) {
+      button.addEventListener("click", async () => {
+        const text = document.getElementById(button.dataset.copy).textContent.trim();
+        try { await navigator.clipboard.writeText(text); } catch {}
+        const old = button.textContent;
+        button.textContent = "Copied ✓";
+        button.classList.add("done");
+        setTimeout(() => { button.textContent = old; button.classList.remove("done"); }, 1600);
+      });
+    }
+  </script>
+</body>
+</html>

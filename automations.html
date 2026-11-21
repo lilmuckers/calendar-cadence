@@ -24,7 +24,7 @@
   <meta name="twitter:title" content="Cadence automations">
   <meta name="twitter:description" content="Copy-and-paste prompts that let Claude and other AI assistants prep, run and follow up on your meetings.">
   <meta name="twitter:image" content="https://cadence.patrick-mckinley.com/assets/og-automations.jpg">
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <header class="site-header">
@@ -33,8 +33,9 @@
       <nav>
         <a class="nav-features" href="./#features">Features</a>
         <a href="automations.html" aria-current="page">Automations</a>
+        <a href="help.html">Help</a>
         <a href="privacy.html">Privacy</a>
-        <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
+        <a class="nav-gh" href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
       </nav>
     </div>
   </header>
@@ -221,7 +222,7 @@
         <div class="toolgroups">
           <div class="card">
             <h3>👀 Read <span class="tag">free to call</span></h3>
-            <p><code>get_agenda</code> today or tomorrow · <code>get_next_meeting</code> · <code>get_current_meeting</code> · <code>list_invites</code> · <code>list_clashes</code> · <code>find_free_time</code> · <code>list_calendars</code> · <code>get_status</code> (presenting, on a call)</p>
+            <p><code>get_agenda</code> today or tomorrow · <code>get_next_meeting</code> · <code>get_current_meeting</code> · <code>list_invites</code> · <code>list_clashes</code> · <code>find_free_time</code> (inside your working hours, with breaks kept clear) · <code>list_calendars</code> · <code>get_status</code> (presenting, on a call)</p>
           </div>
           <div class="card">
             <h3>✋ Act <span class="tag warn">asks you first</span></h3>
@@ -236,7 +237,7 @@
             <p><code>wait_for_event</code> waits up to 5 minutes for <code>meeting.starting_soon</code>, <code>meeting.started</code>, <code>meeting.ending_soon</code>, <code>meeting.ended</code>, <code>invite.new</code>, <code>meeting.changed</code>, <code>meeting.canceled</code>, <code>clash.new</code>, <code>status.presenting</code>, <code>status.on_call</code>, <code>enrichment.changed</code> and <code>enrichment.bingo</code>.</p>
           </div>
         </div>
-        <p class="fine center">Cadence also ships four ready-made prompts your app may list on its own: <code>daily_briefing</code>, <code>prepare_for_meeting</code>, <code>triage_invites</code> and <code>enrich_meeting</code>. Cadence can't create or delete events. For that, pair it with your calendar connector.</p>
+        <p class="fine center">Cadence also ships four ready-made prompts your app may list on its own: <code>daily_briefing</code>, <code>prepare_for_meeting</code>, <code>triage_invites</code> and <code>enrich_meeting</code>. Cadence can't create or delete events. For that, pair it with your calendar connector. Setup trouble? See <a href="help.html#assistants">Help</a>.</p>
       </div>
     </section>
 
@@ -261,6 +262,6 @@
       </nav>
     </div>
   </footer>
-  <script src="automations.js?v=1"></script>
+  <script src="automations.js?v=2"></script>
 </body>
 </html>

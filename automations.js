@@ -27,7 +27,7 @@ const AUTOMATIONS = [
 1. Call get_agenda for today. List each meeting with its time, title and whether it has a join link. Flag back-to-backs with no break.
 2. Call list_invites with horizon "today" and list anything still waiting for my reply.
 3. Call list_clashes and point out any overlaps I haven't sorted out.
-4. Call find_free_time with duration_minutes 30 and working_hours true, and tell me my best two gaps for focused work.
+4. Call find_free_time with duration_minutes 30 (it uses my working hours and keeps my breaks clear), and tell me my best two gaps for focused work.
 
 Keep it under 150 words, in plain sentences, most important thing first. This is read-only: don't reply to invites or change anything.`,
   },
@@ -255,10 +255,70 @@ If a meeting had nothing logged, skip it quietly.`,
     connectors: true,
     prompt: `Using the Cadence tools, protect some focus time.
 
-1. Call find_free_time with duration_minutes 90 and working_hours true, for today and tomorrow.
+1. Call find_free_time with duration_minutes 90 for today and tomorrow. It already sticks to my working hours and keeps my breaks clear.
 2. Pick up to two slots, preferring mornings and avoiding the last hour of the day.
 3. Show me the slots. Cadence can't create events, so once I agree, add "Focus time" events with my calendar connector (Google Calendar or Outlook), marked as busy.
 4. If you don't have a calendar connector, just give me the times so I can add them.`,
+  },
+  {
+    id: "tomorrow-prepped",
+    emoji: "🌙",
+    title: "Tomorrow, prepped",
+    category: "before",
+    trigger: "schedule",
+    when: "Weekdays, 18:00",
+    summary: "Each evening, goes through tomorrow's meetings and attaches a prep note and links to every one that has documents, so the morning starts ready.",
+    tools: ["get_agenda", "get_enrichments", "add_enrichment", "update_enrichment"],
+    kinds: ["markdown", "links"],
+    connectors: true,
+    prompt: `Using the Cadence tools, get tomorrow's meetings ready tonight.
+
+1. Call get_agenda for tomorrow.
+2. Skip meetings with no notes or links in the invite, focus time, and anything I've declined.
+3. For each of the rest, call get_enrichments. If you've already attached a "Prep" note, update it with update_enrichment rather than adding another.
+4. Read the documents and pages linked in the invite (with my other connected tools, if you have them) and attach with add_enrichment:
+   - kind "markdown", title "Prep": the purpose in one line, 3 key points and any decision I'm expected to make;
+   - kind "links", title "Links": each document or page, with a short note.
+5. Finish with a two-line summary: how many meetings you prepped, and the one that needs the most thought.
+
+Only use what's in the invites and the documents. Don't reply to anything or change the meetings.`,
+  },
+  {
+    id: "break-defender",
+    emoji: "🥪",
+    title: "Break defender",
+    category: "invites",
+    trigger: "schedule",
+    when: "Weekdays, 08:00",
+    summary: "Finds invites and meetings that land on your lunch, your other breaks or outside your hours, and offers polite ways out.",
+    tools: ["find_free_time", "list_invites", "get_agenda", "respond_to_invite"],
+    prompt: `Using the Cadence tools, look after my breaks and working hours today and tomorrow.
+
+1. Call find_free_time with duration_minutes 15. Its result lists my working_hours and the breaks_kept_clear (set in Cadence's Work settings). Use those as my hours and breaks.
+2. Call list_invites with horizon "twoDays" and get_agenda for today and tomorrow.
+3. List every invite or meeting that overlaps a break or falls outside my hours, with how much it overlaps.
+4. For each, suggest one of: decline, mark tentative, or ask the organiser to move it. If moving, call find_free_time with the meeting's length and suggest a slot.
+5. Wait for me. Only call respond_to_invite for the ones I agree to, and Cadence will ask me to approve each reply. Draft any "could we move this?" messages, but don't send them.
+
+Keep it friendly: suggest the wording, not excuses.`,
+  },
+  {
+    id: "back-to-back",
+    emoji: "🏃",
+    title: "Back-to-back rescue",
+    category: "during",
+    trigger: "loop",
+    summary: "When a meeting's about to end and the next one starts straight after, warns you and gets the next one's key points ready.",
+    tools: ["wait_for_event", "get_next_meeting", "get_enrichments"],
+    prompt: `Using the Cadence tools, help me through back-to-back meetings today.
+
+Repeat until I tell you to stop:
+1. Call wait_for_event with types ["meeting.ending_soon"] and timeout_seconds 300. If nothing comes back, go round again.
+2. When a meeting is ending soon, call get_next_meeting. If it starts within 5 minutes of the current one ending, it's a back-to-back.
+3. For a back-to-back, tell me in two lines: what's next and when, and the one thing to have ready (from the invite, or from get_enrichments if it has notes).
+4. If the gap is zero, remind me that Cadence's alert has a "Running late?" button to let them know, and offer to draft a one-line note I can paste instead.
+
+Don't send anything or join anything yourself.`,
   },
   {
     id: "co-pilot",
