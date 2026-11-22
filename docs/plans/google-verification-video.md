@@ -16,9 +16,10 @@ from `shots.txt` and the title cards, and writes one 1080p MP4.
   matches the submission.
 - [ ] **Use the built-in client.** A release build (or `scripts/build.sh` with `Support/Secrets.env`),
   *not* "Use my own OAuth client". The client ID in the browser must start `106641200883-`.
-- [ ] **Clean consent.** Signed in as the demo account, open https://myaccount.google.com/connections
-  (Security → "Your connections to third-party apps & services" → See all connections), pick
-  **Calendar Cadence** → "Delete all connections you have with Calendar Cadence". Do this for the demo account, so the consent screen lists every scope instead of "already has access".
+- [ ] **Clean consent.** In Cadence → Settings → Accounts, **Sign Out** of the demo account (this revokes
+  Cadence's access at Google), and remove it from the Simulator too, so the consent screen lists every scope
+  rather than "already has access". (myaccount.google.com/connections may not list an app whose Cloud project
+  belongs to your own Workspace, so it's not a reliable place to revoke it.)
 - [ ] **Demo account:** `patrick@patrick-mckinley.com`. Keep the work account out of the video: in
   Cadence Settings → Calendars, untick its calendars for the recording.
 - [ ] **A second person in the same Workspace** (a spare user on `patrick-mckinley.com`), with *no* existing
