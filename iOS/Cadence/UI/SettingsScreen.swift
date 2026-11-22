@@ -157,6 +157,7 @@ extension CompanionClient.Status {
         case .connecting: "Connecting…"
         case .searching: "Looking…"
         case .failed: "Unavailable"
+        case .noLocalNetwork: "Local Network off"
         case .off: "Not connected"
         case .unpaired: "Pair again"
         }
@@ -252,9 +253,9 @@ private struct CalendarsScreen: View {
                     state.microsoftSignOut(account)
                 }
             }
-            Button("Sign In with Google") { signIn { try await state.googleSignIn() } }
+            ProviderSignInButton(provider: .google) { signIn { try await state.googleSignIn() } }
                 .disabled(state.googleAuth.credentials == nil)
-            Button("Sign In with Microsoft") { signIn { try await state.microsoftSignIn() } }
+            ProviderSignInButton(provider: .microsoft) { signIn { try await state.microsoftSignIn() } }
                 .disabled(state.microsoftAuth.clientID == nil)
         } header: { Text("Accounts on this iPhone") } footer: {
             if state.link.mac != nil {
@@ -408,6 +409,10 @@ private struct MediaScreen: View {
                         Label { Text(app.name) } icon: { MediaLogo(app: app, size: 22) }.tag(app)
                     }
                 }
+                // Picking Apple Music is a good moment to ask for access to what it's playing.
+                .onChange(of: state.prefs.mediaApp) { _, new in
+                    if new == .appleMusic { state.nowPlaying.start(prompt: true) }
+                }
                 if state.prefs.mediaApp == .spotify {
                     // Spotify works like the other apps out of the box (open, and pause from the
                     // desk). Track details are an optional extra that needs a Spotify developer
@@ -517,7 +522,9 @@ private struct MacDetailScreen: View {
             } footer: {
                 Text("Name: shown on Join buttons and in the Dynamic Island, e.g. \"Join on Work laptop\". Leave blank for the Mac's own name.")
             }
-            if link.needsRescan {
+            if link.status == .noLocalNetwork {
+                Section { LocalNetworkHelp() }
+            } else if link.needsRescan {
                 Section {
                     Text("Can't reach this Mac. Make sure Cadence is open on it and you're on the same Wi-Fi, or scan its pairing code again (Pair another Mac).")
                         .font(.callout).foregroundStyle(.secondary)

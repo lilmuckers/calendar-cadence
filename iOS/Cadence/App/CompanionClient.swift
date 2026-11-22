@@ -50,6 +50,8 @@ final class CompanionClient {
         case searching
         case connecting
         case connected
+        /// Local Network access is off for Cadence (Settings → Apps → Cadence), so Macs can't be found.
+        case noLocalNetwork
         case failed(String)
     }
 
@@ -360,7 +362,11 @@ final class MacLink: Identifiable {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 if case .failed(let error) = state { self.status = .failed(error.localizedDescription); self.restartBrowser() }
-                if case .waiting(let error) = state, self.channel == nil { self.status = .failed(error.localizedDescription) }
+                // Access turned on (or the first-run prompt answered): back to looking.
+                if case .ready = state, self.status == .noLocalNetwork { self.status = .searching }
+                if case .waiting(let error) = state, self.channel == nil {
+                    self.status = Self.isLocalNetworkDenied(error) ? .noLocalNetwork : .failed(error.localizedDescription)
+                }
             }
         }
         browser.start(queue: .main)
@@ -368,6 +374,12 @@ final class MacLink: Identifiable {
         if channel == nil { status = .searching }
         scheduleDirect()
         armStuckTimer()
+    }
+
+    /// Bonjour browsing reports a denied Local Network permission as DNS-SD's PolicyDenied.
+    private static func isLocalNetworkDenied(_ error: NWError) -> Bool {
+        if case .dns(let code) = error { return code == -65570 } // kDNSServiceErr_PolicyDenied
+        return false
     }
 
     private func armStuckTimer() {

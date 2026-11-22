@@ -88,6 +88,23 @@ struct ICSParserTests {
         #expect(ICSParser.parseDuration("P1DT2H") == 93_600)
         #expect(ICSParser.parseDuration("-PT15M") == -900)
     }
+
+    /// `docs/demo/review-calendar.ics`, the feed App Review adds: a meeting every hour of every day,
+    /// in the viewer's own time zone, all joinable but the in-person lunch.
+    @Test func reviewDemoFeed() throws {
+        let file = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("docs/demo/review-calendar.ics")
+        let tokyo = TimeZone(identifier: "Asia/Tokyo")!
+        let events = ICSParser.parse(try String(contentsOf: file, encoding: .utf8), defaultTimeZone: tokyo)
+        let day = date("20270315T000000", tz: tokyo)..<date("20270316T000000", tz: tokyo)
+        let meetings = ICSParser.meetings(from: events, calendar: cal, window: day)
+        #expect(meetings.count == 24)
+        #expect(meetings.filter { $0.joinLink?.service == .jitsi }.count == 23)
+        let lunch = try #require(meetings.first { $0.joinLink == nil })
+        #expect(lunch.physicalLocation != nil)
+        #expect(lunch.start == date("20270315T120000", tz: tokyo))
+    }
 }
 
 @Suite("Recurrence")

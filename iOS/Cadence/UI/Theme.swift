@@ -86,7 +86,7 @@ struct ConnectionPill: View {
         switch state.link.status {
         case .connected: .green
         case .connecting, .searching: .orange
-        case .failed: .red
+        case .failed, .noLocalNetwork: .red
         case .off, .unpaired: .gray
         }
     }
@@ -101,6 +101,7 @@ struct ConnectionPill: View {
         case .connecting: return "Connecting to \(mac)…"
         case .searching: return "Looking for \(mac)…"
         case .failed: return "\(mac) unavailable"
+        case .noLocalNetwork: return "Local Network off"
         case .off: return mac
         case .unpaired: return "On this iPhone"
         }

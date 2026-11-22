@@ -20,8 +20,12 @@ final class PhoneVolume {
     private(set) var muted = false
     /// When a Mac volume key last arrived, so the pill can show for a moment.
     private(set) var changedAt: Date?
+    #if DEBUG
     /// `-previewVolume`: keep the pill up, for checking the layout.
     let pinned = ProcessInfo.processInfo.arguments.contains("-previewVolume")
+    #else
+    let pinned = false
+    #endif
     @ObservationIgnored private var restore: Double?
     @ObservationIgnored fileprivate weak var view: MPVolumeView?
 

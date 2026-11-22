@@ -24,6 +24,23 @@ profiles, media keys, the MCP socket). Only the iPhone app goes in the store.
   stays away).
 - [ ] If App Review still objects: drop volume from the Mac's keys (play/pause/skip stay) and
   leave the pill as a plain volume control.
+- [x] **Demo calendar for App Review**: `docs/demo/review-calendar.ics`, a 30-minute meeting every
+  hour of every day in the viewer's own time zone. 23 have a working Jitsi link (Join opens a real,
+  empty room); the 12:00 lunch is in person, with a map. Tested in `SourceTests` (`reviewDemoFeed`).
+  Once merged it's at
+  `https://raw.githubusercontent.com/lilmuckers/calendar-cadence/main/docs/demo/review-calendar.ics`
+  (or copy it to `cadence.patrick-mckinley.com/demo.ics` for a tidier link).
+- [x] Local Network denied: the Mac row says so, with **Open Settings**, instead of a raw error.
+- [x] Apple Music access is asked for when you tap through to Music on the desk or pick Apple Music
+  in Settings, not on launch. (On recent iOS even *reading* the permission status shows the prompt,
+  so the app doesn't read it until it has asked once.) Installs from before this change see the
+  prompt once more, the first time they tap through to Music.
+- [x] Branded **Sign in with Google** / **Sign in with Microsoft** buttons (`SignInButtons.swift`):
+  Google's standard "G" and light/dark colours, Microsoft's four squares, exact wording.
+- [x] `-previewVolume` only works in Debug builds, like the other `-preview…` arguments.
+- [x] **TestFlight from GitHub Actions**: the Release workflow's `ios` job archives, signs and uploads
+  the iPhone app. It switches on once its secrets exist (see "6. GitHub Actions" below); dry runs
+  keep the `.ipa` as an artifact instead of uploading.
 
 ## You: once the developer account is active
 
@@ -78,6 +95,9 @@ it gets its own project.
   accounts aren't affected.
 
 ### 4. Review notes and video
+- [ ] Add the demo feed to the review notes: "Settings → Calendars → Subscribed calendars, paste
+  `<demo feed URL>`, Add". There's a meeting every hour, so the countdown, Join, the full-screen
+  alert, the Live Activity and the widgets can all be tried within the hour.
 - [ ] A 30–60 second screen recording: pairing with the Mac (show the code on the Mac, scan it),
   the desk display, Join opening on the Mac.
 - [ ] Review notes to paste into App Store Connect:
@@ -90,6 +110,12 @@ it gets its own project.
   - A test Google account with a few meetings in its calendar, if Google sign-in is to be tried.
 
 ### 5. App Store Connect listing
+- [ ] **EU trader status (Digital Services Act): non-trader.** Free app, no monetisation, so declare
+  yourself a non-trader in App Store Connect → Business before submitting; your address and phone
+  then aren't shown on the store page.
+- [ ] **Pricing: Free**, all countries. No Paid Apps agreement, banking or tax forms needed.
+- [ ] **Age rating**: fill in the questionnaire (no objectionable content, no user-generated
+  content, no web browsing inside the app); it should come out at the lowest rating.
 - [ ] Privacy policy URL (`cadence.patrick-mckinley.com/privacy`): what's read (calendars, camera
   for the pairing code, local network, Apple Music), that it goes straight to Google / Microsoft /
   your own Mac, and that there's no tracking or analytics.
@@ -99,8 +125,32 @@ it gets its own project.
   Activity, widgets, pairing.
 - [ ] Age rating, category (Productivity), support URL.
 
-### 6. Before submitting
+### 6. GitHub Actions (TestFlight uploads)
+The Release workflow's `ios` job does the archive and upload; it never submits for review. Add these
+under the repo's Settings → Secrets and variables → Actions:
+- [ ] **Distribution certificate**: Xcode → Settings → Accounts → Manage Certificates → **+ Apple
+  Distribution**. Then in Keychain Access, export it (with its private key) as a `.p12` with a
+  password. Secrets: `IOS_DISTRIBUTION_P12` = `base64 -i cert.p12 | pbcopy`,
+  `IOS_DISTRIBUTION_P12_PASSWORD`.
+- [ ] **Provisioning profiles**: developer.apple.com → Profiles → **+** → *App Store Connect* → the
+  app's ID → that certificate. Again for `<id>.widgets`. Download both and save as secrets
+  `IOS_APP_PROFILE` and `IOS_WIDGET_PROFILE` (`base64 -i file.mobileprovision | pbcopy`).
+  Profiles expire with the certificate (a year): renew both and update the secrets.
+- [ ] **App Store Connect API key**: App Store Connect → Users and Access → Integrations → Team
+  Keys → **+**, role *App Manager*. Secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (the
+  whole `.p8` file; it can only be downloaded once).
+- [ ] `APPLE_TEAM_ID` and `MICROSOFT_CLIENT_ID` secrets (shared with the Mac build).
+- [ ] Variables: `IOS_BUNDLE_ID`, `GOOGLE_IOS_CLIENT_PREFIX` (and optionally `SPOTIFY_CLIENT_ID`).
+- [ ] Try it: run **Release** with *dry_run* on; it builds a signed `.ipa` as an artifact without
+  uploading. Then a real release uploads to TestFlight.
+- The marketing version is the release version (`v1.2.0` → 1.2.0); the build number is the run
+  number followed by the attempt. CI builds with Xcode 26.6 (iOS 26 SDK, which App Store Connect
+  requires today); move `XCODE_VERSION` to 27 when GitHub has a stable macOS 27 runner, before Apple
+  starts requiring the iOS 27 SDK (usually each April).
+
+### 7. Before submitting
 - [ ] Publish the notarized Mac DMG, so the links in the app and review notes work.
-- [ ] Archive a Release build in Xcode and upload it to TestFlight. Test on your own phone, then
-  external TestFlight (its beta review is a cheap dry run for App Review).
+- [ ] Run the **Release** workflow to upload to TestFlight. Test on your own phone, then external
+  TestFlight (its beta review is a cheap dry run for App Review).
+- [ ] In App Store Connect, pick that build for the version and **Submit for Review**.
 - [ ] Submit once Google verification has passed.

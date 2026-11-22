@@ -510,6 +510,7 @@
 					"$(BUILT_PRODUCTS_DIR)/libCadenceCore.a",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID)";
+				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_APP_PROFILE)";
 				PRODUCT_NAME = Cadence;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -539,6 +540,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID)";
+				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_APP_PROFILE)";
 				PRODUCT_NAME = Cadence;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -559,6 +561,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID).widgets";
+				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_WIDGET_PROFILE)";
 				PRODUCT_NAME = CadenceWidgets;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -580,6 +583,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID).widgets";
+				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_WIDGET_PROFILE)";
 				PRODUCT_NAME = CadenceWidgets;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 1;

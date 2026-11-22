@@ -31,9 +31,9 @@ struct MediaCorner: View {
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
         .animation(Theme.spring, value: mode.key)
-        // Only ask for Music access when it's the chosen app (it's the only one that shares its track).
-        .onAppear { np.start(prompt: app == .appleMusic) }
-        .onChange(of: app) { _, new in np.start(prompt: new == .appleMusic) }
+        // Starts watching if Music access was already given. The prompt itself waits for something
+        // the user does: tapping the Music button here, or picking Apple Music in Settings.
+        .onAppear { np.start(prompt: false) }
     }
 
     private enum Mode {

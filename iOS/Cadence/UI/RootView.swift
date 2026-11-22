@@ -125,7 +125,9 @@ private struct AgendaScreen: View {
                     Text(statusText(mac)).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            if state.link.needsRescan {
+            if state.link.status == .noLocalNetwork {
+                LocalNetworkHelp()
+            } else if state.link.needsRescan {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Can't reach your Mac. Make sure Cadence is open on it and you're on the same Wi-Fi, or scan its pairing code again.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -146,6 +148,20 @@ private struct AgendaScreen: View {
         case .connected: state.link.connected.first === mac ? "Connected · Join opens on the Mac" : "Connected"
         case .failed(let why): why
         default: mac.status.label
+        }
+    }
+}
+
+/// Shown when Local Network access is off: without it Cadence can't find or reach the Mac.
+struct LocalNetworkHelp: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Cadence needs Local Network access to find your Mac. Turn it on in Settings → Apps → Cadence → Local Network.")
+                .font(.caption).foregroundStyle(.secondary)
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+            }
+            .font(.callout)
         }
     }
 }
