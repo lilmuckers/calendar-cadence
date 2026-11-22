@@ -16,8 +16,9 @@ from `shots.txt` and the title cards, and writes one 1080p MP4.
   matches the submission.
 - [ ] **Use the built-in client.** A release build (or `scripts/build.sh` with `Support/Secrets.env`),
   *not* "Use my own OAuth client". The client ID in the browser must start `106641200883-`.
-- [ ] **Clean consent.** At myaccount.google.com → Security → Third-party connections, remove Cadence
-  for the demo account, so the consent screen lists every scope instead of "already has access".
+- [ ] **Clean consent.** Signed in as the demo account, open https://myaccount.google.com/connections
+  (Security → "Your connections to third-party apps & services" → See all connections), pick
+  **Calendar Cadence** → "Delete all connections you have with Calendar Cadence". Do this for the demo account, so the consent screen lists every scope instead of "already has access".
 - [ ] **Demo account:** `patrick@patrick-mckinley.com`. Keep the work account out of the video: in
   Cadence Settings → Calendars, untick its calendars for the recording.
 - [ ] **A second person in the same Workspace** (a spare user on `patrick-mckinley.com`), with *no* existing
@@ -43,7 +44,7 @@ screen so the captions can be read; the trims in `shots.txt` take out dead time.
 | `05-mac-chat-consent.mov` | Settings → Accounts → under the account, **Allow running-late messages…**. Consent screen shows the Chat permissions; hold, then **Continue**. | Incremental consent for the 3 Chat scopes |
 | `06-mac-chat-send.mov` | Once the meeting has started (or within 15 min of it): right-click it → **Send Running Late** → it shows "Via Google Chat → *their name*"; pick a message. Switch to Google Chat (web): the new DM with the message. | `chat.spaces.readonly`, `chat.spaces.create`, `chat.messages.create` |
 | `07-iphone.mp4` | Recorded from the Simulator (see below). | Same project's iOS client, calendar only |
-| `08-mac-signout.mov` | Settings → Accounts → **Sign Out** → confirm. Optionally show Third-party connections no longer lists Cadence. | Revocation / user control |
+| `08-mac-signout.mov` | Settings → Accounts → **Sign Out** → confirm. Optionally show myaccount.google.com/connections no longer lists Calendar Cadence. | Revocation / user control |
 
 ### iPhone (shot 7)
 Claude can drive this part: it boots the Simulator, starts `xcrun simctl io booted recordVideo`, and
