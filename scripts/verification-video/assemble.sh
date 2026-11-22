@@ -9,7 +9,7 @@
 #   02-list.mov | calendar.readonly: meetings | 3 | 21    …trimmed to seconds 3–21
 #   03-extra.mov |                                        no caption
 # Clips can be any size or orientation (Mac ⌘⇧5 recordings, Simulator recordings); each is fitted
-# into 1920×1080 on black. Audio is dropped.
+# into 1920×1080 on black (above the caption band when there is a caption). Audio is dropped.
 set -euo pipefail
 
 dir=${1:?usage: assemble.sh <clips-dir> [out.mp4]}
@@ -26,6 +26,8 @@ swiftc -O -o "$work/caption" "$here/caption.swift" 2>/dev/null
 
 trim() { local s=$1; s=${s#"${s%%[![:space:]]*}"}; printf '%s' "${s%"${s##*[![:space:]]}"}"; }
 fit="scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30"
+# With a caption, the video sits in the top 920 px so the caption band below never covers the app.
+fitcap="scale=1920:920:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(920-ih)/2:black,setsar=1,fps=30"
 enc=(-c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -an -loglevel error -y)
 
 n=0
@@ -47,7 +49,7 @@ while IFS='|' read -r file caption start end || [[ -n ${file:-} ]]; do
         if [[ -n $caption ]]; then
             "$work/caption" lower "$caption" "$work/$n.png"
             ffmpeg -nostdin ${range[@]+"${range[@]}"} -i "$dir/$file" -i "$work/$n.png" \
-                -filter_complex "[0:v]$fit[v];[v][1:v]overlay=0:0,format=yuv420p" "${enc[@]}" "$seg"
+                -filter_complex "[0:v]$fitcap[v];[v][1:v]overlay=0:0,format=yuv420p" "${enc[@]}" "$seg"
         else
             ffmpeg -nostdin ${range[@]+"${range[@]}"} -i "$dir/$file" -vf "$fit,format=yuv420p" "${enc[@]}" "$seg"
         fi
