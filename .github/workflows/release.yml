@@ -19,8 +19,9 @@ name: Release
 # Optional, bundled into Info.plist (see Support/Secrets.env.example):
 #   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, MICROSOFT_CLIENT_ID, SLACK_CLIENT_ID
 #
-# iPhone app → TestFlight (the "ios" job). It switches on once all of these exist; until then it only
-# builds for the Simulator. It never submits for App Review: do that in App Store Connect.
+# iPhone app → TestFlight (the "ios" job). The job is skipped until the IOS_BUNDLE_ID variable exists (CI
+# already checks the Simulator build on every PR). Once it's set, the job uploads when all of the below exist and
+# only builds for the Simulator otherwise. It never submits for App Review: do that in App Store Connect.
 #   Secrets:
 #     IOS_DISTRIBUTION_P12           base64 of an "Apple Distribution" certificate exported as .p12
 #     IOS_DISTRIBUTION_P12_PASSWORD  password for that .p12
@@ -224,6 +225,8 @@ jobs:
   ios:
     name: iPhone app to TestFlight
     needs: [version, test]
+    # Off until the iPhone app is set up for distribution (see above).
+    if: ${{ vars.IOS_BUNDLE_ID != '' }}
     runs-on: macos-26
     timeout-minutes: 45
     env:
