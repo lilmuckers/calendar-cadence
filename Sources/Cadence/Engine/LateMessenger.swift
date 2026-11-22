@@ -40,7 +40,8 @@ final class LateMessenger {
         let g = google.accounts.map { a in
             let on = a.messagingEnabled == true && !google.needsReconnect.contains(a.id)
             return MessagingAccount(id: a.id, kind: .google, email: a.email, label: a.label,
-                                    canMail: on && a.canSendMail == true, canChat: on && a.canChat == true)
+                                    canMail: on && a.canSendMail == true, canChat: on && a.canChat == true,
+                                    offersMail: GoogleAuth.allowsMail(clientID: a.clientID))
         }
         let m = microsoft.accounts.map { a in
             let on = a.messagingEnabled == true && !microsoft.needsReconnect.contains(a.id)

@@ -68,8 +68,8 @@ profiles, media keys, the MCP socket). Only the iPhone app goes in the store.
 - [ ] App Store Connect → Apps → **+ New App** with that bundle ID, to reserve the name early.
 
 ### 2. Google: a separate Cloud project for iOS
-The Mac's project asks for `gmail.send` (a *restricted* scope, which needs a yearly paid security
-assessment). The iPhone only needs calendar access (*sensitive*: standard verification only), so
+The Mac's built-in client no longer asks for `gmail.send` (a *restricted* scope, which needs a yearly
+paid security assessment); only a user's own client does. Its Chat scopes are still extra review. The iPhone only needs calendar access (*sensitive*: standard verification only), so
 it gets its own project.
 - [ ] console.cloud.google.com → **New project**, e.g. "Cadence iPhone".
 - [ ] APIs & Services → Library → enable **Google Calendar API**.

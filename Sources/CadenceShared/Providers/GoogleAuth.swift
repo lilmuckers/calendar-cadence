@@ -58,11 +58,24 @@ final class GoogleAuth {
 
     static let writeScope = "https://www.googleapis.com/auth/calendar.events"
     static let scope = "openid email profile https://www.googleapis.com/auth/calendar.readonly \(writeScope)"
-    /// Asked for only when "Running late" messages are turned on for an account.
+    /// Asked for only when "Running late" messages are turned on, and only with a client the user brought
+    /// themselves: it's a *restricted* scope, so the built-in client (which goes through Google's verification)
+    /// never asks for it.
     static let mailScope = "https://www.googleapis.com/auth/gmail.send"
     /// Find or start a DM/group chat, then post in it.
     static let chatScopes = "https://www.googleapis.com/auth/chat.spaces.readonly https://www.googleapis.com/auth/chat.spaces.create https://www.googleapis.com/auth/chat.messages.create"
-    static let messagingScope = "\(scope) \(mailScope) \(chatScopes)"
+
+    /// Whether accounts from this client may send Gmail: any client except the built-in one.
+    static func allowsMail(clientID: String) -> Bool { clientID != bundledCredentials?.clientID }
+
+    static func messagingScope(clientID: String) -> String {
+        "\(scope) \(chatScopes)" + (allowsMail(clientID: clientID) ? " \(mailScope)" : "")
+    }
+
+    /// Granted Gmail send, and allowed to use it (a built-in-client token may still carry an old grant).
+    private static func canSendMail(scope: String, clientID: String) -> Bool {
+        scope.contains(mailScope) && allowsMail(clientID: clientID)
+    }
     private static let accountsKey = "Cadence.google.accounts"
     private static let legacyRefreshKey = "google.refreshToken"
     private static let secretKey = "google.clientSecret"
@@ -204,7 +217,7 @@ final class GoogleAuth {
     // MARK: Sign in
 
     /// Opens Google's account chooser and adds (or reconnects) whichever account the user picks.
-    /// Turn "Running late" messages on for an account: signs in again asking for Gmail and Chat.
+    /// Turn "Running late" messages on for an account: signs in again asking for Chat (and Gmail, with your own client).
     func enableMessaging(_ account: GoogleAccount) async throws {
         _ = try await signIn(messaging: true, loginHint: account.email)
     }
@@ -230,7 +243,7 @@ final class GoogleAuth {
             .init(name: "client_id", value: creds.clientID),
             .init(name: "redirect_uri", value: redirect),
             .init(name: "response_type", value: "code"),
-            .init(name: "scope", value: messaging ? Self.messagingScope : Self.scope),
+            .init(name: "scope", value: messaging ? Self.messagingScope(clientID: creds.clientID) : Self.scope),
             // Keep anything granted earlier (e.g. Gmail send) when signing in again.
             .init(name: "include_granted_scopes", value: "true"),
             .init(name: "code_challenge", value: challenge),
@@ -265,7 +278,7 @@ final class GoogleAuth {
         account.pictureURL = response.id_token.flatMap { JWT.payload($0)?["picture"] as? String } ?? account.pictureURL
         if messaging { account.messagingEnabled = true }
         if let scope = response.scope {
-            account.canSendMail = scope.contains(Self.mailScope)
+            account.canSendMail = Self.canSendMail(scope: scope, clientID: creds.clientID)
             account.canChat = scope.contains("chat.messages.create")
         }
         Keychain.set(refresh, for: account.refreshKey)
@@ -294,7 +307,7 @@ final class GoogleAuth {
             if let scope = response.scope {
                 setCanWrite(scope.contains(Self.writeScope), for: account.id)
                 if let i = accounts.firstIndex(where: { $0.id == account.id }) {
-                    let mail = scope.contains(Self.mailScope), chat = scope.contains("chat.messages.create")
+                    let mail = Self.canSendMail(scope: scope, clientID: creds.clientID), chat = scope.contains("chat.messages.create")
                     if accounts[i].canSendMail != mail || accounts[i].canChat != chat {
                         accounts[i].canSendMail = mail
                         accounts[i].canChat = chat

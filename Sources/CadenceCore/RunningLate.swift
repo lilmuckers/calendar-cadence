@@ -88,15 +88,20 @@ public struct MessagingAccount: Hashable, Sendable {
     /// Granted: mail / chat (Teams for Microsoft, Google Chat for Google, chat:write for Slack).
     public var canMail: Bool
     public var canChat: Bool
+    /// Whether this account could ever send email. False for Google accounts on the built-in client,
+    /// which doesn't ask for Gmail, so no email option is offered rather than one that can't be enabled.
+    public var offersMail: Bool
     public var slackTeam: String?
 
-    public init(id: String, kind: Kind, email: String?, label: String, canMail: Bool, canChat: Bool, slackTeam: String? = nil) {
+    public init(id: String, kind: Kind, email: String?, label: String, canMail: Bool, canChat: Bool,
+                offersMail: Bool = true, slackTeam: String? = nil) {
         self.id = id
         self.kind = kind
         self.email = email?.lowercased()
         self.label = label
         self.canMail = canMail
         self.canChat = canChat
+        self.offersMail = offersMail
         self.slackTeam = slackTeam
     }
 
@@ -301,7 +306,7 @@ public enum RunningLate {
                     add(.slackDM(email: dm), "Slack → \(name(dm))", account, blocked: noChat, channelRank: channelRank(.slack))
                 }
             }
-            if account.kind != .slack {
+            if account.kind != .slack, account.offersMail {
                 // Email the organiser; if that's you, everyone else invited.
                 let to = (!iOrganise ? organizer.map { [$0] } : nil) ?? otherEmails
                 if !to.isEmpty {

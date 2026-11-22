@@ -277,7 +277,10 @@ SLACK_CLIENT_ID=1234567890.1234567890                      # optional, for runni
   There's no client secret.
 - **Google Chat:** enable the Google Chat API in the Cloud project and configure a Chat app (name, icon, description).
   This only works for Workspace accounts.
-  Without it, Meet meetings fall back to Gmail, which needs the Gmail API enabled.
+  Without it, Meet meetings fall back to email.
+- **Gmail:** only with a client you bring yourself (*Use my own OAuth client…*, or one you build in). Enable the Gmail API in its project.
+  Cadence then also asks for `gmail.send` when you allow running-late messages. The built-in client never asks for it: `gmail.send` is a *restricted* scope, which would need a yearly paid security assessment to publish.
+  Without it, email goes from a Microsoft account if you have one.
 - **Microsoft:** the Teams chat and mail scopes (`ChatMessage.Send`, `OnlineMeetings.Read`, `Mail.Send`) are requested at sign-in, so the app registration doesn't change.
 
 `scripts/build.sh` writes them into the app's `Info.plist`, so users only see **Sign in with Google** / **Sign in with Microsoft**. A client someone enters in Settings still takes priority.

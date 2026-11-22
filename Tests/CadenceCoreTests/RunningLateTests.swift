@@ -135,6 +135,18 @@ struct RunningLateTests {
         #expect(o.last?.blocked != nil)
     }
 
+    @Test func builtInGoogleClientOffersNoEmail() {
+        let meet = MeetingLink(service: .googleMeet, url: URL(string: "https://meet.google.com/abc-mnop-xyz")!)
+        let m = meeting("m", start: now, link: meet, organizer: "sam@other.com", attendees: [Attendee(email: "sam@other.com")])
+        let builtIn = MessagingAccount(id: "b", kind: .google, email: "me@client.com", label: "me@client.com",
+                                       canMail: false, canChat: true, offersMail: false)
+        let o = RunningLate.options(for: m, accounts: [builtIn, ownMS], rules: [], preferredAccountIDs: ["b"], myEmails: mine)
+        #expect(!o.contains { if case .email = $0.target { $0.accountID == "b" } else { false } })
+        #expect(o.contains { $0.target == .googleDM(email: "sam@other.com") && $0.accountID == "b" })
+        // Email still goes from Outlook.
+        #expect(o.contains { $0.target == .email(to: ["sam@other.com"]) && $0.accountID == "m" })
+    }
+
     @Test func meetingDomains() {
         let m = meeting("d", start: now, organizer: me, attendees: [
             Attendee(email: me), Attendee(email: "a@client.com"), Attendee(email: "b@client.com"), Attendee(email: "c@vendor.com"),
