@@ -409,11 +409,14 @@ private struct MediaScreen: View {
                     }
                 }
                 if state.prefs.mediaApp == .spotify {
+                    // Spotify works like the other apps out of the box (open, and pause from the
+                    // desk). Track details are an optional extra that needs a Spotify developer
+                    // app, so it reads as "Off" rather than "Not set up" until one is added.
                     NavigationLink {
                         SpotifySetupScreen()
                     } label: {
-                        LabeledContent("Spotify app", value: state.spotify.customClientID != nil ? "Your own"
-                                       : state.spotify.isAvailable ? "Built-in" : "Not set up")
+                        LabeledContent("Track details", value: state.spotify.customClientID != nil ? "Your own app"
+                                       : state.spotify.isAvailable ? "On" : "Off")
                     }
                     if state.spotify.isAvailable {
                         if state.spotify.connected {
@@ -430,9 +433,10 @@ private struct MediaScreen: View {
                     }
                 }
             } footer: {
-                Text(state.prefs.mediaApp == .spotify
-                     ? "Track details and skip need your own free Spotify developer app; connecting opens Spotify for a moment to approve."
-                     : "Apple Music shows track details and skip; other apps show that they're playing and can be paused. While connected, the desk also shows and controls the Mac's Music or Spotify.")
+                Text(state.prefs.mediaApp != .spotify ? mediaFooter
+                     : state.spotify.isAvailable
+                     ? "Shows the track and adds skip. Connecting opens Spotify for a moment to approve."
+                     : "The desk opens Spotify and pauses it for meetings. Optional: track names and skip, with a free Spotify developer app (Track details).")
             }
             Section {
                 Toggle("Fade out for meetings", isOn: $state.prefs.pauseMediaForAlerts)
@@ -445,6 +449,10 @@ private struct MediaScreen: View {
         }
         .navigationTitle("Music & Media")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var mediaFooter: String {
+        "Apple Music shows track details and skip; other apps show that they're playing and can be paused. While connected, the desk also shows and controls the Mac's Music or Spotify."
     }
 }
 
@@ -616,7 +624,7 @@ private struct SpotifySetupScreen: View {
                 Text("It's free and takes a couple of minutes. Spotify keeps new apps in development mode, which is fine here: they work for the account that made them (add anyone else under User Management).")
             }
         }
-        .navigationTitle("Spotify app")
+        .navigationTitle("Track details")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { clientID = state.spotify.customClientID ?? "" }
     }
