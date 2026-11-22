@@ -16,16 +16,18 @@ from `shots.txt` and the title cards, and writes one 1080p MP4.
   matches the submission.
 - [ ] **Use the built-in client.** A release build (or `scripts/build.sh` with `Support/Secrets.env`),
   *not* "Use my own OAuth client". The client ID in the browser must start `106641200883-`.
-- [ ] **Clean consent.** In Cadence → Settings → Accounts, **Sign Out** of the demo account (this revokes
-  Cadence's access at Google), and remove it from the Simulator too, so the consent screen lists every scope
-  rather than "already has access". (myaccount.google.com/connections may not list an app whose Cloud project
-  belongs to your own Workspace, so it's not a reliable place to revoke it.)
-- [ ] **Demo account:** `patrick@patrick-mckinley.com`. Keep the work account out of the video: in
-  Cadence Settings → Calendars, untick its calendars for the recording.
-- [ ] **A second person in the same Workspace** (a spare user on `patrick-mckinley.com`), with *no* existing
-  Chat DM with you, so the video shows Cadence starting one. From that account create **"Cadence demo
-  review"**, starting 5 minutes from when you'll record shot 6, with a Meet link, inviting
-  `patrick@patrick-mckinley.com`. Leave it unanswered: it's also the invite for shot 3.
+- [ ] **Two fresh test accounts in the Workspace** (e.g. `tester.ay@` and `tester.bee@`), so no real calendar
+  or chat shows and the consent screen is clean (they've never granted Cadence access):
+  - **Demo account** (`tester.ay@`): signs in to Cadence on camera, on the Mac and the iPhone.
+  - **Organiser** (`tester.bee@`): creates **"Cadence demo review"** with a Meet link, starting about
+    5 minutes after you'll record shot 6, inviting the demo account. Leave it unanswered: it's also the invite
+    for shot 3. They must have *no* Chat DM with the demo account yet, so the video shows Cadence starting one.
+  - While the app is in Testing, add both under Google Auth Platform → Audience → Test users.
+  - Sign each in to Google Chat once (chat.google.com) so Chat can find them.
+- [ ] **On the Mac, add the demo account alongside your own** (Settings → Accounts → Add Another Account,
+  on camera in shot 1), and untick your own accounts' calendars in Settings → Calendars for the recording.
+  If an account was used before, Cadence's **Sign Out** revokes its access (myaccount.google.com/connections
+  may not list an app whose Cloud project belongs to your own Workspace).
 - [ ] Hide anything private: quit Mail/Slack, turn on Do Not Disturb, close other browser tabs, and use a
   browser window with no other signed-in accounts showing.
 - [ ] Have Google Calendar (web) and Google Chat (web) open in tabs, signed in as the demo account.
@@ -38,7 +40,7 @@ screen so the captions can be read; the trims in `shots.txt` take out dead time.
 
 | File | What to do | Proves |
 |---|---|---|
-| `01-mac-signin.mov` | Cadence → Settings → Accounts → **Sign in with Google**. In the browser, click into the address bar and scroll it so `client_id=106641200883-…` shows; hold 2 s. Pick the demo account. On the consent screen, hold until every line is readable, then **Continue**. Wait for "Cadence is connected". | Consent flow, client ID, app branding |
+| `01-mac-signin.mov` | Cadence → Settings → Accounts → **Sign in with Google** (or **Add Another Account**). In the browser, click into the address bar and scroll it so `client_id=106641200883-…` shows; hold 2 s. Sign in as the demo account. On the consent screen, hold until every line is readable, then **Continue**. Wait for "Cadence is connected". | Consent flow, client ID, app branding |
 | `02-mac-calendar.mov` | Open the menu-bar panel. Hover/expand "Cadence demo review" so its time, Meet link and attendees show. | `calendar.readonly` |
 | `03-mac-rsvp.mov` | Right-click "Cadence demo review" → **Accept**. Switch to Google Calendar (web), open the event: "Going? Yes". | `calendar.events` (RSVP) |
 | `04-mac-colour.mov` | Right-click the same event → **Colour** → Tomato. Switch to Google Calendar (web) and refresh: the event is red. | `calendar.events` (colour) |
