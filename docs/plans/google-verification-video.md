@@ -16,14 +16,14 @@ from `shots.txt` and the title cards, and writes one 1080p MP4.
   matches the submission.
 - [ ] **Use the built-in client.** A release build (or `scripts/build.sh` with `Support/Secrets.env`),
   *not* "Use my own OAuth client". The client ID in the browser must start `106641200883-`.
-- [ ] **Two fresh test accounts in the Workspace** (e.g. `tester.ay@` and `tester.bee@`), so no real calendar
-  or chat shows and the consent screen is clean (they've never granted Cadence access):
-  - **Demo account** (`tester.ay@`): signs in to Cadence on camera, on the Mac and the iPhone.
-  - **Organiser** (`tester.bee@`): creates **"Cadence demo review"** with a Meet link, starting about
+- [ ] **A fresh test account in the Workspace** as the demo account, so no real calendar or chat shows and the
+  consent screen is clean (it has never granted Cadence access):
+  - **Demo account** (`tester.bee@`): signs in to Cadence on camera, on the Mac and the iPhone.
+  - **Organiser** (any other user in the same Workspace, your own account is fine): creates **"Cadence demo review"** with a Meet link, starting about
     5 minutes after you'll record shot 6, inviting the demo account. Leave it unanswered: it's also the invite
     for shot 3. They must have *no* Chat DM with the demo account yet, so the video shows Cadence starting one.
-  - While the app is in Testing, add both under Google Auth Platform → Audience → Test users.
-  - Sign each in to Google Chat once (chat.google.com) so Chat can find them.
+  - While the app is in Testing, add the demo account under Google Auth Platform → Audience → Test users.
+  - Open Google Chat (chat.google.com) once as the demo account so Chat can find it.
 - [ ] **On the Mac, add the demo account alongside your own** (Settings → Accounts → Add Another Account,
   on camera in shot 1), and untick your own accounts' calendars in Settings → Calendars for the recording.
   If an account was used before, Cadence's **Sign Out** revokes its access (myaccount.google.com/connections
