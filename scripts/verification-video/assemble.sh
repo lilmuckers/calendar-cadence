@@ -8,6 +8,7 @@
 #   01-signin.mov | Sign-in: consent screen               a clip with a caption along the bottom
 #   02-list.mov | calendar.readonly: meetings | 3 | 21    …trimmed to seconds 3–21
 #   03-extra.mov |                                        no caption
+#   01-signin.mov | Client ID | 47 | 75 | 2700:1300:300:150   …and cropped (w:h:x:y in the clip's pixels) to zoom in
 # Clips can be any size or orientation (Mac ⌘⇧5 recordings, Simulator recordings); each is fitted
 # into 1920×1080 on black (above the caption band when there is a caption). Audio is dropped.
 set -euo pipefail
@@ -32,8 +33,9 @@ enc=(-c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -an -loglevel error -y
 
 n=0
 : > "$work/list.txt"
-while IFS='|' read -r file caption start end || [[ -n ${file:-} ]]; do
+while IFS='|' read -r file caption start end crop || [[ -n ${file:-} ]]; do
     file=$(trim "${file:-}"); caption=$(trim "${caption:-}"); start=$(trim "${start:-}"); end=$(trim "${end:-}")
+    crop=$(trim "${crop:-}")
     [[ -z $file || $file == \#* ]] && continue
     n=$((n + 1))
     seg=$work/$(printf '%03d' $n).mp4
@@ -43,15 +45,23 @@ while IFS='|' read -r file caption start end || [[ -n ${file:-} ]]; do
         echo "  $n. card: ${caption%%\\n*}"
     else
         [[ -f $dir/$file ]] || { echo "Missing clip: $dir/$file" >&2; exit 1; }
-        range=()
-        [[ -n $start ]] && range+=(-ss "$start")
-        [[ -n $end ]] && range+=(-to "$end")
+        # Trim with the trim filter rather than -ss: screen recordings are variable-frame-rate, and input
+        # seeking lands seconds away from the requested time.
+        pre=""
+        if [[ -n $start || -n $end ]]; then
+            pre="trim=${start:+start=$start}${start:+${end:+:}}${end:+end=$end},setpts=PTS-STARTPTS,"
+        fi
+        [[ -n $crop ]] && pre+="crop=$crop,"
+        # Screen recordings only store a frame when something changes, so a still screen at the end of a
+        # trim would stretch to the next stored frame. Cap the output at the trimmed length.
+        len=()
+        [[ -n $start && -n $end ]] && len=(-t "$(awk "BEGIN{print $end - $start}")")
         if [[ -n $caption ]]; then
             "$work/caption" lower "$caption" "$work/$n.png"
-            ffmpeg -nostdin ${range[@]+"${range[@]}"} -i "$dir/$file" -i "$work/$n.png" \
-                -filter_complex "[0:v]$fitcap[v];[v][1:v]overlay=0:0,format=yuv420p" "${enc[@]}" "$seg"
+            ffmpeg -nostdin -i "$dir/$file" -i "$work/$n.png" \
+                -filter_complex "[0:v]$pre$fitcap[v];[v][1:v]overlay=0:0,format=yuv420p" ${len[@]+"${len[@]}"} "${enc[@]}" "$seg"
         else
-            ffmpeg -nostdin ${range[@]+"${range[@]}"} -i "$dir/$file" -vf "$fit,format=yuv420p" "${enc[@]}" "$seg"
+            ffmpeg -nostdin -i "$dir/$file" -vf "$pre$fit,format=yuv420p" ${len[@]+"${len[@]}"} "${enc[@]}" "$seg"
         fi
         echo "  $n. $file${caption:+ — $caption}"
     fi
