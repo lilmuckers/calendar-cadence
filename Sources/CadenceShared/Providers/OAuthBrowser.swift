@@ -116,8 +116,11 @@ final class WebRedirectSession: NSObject, OAuthRedirectSession, ASWebAuthenticat
             let session = ASWebAuthenticationSession(url: url, callbackURLScheme: scheme) { callback, error in
                 if let callback, let comps = URLComponents(url: callback, resolvingAgainstBaseURL: false) {
                     cont.resume(returning: comps)
+                } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+                    // Closing the sheet isn't a failure: callers stay quiet on CancellationError.
+                    cont.resume(throwing: CancellationError())
                 } else {
-                    cont.resume(throwing: error ?? URLError(.cancelled))
+                    cont.resume(throwing: error ?? CancellationError())
                 }
             }
             session.presentationContextProvider = self

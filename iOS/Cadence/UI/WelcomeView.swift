@@ -173,7 +173,7 @@ private struct SourcesPage: View {
                                signIn: @escaping () async throws -> Void) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             ProviderSignInButton(provider: provider) {
-                Task { do { try await signIn() } catch { authError = error.localizedDescription } }
+                Task { do { try await signIn() } catch is CancellationError {} catch { authError = error.localizedDescription } }
             }
             .environment(\.colorScheme, .dark)
             ForEach(accounts, id: \.self) { label in

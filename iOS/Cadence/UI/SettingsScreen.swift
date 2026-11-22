@@ -291,7 +291,7 @@ struct CalendarsScreen: View {
 
     private func signIn(_ work: @escaping () async throws -> Void) {
         Task {
-            do { try await work() } catch { authError = error.localizedDescription }
+            do { try await work() } catch is CancellationError {} catch { authError = error.localizedDescription }
         }
     }
 
