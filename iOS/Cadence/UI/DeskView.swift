@@ -16,8 +16,6 @@ struct DeskView: View {
             let landscape = geo.size.width > geo.size.height
             ZStack {
                 background
-                // Lets the Mac's volume keys set this phone's volume (invisible).
-                PhoneVolumeHost(volume: state.volume).frame(width: 1, height: 1).allowsHitTesting(false)
                 Group {
                     if landscape {
                         HStack(spacing: 28) {
@@ -121,6 +119,14 @@ struct DeskView: View {
                         .padding(.horizontal, 28).padding(.vertical, 20)
                         .opacity(dimmed && !prompting ? 0.55 : 1)
                 }
+                // The Mac's volume keys set this phone's volume through this; it shows for a moment
+                // when they do. Just above the media corner when there is one, else bottom centre
+                // (the top is the clock and status pills).
+                let byMedia = landscape && state.prefs.deskMediaControls
+                VolumePill(volume: state.volume)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: byMedia ? .bottomTrailing : .bottom)
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, byMedia ? 20 + MediaCorner.height + 10 : 24)
             }
             .foregroundStyle(.white)
             .contentShape(Rectangle())

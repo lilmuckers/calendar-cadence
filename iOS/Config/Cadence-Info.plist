@@ -38,6 +38,10 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Only standard encryption from the OS (HTTPS, and TLS-PSK via Network.framework to the
+	     paired Mac), which is exempt, so App Store Connect stops asking on every upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>spotify</string>

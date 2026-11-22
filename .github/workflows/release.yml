@@ -18,6 +18,24 @@ name: Release
 #
 # Optional, bundled into Info.plist (see Support/Secrets.env.example):
 #   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, MICROSOFT_CLIENT_ID
+#
+# iPhone app → TestFlight (the "ios" job). It switches on once all of these exist; until then it only
+# builds for the Simulator. It never submits for App Review: do that in App Store Connect.
+#   Secrets:
+#     IOS_DISTRIBUTION_P12           base64 of an "Apple Distribution" certificate exported as .p12
+#     IOS_DISTRIBUTION_P12_PASSWORD  password for that .p12
+#     IOS_APP_PROFILE                base64 of the App Store provisioning profile for the app
+#     IOS_WIDGET_PROFILE             base64 of the App Store provisioning profile for <bundle id>.widgets
+#     ASC_KEY_ID, ASC_ISSUER_ID      App Store Connect API key (role: App Manager) and its issuer ID
+#     ASC_KEY_P8                     contents of that key's AuthKey_<id>.p8
+#     APPLE_TEAM_ID                  (shared with the Mac app above)
+#     MICROSOFT_CLIENT_ID            (shared with the Mac app above; the registration needs the iOS redirect)
+#   Variables (Settings → Secrets and variables → Actions → Variables; not secret):
+#     IOS_BUNDLE_ID                  e.g. com.yourname.cadence
+#     GOOGLE_IOS_CLIENT_PREFIX       the part of the iOS OAuth client ID before .apps.googleusercontent.com
+#     SPOTIFY_CLIENT_ID              optional built-in Spotify app
+# Build numbers are the run number followed by the attempt (run 42 → 421, its re-run → 422), so a
+# re-run never reuses a number App Store Connect has already seen.
 
 on:
   workflow_dispatch:
@@ -201,6 +219,147 @@ jobs:
       - name: Clean up keychain
         if: always() && env.HAS_SIGNING == 'true'
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+
+  ios:
+    name: iPhone app to TestFlight
+    needs: [version, test]
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      BUILD_NUMBER: ${{ github.run_number }}${{ github.run_attempt }}
+      HAS_IOS_SIGNING: ${{ secrets.IOS_DISTRIBUTION_P12 != '' && secrets.IOS_APP_PROFILE != '' && secrets.IOS_WIDGET_PROFILE != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.ASC_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' && vars.IOS_BUNDLE_ID != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: scripts/ci-select-xcode.sh
+
+      - name: No signing secrets
+        if: env.HAS_IOS_SIGNING != 'true'
+        run: |
+          echo "::warning::iPhone app not uploaded — add the iOS signing and App Store Connect secrets (see the top of release.yml). Building for the Simulator only."
+          scripts/ios-build.sh
+
+      - name: Import distribution certificate
+        if: env.HAS_IOS_SIGNING == 'true'
+        env:
+          P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12 }}
+          P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/ios-signing.keychain-db"
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/ios-cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/ios-cert.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/ios-cert.p12"
+
+      - name: Install provisioning profiles
+        if: env.HAS_IOS_SIGNING == 'true'
+        env:
+          APP_PROFILE: ${{ secrets.IOS_APP_PROFILE }}
+          WIDGET_PROFILE: ${{ secrets.IOS_WIDGET_PROFILE }}
+        run: |
+          # Xcode 16+ reads UserData; older tools read MobileDevice. Install into both.
+          DIRS=("$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles")
+          mkdir -p "${DIRS[@]}"
+          install_profile() { # $1 base64, $2 env var for its name
+            local file="$RUNNER_TEMP/$2.mobileprovision"
+            echo "$1" | base64 --decode > "$file"
+            security cms -D -i "$file" > "$RUNNER_TEMP/$2.plist"
+            local uuid name
+            uuid=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/$2.plist")
+            name=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/$2.plist")
+            for d in "${DIRS[@]}"; do cp "$file" "$d/$uuid.mobileprovision"; done
+            echo "$2=$name" >> "$GITHUB_ENV"
+            echo "Installed $2: $name ($uuid)"
+          }
+          install_profile "$APP_PROFILE" APP_PROFILE_NAME
+          install_profile "$WIDGET_PROFILE" WIDGET_PROFILE_NAME
+
+      - name: Write build settings
+        if: env.HAS_IOS_SIGNING == 'true'
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
+          GOOGLE_IOS_CLIENT_PREFIX: ${{ vars.GOOGLE_IOS_CLIENT_PREFIX }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+          SPOTIFY_CLIENT_ID: ${{ vars.SPOTIFY_CLIENT_ID }}
+        run: |
+          # A release without built-in sign-in would make users bring their own OAuth clients.
+          [[ -n "$GOOGLE_IOS_CLIENT_PREFIX" ]] || echo "::warning::GOOGLE_IOS_CLIENT_PREFIX isn't set: Sign in with Google will be off."
+          [[ -n "$MICROSOFT_CLIENT_ID" ]] || echo "::warning::MICROSOFT_CLIENT_ID isn't set: Sign in with Microsoft will be off."
+          cat > iOS/Config/Local.xcconfig <<EOF
+          DEVELOPMENT_TEAM = $TEAM_ID
+          CADENCE_BUNDLE_ID = $BUNDLE_ID
+          GOOGLE_IOS_CLIENT_PREFIX = $GOOGLE_IOS_CLIENT_PREFIX
+          MICROSOFT_CLIENT_ID = $MICROSOFT_CLIENT_ID
+          SPOTIFY_CLIENT_ID = $SPOTIFY_CLIENT_ID
+          CADENCE_APP_PROFILE = $APP_PROFILE_NAME
+          CADENCE_WIDGET_PROFILE = $WIDGET_PROFILE_NAME
+          EOF
+
+      - name: Archive
+        if: env.HAS_IOS_SIGNING == 'true'
+        run: |
+          xcodebuild -project iOS/CadenceCompanion.xcodeproj -scheme Cadence -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Cadence.xcarchive" \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Apple Distribution" OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            archive
+
+      - name: Export and upload to TestFlight
+        if: env.HAS_IOS_SIGNING == 'true'
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$KEY"
+          # Dry runs export the .ipa (kept as an artifact below) instead of uploading it.
+          DESTINATION=upload
+          [[ "$DRY_RUN" == "true" ]] && DESTINATION=export
+          OPTS="$RUNNER_TEMP/ExportOptions.plist"
+          /usr/libexec/PlistBuddy -c "Add :method string app-store-connect" \
+            -c "Add :destination string $DESTINATION" \
+            -c "Add :teamID string $TEAM_ID" \
+            -c "Add :signingStyle string manual" \
+            -c "Add :signingCertificate string Apple Distribution" \
+            -c "Add :uploadSymbols bool true" \
+            -c "Add :manageAppVersionAndBuildNumber bool false" \
+            -c "Add :provisioningProfiles dict" \
+            -c "Add :provisioningProfiles:$BUNDLE_ID string $APP_PROFILE_NAME" \
+            -c "Add :provisioningProfiles:$BUNDLE_ID.widgets string $WIDGET_PROFILE_NAME" \
+            "$OPTS"
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Cadence.xcarchive" \
+            -exportOptionsPlist "$OPTS" -exportPath "$RUNNER_TEMP/export" \
+            -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          rm -f "$KEY"
+          if [[ "$DESTINATION" == "upload" ]]; then
+            echo "### iPhone app $VERSION ($BUILD_NUMBER) uploaded to TestFlight" >> "$GITHUB_STEP_SUMMARY"
+            echo "Processing takes a few minutes; then it's under TestFlight in App Store Connect." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_IOS_SIGNING == 'true' && inputs.dry_run
+        with:
+          name: Cadence-iOS-${{ needs.version.outputs.version }}
+          path: ${{ runner.temp }}/export/*.ipa
+          if-no-files-found: error
+
+      - name: Clean up
+        if: always() && env.HAS_IOS_SIGNING == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/ios-signing.keychain-db" || true
+          rm -f iOS/Config/Local.xcconfig "$RUNNER_TEMP"/AuthKey_*.p8
 
   release:
     name: Tag and publish release

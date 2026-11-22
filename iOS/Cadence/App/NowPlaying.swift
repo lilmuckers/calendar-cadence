@@ -18,9 +18,19 @@ final class NowPlaying {
     private(set) var musicPlaying = false
     /// Some other app (Spotify, a podcast…) is playing.
     private(set) var otherPlaying = false
-    private(set) var authorized = MPMediaLibrary.authorizationStatus() == .authorized
+    private(set) var authorized = NowPlaying.libraryStatus == .authorized
 
-    @ObservationIgnored private let player = MPMusicPlayerController.systemMusicPlayer
+    /// Set once Cadence has asked for Music access. Until then the status isn't read at all: on
+    /// recent iOS even reading `MPMediaLibrary.authorizationStatus()` shows the prompt, and that
+    /// should wait for something the user does (tapping the Music button, picking Apple Music).
+    private static let askedKey = "Cadence.music.asked"
+    private static var libraryStatus: MPMediaLibraryAuthorizationStatus {
+        UserDefaults.standard.bool(forKey: askedKey) ? MPMediaLibrary.authorizationStatus() : .notDetermined
+    }
+
+    /// Fetched on use, not up front: touching the system player is enough for iOS to show the
+    /// Music permission prompt, which should wait for something the user does.
+    private var player: MPMusicPlayerController { .systemMusicPlayer }
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var started = false
 
@@ -46,17 +56,23 @@ final class NowPlaying {
         }
     }
 
+    /// Media library access hasn't been asked for yet.
+    var canPrompt: Bool { Self.libraryStatus == .notDetermined }
+
     /// Asks for media library access the first time (needed to read the track), then starts watching.
-    func start(prompt: Bool = true) {
+    /// `answered` runs once the prompt is answered (only when it was shown).
+    func start(prompt: Bool = true, answered: (@MainActor () -> Void)? = nil) {
         guard !started else { return }
-        switch MPMediaLibrary.authorizationStatus() {
+        switch Self.libraryStatus {
         case .authorized:
             begin()
         case .notDetermined where prompt:
+            UserDefaults.standard.set(true, forKey: Self.askedKey)
             MPMediaLibrary.requestAuthorization { status in
                 Task { @MainActor [weak self] in
                     self?.authorized = status == .authorized
                     if status == .authorized { self?.begin() }
+                    answered?()
                 }
             }
         default:

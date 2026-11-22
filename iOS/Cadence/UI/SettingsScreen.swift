@@ -157,6 +157,7 @@ extension CompanionClient.Status {
         case .connecting: "Connecting…"
         case .searching: "Looking…"
         case .failed: "Unavailable"
+        case .noLocalNetwork: "Local Network off"
         case .off: "Not connected"
         case .unpaired: "Pair again"
         }
@@ -252,9 +253,9 @@ private struct CalendarsScreen: View {
                     state.microsoftSignOut(account)
                 }
             }
-            Button("Sign In with Google") { signIn { try await state.googleSignIn() } }
+            ProviderSignInButton(provider: .google) { signIn { try await state.googleSignIn() } }
                 .disabled(state.googleAuth.credentials == nil)
-            Button("Sign In with Microsoft") { signIn { try await state.microsoftSignIn() } }
+            ProviderSignInButton(provider: .microsoft) { signIn { try await state.microsoftSignIn() } }
                 .disabled(state.microsoftAuth.clientID == nil)
         } header: { Text("Accounts on this iPhone") } footer: {
             if state.link.mac != nil {
@@ -408,12 +409,19 @@ private struct MediaScreen: View {
                         Label { Text(app.name) } icon: { MediaLogo(app: app, size: 22) }.tag(app)
                     }
                 }
+                // Picking Apple Music is a good moment to ask for access to what it's playing.
+                .onChange(of: state.prefs.mediaApp) { _, new in
+                    if new == .appleMusic { state.nowPlaying.start(prompt: true) }
+                }
                 if state.prefs.mediaApp == .spotify {
+                    // Spotify works like the other apps out of the box (open, and pause from the
+                    // desk). Track details are an optional extra that needs a Spotify developer
+                    // app, so it reads as "Off" rather than "Not set up" until one is added.
                     NavigationLink {
                         SpotifySetupScreen()
                     } label: {
-                        LabeledContent("Spotify app", value: state.spotify.customClientID != nil ? "Your own"
-                                       : state.spotify.isAvailable ? "Built-in" : "Not set up")
+                        LabeledContent("Track details", value: state.spotify.customClientID != nil ? "Your own app"
+                                       : state.spotify.isAvailable ? "On" : "Off")
                     }
                     if state.spotify.isAvailable {
                         if state.spotify.connected {
@@ -430,9 +438,10 @@ private struct MediaScreen: View {
                     }
                 }
             } footer: {
-                Text(state.prefs.mediaApp == .spotify
-                     ? "Track details and skip need your own free Spotify developer app; connecting opens Spotify for a moment to approve."
-                     : "Apple Music shows track details and skip; other apps show that they're playing and can be paused. While connected, the desk also shows and controls the Mac's Music or Spotify.")
+                Text(state.prefs.mediaApp != .spotify ? mediaFooter
+                     : state.spotify.isAvailable
+                     ? "Shows the track and adds skip. Connecting opens Spotify for a moment to approve."
+                     : "The desk opens Spotify and pauses it for meetings. Optional: track names and skip, with a free Spotify developer app (Track details).")
             }
             Section {
                 Toggle("Fade out for meetings", isOn: $state.prefs.pauseMediaForAlerts)
@@ -445,6 +454,10 @@ private struct MediaScreen: View {
         }
         .navigationTitle("Music & Media")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var mediaFooter: String {
+        "Apple Music shows track details and skip; other apps show that they're playing and can be paused. While connected, the desk also shows and controls the Mac's Music or Spotify."
     }
 }
 
@@ -509,7 +522,9 @@ private struct MacDetailScreen: View {
             } footer: {
                 Text("Name: shown on Join buttons and in the Dynamic Island, e.g. \"Join on Work laptop\". Leave blank for the Mac's own name.")
             }
-            if link.needsRescan {
+            if link.status == .noLocalNetwork {
+                Section { LocalNetworkHelp() }
+            } else if link.needsRescan {
                 Section {
                     Text("Can't reach this Mac. Make sure Cadence is open on it and you're on the same Wi-Fi, or scan its pairing code again (Pair another Mac).")
                         .font(.callout).foregroundStyle(.secondary)
@@ -616,7 +631,7 @@ private struct SpotifySetupScreen: View {
                 Text("It's free and takes a couple of minutes. Spotify keeps new apps in development mode, which is fine here: they work for the account that made them (add anyone else under User Management).")
             }
         }
-        .navigationTitle("Spotify app")
+        .navigationTitle("Track details")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { clientID = state.spotify.customClientID ?? "" }
     }

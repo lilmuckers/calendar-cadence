@@ -646,6 +646,12 @@ final class PhoneState {
 
     /// Desk media button: open the preferred player.
     func openMediaApp() {
+        // Tapping through to Music is when to ask to see what it's playing (not on opening the desk):
+        // ask first, then open Music once it's answered.
+        if prefs.mediaApp == .appleMusic && nowPlaying.canPrompt {
+            nowPlaying.start(prompt: true) { [weak self] in self?.openMediaApp() }
+            return
+        }
         UIApplication.shared.open(prefs.mediaApp.url)
     }
 
