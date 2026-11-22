@@ -115,9 +115,16 @@
       <li><code>chat.messages.create</code>: post the running-late message you chose to send.</li>
     </ul>
     <p>Cadence's built-in Google sign-in never asks for Gmail access. If you set Cadence up with your own Google OAuth client (<em>Settings → Accounts → Use my own OAuth client</em>), it also asks for <code>gmail.send</code> so it can send running-late emails from your account. Cadence can't read your email.</p>
-    <p>This data goes straight from Google to the app on your Mac. It never passes through or is stored on any server we run, and it isn't shared with anyone. It isn't used for advertising or to train AI or machine-learning models, and no person (including the developer) reads it. It is processed only on your devices to provide Cadence's features.</p>
+    <p>This data goes straight from Google to the app on your Mac or iPhone. It never passes through or is stored on any server we run, and we never receive it. It only leaves your device in these cases, each one something you set up or ask for:</p>
+    <ul>
+      <li><strong>Your paired iPhone or Mac:</strong> today's and tomorrow's meetings are sent over the encrypted link between your own devices (see <a href="#iphone">Cadence for iPhone</a>).</li>
+      <li><strong>Apple Maps:</strong> if you allow location, a meeting's location is sent to Apple's MapKit to estimate travel time.</li>
+      <li><strong>AI assistants you connect:</strong> an assistant you install in <em>Settings → Assistants</em> can read your calendar, including Google events, and its provider handles that under its own policy (see <a href="#assistants">AI assistants</a>). Nothing is shared with an assistant unless you connect one, and you can turn this off at any time.</li>
+      <li><strong>Messages you send:</strong> a running-late message goes to the people you choose.</li>
+    </ul>
+    <p>Google user data isn't sold or used for advertising or to train AI or machine-learning models, and no person (including the developer) reads it. It is processed only on your devices to provide Cadence's features.</p>
     <p>Cadence's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
-    <p>You can disconnect an account at any time in <em>Cadence → Settings → Accounts</em>. Disconnecting revokes the token with Google and removes it and the cached photo from your Mac.</p>
+    <p>You can disconnect an account at any time in <em>Cadence → Settings → Accounts</em>. On iPhone, use <em>Settings → Calendars</em>. Disconnecting revokes the token with Google and removes it, the cached photo and the account's events from that device.</p>
 
     <h2>Microsoft user data</h2>
     <p>When you choose <strong>Sign in with Microsoft</strong>, Cadence asks for these Microsoft Graph permissions:</p>
