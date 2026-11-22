@@ -55,6 +55,12 @@ xcrun simctl io booted recordVideo --codec=h264 ~/Movies/cadence-oauth/07-iphone
 ```
 (Ctrl-C to stop.)
 
+On a Mac behind TLS inspection (Netskope), the Simulator doesn't trust the proxy's certificate authority,
+so sign-in fails with an SSL error at the token exchange. Trust it in the Simulator only:
+```bash
+xcrun simctl keychain booted add-root-cert "$SSL_CERT_FILE"
+```
+
 ## Assemble and upload
 ```bash
 cp scripts/verification-video/shots.example.txt ~/Movies/cadence-oauth/shots.txt
