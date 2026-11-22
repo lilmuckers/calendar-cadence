@@ -40,6 +40,7 @@
 4. **Anything else, or if the steps above fail** → email to the organiser, or to everyone invited if you're the
    organiser.
    - Sent from the account the meeting came from, through Gmail `messages.send` or Graph `sendMail`.
+   - Gmail only with a user-supplied Google client (see Permissions).
    - macOS Calendar and ICS meetings use your first connected account.
 
 ## Can it all be done with API calls? (checked against current docs, 2026-11-18)
@@ -51,7 +52,7 @@ the existing Google/Microsoft clients). After that, users just sign in.
 | Teams meeting chat | ✅ | None. Graph v2 asks for extra scopes at sign-in, with no portal change. | Consent to `ChatMessage.Send` + `OnlineMeetings.Read`. Some tenants block user consent. |
 | Find chat ID | ✅ | — | `GET /me/onlineMeetings?$filter=JoinWebUrl eq '…'` → `chatInfo.threadId`. Docs: works with "the invited attendee's user token". |
 | Outlook email | ✅ | None | `Mail.Send` consent |
-| Gmail email | ✅ | None in Testing mode. Publishing would need Google verification (restricted scope). | `gmail.send` consent |
+| Gmail email | ✅ | Own Google client only. The built-in client doesn't ask for it: publishing a restricted scope needs a yearly paid security assessment. | `gmail.send` consent |
 | Google Chat DM | ⚠️ | Chat API enabled **and a Chat app configured** (name, icon, description) in the Cloud project. Console only, no API. | Business/Enterprise **Workspace accounts only**. No consumer Gmail. |
 | Slack channel post | ✅ | Create one Slack app with **PKCE on**: user scope `chat:write`, localhost redirect. With PKCE there's no client secret, so the client ID can ship in the app. | Sign in with Slack through the browser. Refresh tokens expire after 30 days. A client's workspace admin may need to approve the app. |
 
@@ -61,11 +62,13 @@ Notes:
 - Turning PKCE on is one-way for a Slack app.
 - Plan change: no pasted Slack token. Real "Sign in with Slack", like Google/Microsoft.
 - Plan change: Google Chat is optional. If the Chat app isn't configured, or the account isn't Workspace,
-  Meet meetings go by Gmail.
+  Meet meetings go by email.
 
 ## Permissions (asked for only when you turn sending on, so normal sign-in never breaks)
 - **Accounts tab:** each account gets an "Allow Running-late messages" button. It re-runs sign-in with the extra scopes:
-  - Google: `gmail.send`, `chat.spaces.readonly`, `chat.messages.create`
+  - Google: `chat.spaces.readonly`, `chat.spaces.create`, `chat.messages.create`, plus `gmail.send` only when signed in
+    through a client the user brought (Settings → Accounts → Use my own OAuth client). Accounts on the built-in client
+    get no Gmail email option.
   - Microsoft: `Mail.Send`, `ChatMessage.Send`, `OnlineMeetings.Read`
 - Some work tenants block these until an admin approves them. If so, Cadence says so and uses email instead.
 - **Slack**: Settings → Accounts gets "Sign in with Slack", using OAuth with PKCE and a loopback redirect.

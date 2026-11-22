@@ -130,6 +130,7 @@ private struct GoogleSection: View {
             + "Google shows its account chooser each time. Events that also arrive via macOS Calendar or another account are merged."
         if needsClientFields {
             text += " Needs a Google Cloud OAuth client of type \"Desktop app\" with the Google Calendar API enabled — see the README."
+                + " With your own client, running-late messages can also send email through Gmail (enable the Gmail API)."
         }
         return text
     }
