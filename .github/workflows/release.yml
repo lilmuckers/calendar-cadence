@@ -17,7 +17,7 @@ name: Release
 #   APPLE_APP_PASSWORD           app-specific password for that Apple ID
 #
 # Optional, bundled into Info.plist (see Support/Secrets.env.example):
-#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, MICROSOFT_CLIENT_ID
+#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, MICROSOFT_CLIENT_ID, SLACK_CLIENT_ID
 #
 # iPhone app → TestFlight (the "ios" job). It switches on once all of these exist; until then it only
 # builds for the Simulator. It never submits for App Review: do that in App Store Connect.
@@ -156,6 +156,7 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+          SLACK_CLIENT_ID: ${{ secrets.SLACK_CLIENT_ID }}
         run: |
           if [[ "$HAS_SIGNING" != "true" ]]; then
             echo "::warning::No signing secrets — building ad-hoc signed. The DMG will not open cleanly on other Macs."
