@@ -167,7 +167,7 @@ extension CompanionClient.Status {
 // MARK: - Calendars
 
 /// Where meetings come from (accounts and ICS links), which calendars count, and what's filtered out.
-private struct CalendarsScreen: View {
+struct CalendarsScreen: View {
     @Environment(PhoneState.self) private var state
     @State private var authError: String?
     @State private var newFeedURL = ""
@@ -214,6 +214,11 @@ private struct CalendarsScreen: View {
                 } header: { Text("Calendars") } footer: {
                     Text("Agenda only: shown in the agenda, but never alerts, notifies or counts as your next meeting. Handy for long room bookings. Calendars from the Mac follow its settings.")
                 }
+            }
+            Section {
+                Toggle("Sample meetings", isOn: Binding(get: { state.usingSample }, set: { state.setSample($0) }))
+            } footer: {
+                Text("A made-up day with a meeting every hour, to try the countdown, alerts and desk mode. Turns itself off when you connect a calendar or a Mac.")
             }
             Section("Filters") {
                 Toggle("Hide all-day events", isOn: $state.prefs.filters.hideAllDay)

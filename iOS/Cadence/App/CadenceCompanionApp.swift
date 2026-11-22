@@ -1,9 +1,17 @@
 import SwiftUI
+import TipKit
 
 @main
 struct CadenceCompanionApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var state = PhoneState.shared
+
+    init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-resetTips") { try? Tips.resetDatastore() }
+        #endif
+        try? Tips.configure([.displayFrequency(.immediate)])
+    }
 
     var body: some Scene {
         WindowGroup {

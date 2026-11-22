@@ -497,7 +497,7 @@
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Cadence shows what the Music app is playing on the desk display, with play, pause and skip.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cadence connects to Cadence on your Mac to show your meetings and join them on the Mac.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -532,7 +532,7 @@
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Cadence shows what the Music app is playing on the desk display, with play, pause and skip.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cadence connects to Cadence on your Mac to show your meetings and join them on the Mac.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -30,6 +30,11 @@ profiles, media keys, the MCP socket). Only the iPhone app goes in the store.
   Once merged it's at
   `https://raw.githubusercontent.com/lilmuckers/calendar-cadence/main/docs/demo/review-calendar.ics`
   (or copy it to `cadence.patrick-mckinley.com/demo.ics` for a tidier link).
+- [x] **First launch**: a three-page welcome (what it does, where meetings come from, alerts and desk
+  mode), **Try with sample meetings** (made up on the phone, a meeting every hour plus one two
+  minutes after turning it on, to show the alert), a designed empty home screen, a desk-mode tile,
+  one-off tips, and a launch screen in the home screen's colour. Notifications are asked for on the
+  welcome's last page, or when the first calendar or Mac is connected, never at launch.
 - [x] Local Network denied: the Mac row says so, with **Open Settings**, instead of a raw error.
 - [x] Apple Music access is asked for when you tap through to Music on the desk or pick Apple Music
   in Settings, not on launch. (On recent iOS even *reading* the permission status shows the prompt,
@@ -95,7 +100,10 @@ it gets its own project.
   accounts aren't affected.
 
 ### 4. Review notes and video
-- [ ] Add the demo feed to the review notes: "Settings → Calendars → Subscribed calendars, paste
+- [ ] Tell the reviewer about **Try with sample meetings** (on the welcome's second page, the empty
+  home screen, and Settings → Calendars): the quickest way to see everything, no account needed.
+  An alert comes up two minutes after turning it on.
+- [ ] Also add the demo feed to the review notes: "Settings → Calendars → Subscribed calendars, paste
   `<demo feed URL>`, Add". There's a meeting every hour, so the countdown, Join, the full-screen
   alert, the Live Activity and the widgets can all be tried within the hour.
 - [ ] A 30–60 second screen recording: pairing with the Mac (show the code on the Mac, scan it),

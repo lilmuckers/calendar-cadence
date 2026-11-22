@@ -28,6 +28,13 @@ final class PhoneNotifier: NSObject, UNUserNotificationCenterDelegate {
         (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
     }
 
+    private func isAuthorized() async -> Bool {
+        switch await center.notificationSettings().authorizationStatus {
+        case .authorized, .provisional, .ephemeral: true
+        default: false
+        }
+    }
+
     /// Replaces every scheduled notification with ones for `meetings`.
     func reschedule(meetings: [Meeting], prefs: PhonePrefs, schedule: WorkSchedule, skipping: Set<String>) {
         let now = Date()
@@ -69,7 +76,8 @@ final class PhoneNotifier: NSObject, UNUserNotificationCenterDelegate {
         Task {
             let pending = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(Self.prefix) }
             center.removePendingNotificationRequests(withIdentifiers: pending)
-            guard !requests.isEmpty, await requestAuthorization() else { return }
+            // Never asks from here: the welcome, or connecting the first calendar, does (see PhoneState).
+            guard !requests.isEmpty, await isAuthorized() else { return }
             for r in requests { try? await center.add(r) }
         }
     }

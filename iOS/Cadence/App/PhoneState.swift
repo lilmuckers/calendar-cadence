@@ -18,6 +18,7 @@ final class PhoneState {
             prefs.save()
             if prefs.icsFeeds != oldValue.icsFeeds { syncFeeds(fetch: true) }
             if prefs.filters != oldValue.filters { recompute() }
+            if prefs.sampleCalendarSince != oldValue.sampleCalendarSince { syncSample() }
             scheduleBackgroundWork()
         }
     }
@@ -75,7 +76,11 @@ final class PhoneState {
     private(set) var googleProviders: [GoogleCalendarProvider] = []
     private(set) var microsoftProviders: [MicrosoftCalendarProvider] = []
     private(set) var icsProviders: [ICSProvider] = []
-    @ObservationIgnored private var providers: [CalendarProvider] { [eventKit] + googleProviders + microsoftProviders + icsProviders }
+    /// "Try with sample meetings", while it's on.
+    private(set) var sample: SampleCalendar?
+    @ObservationIgnored private var providers: [CalendarProvider] {
+        [eventKit] + googleProviders + microsoftProviders + icsProviders + (sample.map { [$0] } ?? [])
+    }
 
     @ObservationIgnored private var planner = AlertPlanner()
     @ObservationIgnored private var timer: Timer?
@@ -115,6 +120,7 @@ final class PhoneState {
             Self.saveSnapshots(snapshots)
         }
         rebuildAgenda()
+        sourcesChanged()
         // A Mac that just connected hears what's playing here and the volume.
         sentMedia = nil
         sentVolume = nil
@@ -165,6 +171,10 @@ final class PhoneState {
     /// When the saved agenda was last brought up to date.
     var macCopyDate: Date? { snapshot?.generatedAt }
     var hasOwnSources: Bool { calendarAccess || !googleProviders.isEmpty || !microsoftProviders.isEmpty || !icsProviders.isEmpty }
+    /// Somewhere real for meetings to come from: a calendar on this phone or a paired Mac.
+    var hasRealSource: Bool { hasOwnSources || !link.links.isEmpty }
+    /// Showing the made-up sample meetings.
+    var usingSample: Bool { sample != nil }
     /// Meetings muted by a clash choice or an agenda-only calendar on the Mac (still honoured from the
     /// saved copy), plus this phone's own agenda-only calendars.
     private var suppressed: Set<String> {
@@ -285,7 +295,17 @@ final class PhoneState {
         syncMicrosoft(fetch: false)
         syncFeeds(fetch: false)
         calendarAccess = eventKit.isAuthorized
-        refresh()
+        syncSample()
+        hadRealSource = hasRealSource
+        // Already set up before the welcome existed: no need to show it.
+        if !prefs.welcomeSeen && hasRealSource { prefs.welcomeSeen = true }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-previewWelcome") { prefs.welcomeSeen = false }
+        // -previewSample: past the welcome, with the sample meetings on.
+        if ProcessInfo.processInfo.arguments.contains("-previewSample") { prefs.welcomeSeen = true; setSample(true) }
+        // -previewHome: past the welcome with nothing connected (the empty home screen).
+        if ProcessInfo.processInfo.arguments.contains("-previewHome") { prefs.welcomeSeen = true; setSample(false) }
+        #endif
         Task { await refreshRemote() }
 
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
@@ -350,6 +370,40 @@ final class PhoneState {
         planner.prune(keeping: meetings)
         updateLiveActivity()
         updateWidgets()
+        sourcesChanged()
+    }
+
+    // MARK: - Sample meetings & first sources
+
+    func setSample(_ on: Bool) { prefs.sampleCalendarSince = on ? Date() : nil }
+
+    private func syncSample() {
+        if let since = prefs.sampleCalendarSince {
+            if sample?.since != since { sample = SampleCalendar(since: since) }
+        } else {
+            sample = nil
+        }
+        refresh()
+    }
+
+    @ObservationIgnored private var hadRealSource: Bool?
+
+    /// The first real calendar or Mac just arrived: the sample meetings make way, and (once past the
+    /// welcome, which asks on its own page) it's the moment to ask about notifications.
+    private func sourcesChanged() {
+        // Not tracked until start() has loaded every account, so launching isn't mistaken for one arriving.
+        guard let had = hadRealSource else { return }
+        let has = hasRealSource
+        hadRealSource = has
+        guard !had, has else { return }
+        if prefs.sampleCalendarSince != nil { prefs.sampleCalendarSince = nil }
+        if prefs.welcomeSeen { Task { await askForNotifications() } }
+    }
+
+    /// Asks once for notifications (iOS shows its prompt only the first time), then schedules them.
+    func askForNotifications() async {
+        _ = await notifier.requestAuthorization()
+        scheduleBackgroundWork()
     }
 
     func refreshRemote() async {
@@ -884,7 +938,8 @@ final class PhoneState {
 
     /// Notifications and the Live Activity keep working while the app is suspended.
     private func scheduleBackgroundWork() {
-        notifier.reschedule(meetings: offlineMeetings.filter { !suppressed.contains($0.id) }, prefs: prefs,
+        // Not for the sample meetings: one an hour would be a lot of notifications.
+        notifier.reschedule(meetings: offlineMeetings.filter { !suppressed.contains($0.id) && $0.calendar.id != SampleCalendar.calendarID }, prefs: prefs,
                             schedule: schedule, skipping: suppressed)
         updateLiveActivity()
         updateWidgets()
