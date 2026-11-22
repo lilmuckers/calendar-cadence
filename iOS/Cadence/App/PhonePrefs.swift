@@ -55,6 +55,11 @@ struct PhonePrefs: Codable, Equatable {
     /// the first Mac in the list rather than the one it came from.
     var joinOnPriorityMac = false
 
+    /// "Try with sample meetings": when it was turned on, nil while it's off.
+    var sampleCalendarSince: Date?
+    /// The first-launch welcome has been finished or skipped.
+    var welcomeSeen = false
+
     private static let key = "Cadence.phone.preferences.v1"
 
     static func load() -> PhonePrefs {
@@ -99,5 +104,7 @@ extension PhonePrefs {
         widgetTomorrowHour = v(.widgetTomorrowHour, d.widgetTomorrowHour)
         workSchedule = v(.workSchedule, d.workSchedule)
         joinOnPriorityMac = v(.joinOnPriorityMac, d.joinOnPriorityMac)
+        sampleCalendarSince = v(.sampleCalendarSince, d.sampleCalendarSince)
+        welcomeSeen = v(.welcomeSeen, d.welcomeSeen)
     }
 }

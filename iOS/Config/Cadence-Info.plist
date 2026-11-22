@@ -46,6 +46,13 @@
 	<array>
 		<string>spotify</string>
 	</array>
+	<!-- The grouped-list grey (black in dark mode) of the home screen, so opening the app doesn't
+	     flash a different colour first. -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_cadence._tcp</string>
