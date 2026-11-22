@@ -67,23 +67,27 @@ profiles, media keys, the MCP socket). Only the iPhone app goes in the store.
   linked from that capability's page), then use `Config/Cadence-DeviceName.entitlements`.
 - [ ] App Store Connect → Apps → **+ New App** with that bundle ID, to reserve the name early.
 
-### 2. Google: a separate Cloud project for iOS
-The Mac's built-in client no longer asks for `gmail.send` (a *restricted* scope, which needs a yearly
-paid security assessment); only a user's own client does. Its Chat scopes are still extra review. The iPhone only needs calendar access (*sensitive*: standard verification only), so
-it gets its own project.
-- [ ] console.cloud.google.com → **New project**, e.g. "Cadence iPhone".
-- [ ] APIs & Services → Library → enable **Google Calendar API**.
-- [ ] Google Auth Platform → **Branding**: app name, support email, logo, home page and privacy
-  policy on `cadence.patrick-mckinley.com`, authorised domain `patrick-mckinley.com` (verify the
-  domain in Google Search Console when asked).
-- [ ] **Audience**: External, *Testing*; add yourself and any TestFlight testers as test users.
-- [ ] **Data access**: add `openid`, `email`, `profile`, `.../auth/calendar.readonly` and
-  `.../auth/calendar.events`. Nothing else.
-- [ ] **Clients → Create client → iOS**, with the bundle ID. From the client ID
-  `1234-abcd.apps.googleusercontent.com`, put `1234-abcd` in `Local.xcconfig` as
-  `GOOGLE_IOS_CLIENT_PREFIX`.
-- [ ] When the listing and privacy policy are ready: Audience → **Publish app**, then submit for
-  verification (it asks for a demo video of the sign-in and how the data is used). Start early:
+### 2. Google: one Cloud project for both apps
+The Mac and iPhone share the Mac's existing Cloud project, with a Desktop client and an iOS client.
+Every scope is *sensitive* (the built-in client doesn't ask for the *restricted* `gmail.send`), so one
+standard verification covers both apps. If Google holds up the Chat scopes, the iPhone waits too.
+- [x] **Clients → Create client → iOS**, with the bundle ID. `GOOGLE_IOS_CLIENT_PREFIX` is set in
+  `Local.xcconfig` and as a GitHub repository variable for `release.yml`.
+- [ ] **APIs**: Google Calendar API and Google Chat API on, Gmail API off. Chat API → Configuration:
+  name, icon and description filled in.
+- [ ] **Data access**: `openid`, `email`, `profile`, `.../auth/calendar.readonly`,
+  `.../auth/calendar.events`, `.../auth/chat.spaces.readonly`, `.../auth/chat.spaces.create`,
+  `.../auth/chat.messages.create`. Nothing else, and no `gmail.send`. One line of justification each.
+- [ ] Google Search Console: verify `patrick-mckinley.com` with the account that owns the project.
+- [ ] **Branding**: app name, support email, logo, home page and privacy policy on
+  `cadence.patrick-mckinley.com`, authorised domain `patrick-mckinley.com`.
+- [ ] Privacy policy: what's read (calendar events, Chat spaces) and why, kept on your devices and never
+  sold or shared, how to delete it, and Google's Limited Use statement word for word.
+- [ ] **Audience**: External; add yourself and any TestFlight testers as test users until it's published.
+- [ ] Demo video (unlisted YouTube): sign-in with the client ID visible in the URL, meetings appearing,
+  replying to an invite and setting a colour, and a running-late Google Chat message (needs a Workspace
+  account). The iPhone sign-in too, ideally.
+- [ ] Audience → **Publish app**, then Verification Center → **Submit for verification**. Start early:
   until it's verified, sign-in shows an "unverified app" warning and stops at 100 users.
 
 ### 3. Microsoft
