@@ -142,7 +142,7 @@
 
         <div class="tab-panel" role="tabpanel" id="panel-gemini" aria-labelledby="tab-gemini" hidden>
           <ol class="steps">
-            <li>Install <a href="https://github.com/google-gemini/gemini-cli">Gemini CLI</a>, then add Cadence for every folder you work in. Moved to Antigravity CLI? Use the <a href="#setup" data-tab="tab-antigravity">Antigravity</a> tab instead.</li>
+            <li>Install <a href="https://github.com/google-gemini/gemini-cli">Gemini CLI</a>, then click <strong>Install</strong> next to <strong>Gemini CLI</strong> in Cadence's <em>Settings → Assistants</em>, or run this to add Cadence for every folder you work in. Moved to Antigravity CLI? Use the <a href="#setup" data-tab="tab-antigravity">Antigravity</a> tab instead.</li>
           </ol>
           <div class="snippet"><pre id="snip-gemini"><code>gemini mcp add --scope user cadence /Applications/Cadence.app/Contents/MacOS/cadence-mcp</code></pre><button type="button" class="btn small" data-copy="snip-gemini">Copy</button></div>
           <p class="fine">Or add it to <code>~/.gemini/settings.json</code> yourself:</p>
@@ -166,7 +166,7 @@
 
         <div class="tab-panel" role="tabpanel" id="panel-antigravity" aria-labelledby="tab-antigravity" hidden>
           <ol class="steps">
-            <li>Antigravity's app, IDE and CLI share one MCP file: <code>~/.gemini/config/mcp_config.json</code>. To open it in the IDE, click <strong>…</strong> at the top of the agent panel, then <em>MCP Servers → Manage MCP Servers → View raw config</em>. In the app, <em>Customizations → Installed → MCP Servers</em> has a button that copies the file's path.</li>
+            <li>Click <strong>Install</strong> next to <strong>Antigravity</strong> in Cadence's <em>Settings → Assistants</em> and let it restart Antigravity, then skip to step 3. To do it by hand: Antigravity's app, IDE and CLI share one MCP file, <code>~/.gemini/config/mcp_config.json</code> (older versions use <code>~/.gemini/antigravity/mcp_config.json</code>). To open it in the IDE, click <strong>…</strong> at the top of the agent panel, then <em>MCP Servers → Manage MCP Servers → View raw config</em>. In the app, <em>Customizations → Installed → MCP Servers</em> has a button that copies the file's path.</li>
             <li>Add Cadence and save:</li>
           </ol>
           <div class="snippet"><pre id="snip-antigravity"><code>{

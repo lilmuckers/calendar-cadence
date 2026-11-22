@@ -73,7 +73,7 @@
           </header>
           <p>To show and control Spotify on the desk display, Cadence talks to the Spotify app through Spotify's App Remote SDK, which needs a <em>Client ID</em> from a Spotify developer app. Spotify only lets a new developer app work for the people its owner adds, so one app can't be shared with everyone. Instead you make your own. It's free and you only do it once.</p>
           <ol class="steps">
-            <li>On the iPhone, open Cadence's <em>Settings → Media</em>, pick <strong>Spotify</strong> as your media app, and tap <strong>Spotify app</strong>. Keep this screen open: it has the two values you'll paste below, each with a copy button.</li>
+            <li>On the iPhone, open Cadence's <em>Settings → Music &amp; Media</em>, pick <strong>Spotify</strong> as the media app, and tap <strong>Track details</strong>. Keep this screen open: it has the two values you'll paste below, each with a copy button.</li>
             <li>Open the <a href="https://developer.spotify.com/dashboard">Spotify Developer Dashboard</a>, sign in with your Spotify account and choose <strong>Create app</strong>. Any name and description will do, like <em>My Cadence</em>.</li>
             <li>Under <strong>Redirect URIs</strong>, add:
               <div class="snippet"><pre id="c-spotify-redirect"><code>cadence-companion://spotify-callback</code></pre><button type="button" class="btn small" data-copy="c-spotify-redirect">Copy</button></div>
@@ -88,7 +88,8 @@
               <li>Your new app stays in Spotify's <em>development mode</em>, which is fine: it works for the account that made it. To use it on someone else's account, add them under <strong>User Management</strong> in the dashboard.</li>
               <li>The Spotify app has to be installed on the phone, and running, for the desk display to connect.</li>
               <li>Saving a different Client ID signs you out of Spotify in Cadence. Connect again afterwards.</li>
-              <li>Apple Music needs none of this: just allow access to your music when the phone asks.</li>
+              <li>Opening Spotify and pausing it from the desk work without any of this. The Client ID only adds track details and artwork.</li>
+              <li>Apple Music needs none of this: allow access to your music when the phone asks, which it does the first time you pick Apple Music or open it from the desk.</li>
             </ul>
           </div>
         </article>
@@ -196,7 +197,7 @@
             <li><strong>A nudge</strong> when a break starts, and a warning five minutes before if your current meeting is going to run into it.</li>
             <li><strong>A meeting booked over a break</strong> asks you, like a double-booking: keep the break (the meeting won't alert) or give it up for the day.</li>
           </ul>
-          <p class="fine">The iPhone uses the Mac's schedule while they're paired, or its own (<em>Settings → Working hours &amp; breaks</em>) when it's on its own.</p>
+          <p class="fine">The iPhone uses the Mac's schedule while they're paired, or its own (<em>Settings → Working Hours &amp; Breaks</em>) when it's on its own.</p>
         </article>
 
         <article class="guide" id="pairing">
@@ -212,9 +213,10 @@
           </ol>
           <ul class="steps plain">
             <li><strong>More iPhones on one Mac:</strong> pair each one the same way. Alerts and prompts go to all of them, and the Mac's media keys follow whichever went on display last.</li>
-            <li><strong>One iPhone, several Macs:</strong> on the phone, <em>Settings → Mac → Pair another Mac</em>. Agendas are merged, so a meeting on both Macs shows once.</li>
+            <li><strong>One iPhone, several Macs:</strong> on the phone, tap <strong>Pair Another Mac</strong> under your Macs at the top of <em>Settings</em>. Agendas are merged, so a meeting on both Macs shows once.</li>
             <li><strong>Which Mac opens Join:</strong> the highest one in the list that has the meeting. Tap <strong>Edit</strong> to drag them into order. Turn on <strong>Open web links on the first Mac</strong> to send any plain web link to your top Mac, even if only another Mac has the meeting.</li>
             <li><strong>Removing a phone:</strong> on the Mac, <em>Settings → iPhone → Forget…</em> next to it deletes just that phone's key. <em>Forget All iPhones</em> unpairs them all.</li>
+            <li><strong>What's going over the link:</strong> open a paired device (on the Mac, click it in <em>Settings → iPhone</em>; on the phone, tap the Mac in <em>Settings</em>) and turn on <strong>Advanced</strong> for data used, messages by type over time and the last 50 messages (their type and size, not their contents). It's kept in memory only and gone when the app quits.</li>
             <li><strong>Codes are single-use:</strong> each code works once, for 15 minutes, and showing a new one cancels the last. A pairing link opened from Safari, Messages or the Camera app asks before pairing.</li>
           </ul>
         </article>
@@ -240,14 +242,14 @@
             <p class="guide-meta"><span>Mac</span><span>1 minute</span></p></div>
           </header>
           <ol class="steps">
-            <li>Open <em>Settings → Assistants</em>. Cadence finds Claude, Claude Code, Cursor and Windsurf on your Mac and shows whether each is set up.</li>
-            <li>Click <strong>Install</strong>, then let Cadence restart the app so it picks up the new server. If Cadence isn't in your Applications folder, it offers to move itself there first so the path keeps working.</li>
+            <li>Open <em>Settings → Assistants</em>. Cadence finds Claude, Claude Code, Cursor, Windsurf, Gemini CLI and Antigravity on your Mac and shows whether each is set up.</li>
+            <li>Click <strong>Install</strong>, then let Cadence restart the app so it picks up the new server. Command-line tools like Claude Code and Gemini CLI pick it up in their next session. If Cadence isn't in your Applications folder, it offers to move itself there first so the path keeps working.</li>
             <li>Try a prompt from the <a href="automations.html">automation catalog</a>.</li>
           </ol>
           <ul class="steps plain">
-            <li><strong>Gemini and other apps:</strong> Cadence doesn't list these, so add it yourself. The <a href="automations.html#setup">automations page</a> has steps for Gemini CLI and Antigravity. The Gemini desktop app only takes remote servers, so it can't connect.</li>
+            <li><strong>Other apps:</strong> any MCP client that runs local servers can use Cadence; the <a href="automations.html#setup">automations page</a> has the config to copy. The Gemini desktop app only takes remote servers, so it can't connect.</li>
             <li><strong>Approvals:</strong> every action shows an Allow / Deny card. Turn on auto-approval for specific actions in the same tab.</li>
-            <li><strong>Notes on meetings:</strong> switch assistant attachments off here if you'd rather not have them. On the Mac, the Notes button lives in <em>Settings → General</em>; on the iPhone, in <em>Settings → Desk mode</em>.</li>
+            <li><strong>Notes on meetings:</strong> switch assistant attachments off here if you'd rather not have them. On the Mac, the Notes button lives in <em>Settings → General</em>; on the iPhone, in <em>Settings → Desk Mode</em>.</li>
             <li><strong>Activity:</strong> see every call from the last 30 days, filter by assistant, or clear it.</li>
           </ul>
         </article>
