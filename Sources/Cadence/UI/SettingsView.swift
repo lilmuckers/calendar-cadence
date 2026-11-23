@@ -515,6 +515,7 @@ private struct GeneralTab: View {
                 }
                 Toggle("Open Zoom and Teams in their apps when installed", isOn: $state.prefs.preferNativeApps)
             }
+            UpdatesSection()
             Section("Startup") {
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in setLaunchAtLogin(on) }
@@ -642,5 +643,66 @@ struct PhoneMediaSection: View {
                 try? await Task.sleep(for: .seconds(3))
             }
         }
+    }
+}
+
+/// Settings → General → Updates.
+private struct UpdatesSection: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        let updater = state.updater
+        let mode = Binding(get: { state.prefs.updateMode ?? .off }, set: { state.prefs.updateMode = $0 })
+        Section {
+            Picker("Updates", selection: mode) {
+                ForEach(UpdateMode.allCases) { Text($0.label).tag($0) }
+            }
+            LabeledContent("Cadence \(updater.currentVersionText)") {
+                HStack {
+                    status(updater)
+                    Button("Check Now") { Task { await updater.check() } }
+                        .disabled(updater.phase == .checking || updater.phase == .downloading || updater.phase == .installing)
+                }
+            }
+            if let release = updater.available {
+                LabeledContent("Version \(release.version?.description ?? release.tag) is available") {
+                    HStack {
+                        Button("What's New") { updater.showNotes() }
+                        Button(updater.canInstall ? "Update and Restart" : "Download…") { updater.installAvailable() }
+                            .disabled(updater.phase == .downloading || updater.phase == .installing)
+                    }
+                }
+                if let reason = updater.cannotInstallReason {
+                    Text(reason).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Updates")
+        } footer: {
+            Text((state.prefs.updateMode ?? .off).detail + " Updates come from Cadence's GitHub releases and are checked against their checksum and Developer ID signature before they're installed.")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private func status(_ updater: Updater) -> some View {
+        Group {
+            switch updater.phase {
+            case .checking: Text("Checking…")
+            case .downloading: Text("Downloading…")
+            case .installing: Text("Restarting…")
+            case .ready: Text("Ready — installs at a quiet moment")
+            case .failed(let message): Text(message).foregroundStyle(.red).lineLimit(2)
+            case .idle:
+                if updater.available != nil {
+                    Text("Update available")
+                } else if let checked = updater.lastChecked {
+                    Text("Up to date · checked \(checked.formatted(.relative(presentation: .named)))")
+                } else {
+                    Text("Not checked yet")
+                }
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 }

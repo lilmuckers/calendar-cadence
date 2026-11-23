@@ -100,6 +100,8 @@ final class AppState {
 
     /// Link to a paired iPhone. Observable on its own, so views can watch `companion.phoneDisplaying`.
     @ObservationIgnored let companion = CompanionHub()
+    /// Updates from GitHub releases. Observable on its own, like `companion`.
+    @ObservationIgnored let updater = Updater()
     /// What assistants attached to meetings. Observable on its own, like `companion`.
     @ObservationIgnored let enrichments = EnrichmentStore()
     @ObservationIgnored private let eventKit = EventKitProvider()

@@ -345,7 +345,7 @@ scripts/release-notes.sh v0.1.0 "" patch false /dev/null   # tag, previous tag, 
 
 ## 🔒 Privacy
 
-Everything runs locally. Cadence talks only to the services you connect (Google's and Microsoft's APIs, your ICS feed hosts) and Apple Maps for travel times. Presentation and call detection read window positions and microphone *usage* — never screen contents or audio — and need no Screen Recording or Microphone permission. The assistant server listens only on a private Unix socket (no network port). What an assistant reads goes wherever that assistant sends it, so connect only ones you trust.
+Everything runs locally. Cadence talks only to the services you connect (Google's and Microsoft's APIs, your ICS feed hosts) and Apple Maps for travel times, plus GitHub's releases API if update checks are on. Presentation and call detection read window positions and microphone *usage* — never screen contents or audio — and need no Screen Recording or Microphone permission. The assistant server listens only on a private Unix socket (no network port). What an assistant reads goes wherever that assistant sends it, so connect only ones you trust.
 
 ## 🧬 How it's built
 

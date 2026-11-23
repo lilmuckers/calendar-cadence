@@ -72,6 +72,10 @@ final class AlertRouter {
         banner.dismiss()
     }
 
+    func notifyUpdate(_ release: GitHubRelease, canInstall: Bool) {
+        notifier.notify(update: release, canInstall: canInstall)
+    }
+
     func notifyInvites(_ invites: [Meeting]) {
         for m in invites { notifier.notify(invite: m) }
     }
