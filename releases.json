@@ -1,5 +1,35 @@
 [
  {
+  "tag": "v0.5.0",
+  "name": "Cadence 0.5.0",
+  "url": "https://github.com/lilmuckers/calendar-cadence/releases/tag/v0.5.0",
+  "date": "2026-11-23T16:34:11Z",
+  "pre": false,
+  "body": "## Cadence 0.5.0\n\n_Released 2026-11-23 · minor release_\n\n> [!NOTE]\n> Signed with a Developer ID and notarized by Apple.\n\n## What's Changed\n\n### 🖥️ Mac app\n#### ✨ New features\n* Release notes, What's new and TestFlight notes split by build by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/75\n* Stack Cadence's alerts down the right, and a movable, compact Mac mini-player by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/78\n* Show a version's release notes from the About window by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/80\n#### 🐛 Fixes and improvements\n* Load Google colour label names again (calendar.calendars.readonly) by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/79\n\n### 📱 iPhone app\n#### ✨ New features\n* Release notes, What's new and TestFlight notes split by build by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/75\n* Stack Cadence's alerts down the right, and a movable, compact Mac mini-player by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/78\n#### 🐛 Fixes and improvements\n* Load Google colour label names again (calendar.calendars.readonly) by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/79\n\n### 🌐 Website\n#### ✨ New features\n* Release notes, What's new and TestFlight notes split by build by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/75\n\n### ⚙️ Build and release\n#### ✨ New features\n* Release notes, What's new and TestFlight notes split by build by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/75\n\n**Full Changelog**: https://github.com/lilmuckers/calendar-cadence/compare/v0.4.0...v0.5.0\n\n## 📥 Install\n\n1. Download **Cadence-0.5.0.dmg** below.\n2. Open it and drag **Cadence** into **Applications**.\n3. Launch Cadence from Applications and allow calendar access when asked.\n\nRequires macOS 14 or later on Apple Silicon.\n\n<details>\n<summary>Downloads and checksums</summary>\n\n| File | What it is |\n|---|---|\n| `Cadence-0.5.0.dmg` | Disk image, drag to Applications |\n| `Cadence-0.5.0.zip` | The same app, zipped (for scripted installs) |\n| `SHA256SUMS.txt` | Checksums for both |\n\n```text\n4afdaf951d23a15b2e8fb4d9c8f16e1aa5164fcb745fcde9fe229c596f604519  Cadence-0.5.0.dmg\n20fde137b6076ff9e7d4c6f450f2f2773896b31c5b8c596771238aaa5cd44484  Cadence-0.5.0.zip\n```\n\nCheck a download with `shasum -a 256 -c SHA256SUMS.txt`.\n</details>\n",
+  "assets": [
+   {
+    "name": "Cadence-0.5.0.dmg",
+    "size": 6314532,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.5.0/Cadence-0.5.0.dmg"
+   },
+   {
+    "name": "Cadence-0.5.0.zip",
+    "size": 4318987,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.5.0/Cadence-0.5.0.zip"
+   },
+   {
+    "name": "Cadence.dmg",
+    "size": 6314532,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.5.0/Cadence.dmg"
+   },
+   {
+    "name": "SHA256SUMS.txt",
+    "size": 168,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.5.0/SHA256SUMS.txt"
+   }
+  ]
+ },
+ {
   "tag": "v0.4.0",
   "name": "Cadence 0.4.0",
   "url": "https://github.com/lilmuckers/calendar-cadence/releases/tag/v0.4.0",
