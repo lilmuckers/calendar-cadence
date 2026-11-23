@@ -56,6 +56,18 @@ enum ScreenshotRenderer {
         render(Moods(), state: state, name: "moods", to: dir, size: CGSize(width: 360, height: 110), wallpaper: false, pad: 0)
         render(Moods(phone: .connected), state: state, name: "moods-phone", to: dir, size: CGSize(width: 420, height: 110), wallpaper: false, pad: 0)
         render(Moods(phone: .displaying), state: state, name: "moods-phone-desk", to: dir, size: CGSize(width: 420, height: 110), wallpaper: false, pad: 0)
+        // First launch and after an update.
+        render(WelcomeView(initial: .notify, choose: { _ in }), state: state, name: "welcome", to: dir,
+               size: CGSize(width: 480, height: 640), wallpaper: false, pad: 0)
+        let page = AboutView.repo.appending(path: "releases")
+        let notes = [
+            GitHubRelease(tag: "v0.3.0", body: "### ✨ New\n* Cadence can keep itself up to date by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/63\n### 🐛 Fixes and improvements\n* A welcome screen on first launch by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/63",
+                          page: page, publishedAt: demo.day),
+            GitHubRelease(tag: "v0.2.3", body: "### 🐛 Fixes and improvements\n* Request calendar.calendarlist.readonly instead of calendar.readonly by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/61",
+                          page: page, publishedAt: demo.day),
+        ]
+        render(WhatsNewView(version: SemVer(0, 3, 0), releases: notes, done: {}), state: state, name: "whats-new", to: dir,
+               size: CGSize(width: 520, height: 640), wallpaper: false, pad: 0)
         print("Screenshots written to \(dir.path)")
     }
 

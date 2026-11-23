@@ -154,6 +154,8 @@ struct Preferences: Codable, Equatable {
     var fadeMediaForAlerts = false
     /// ...and says which meeting it is.
     var announceAlerts = true
+    /// How Cadence updates itself. nil = not chosen yet, so the welcome screen asks.
+    @EncodesNil var updateMode: UpdateMode? = nil
 
     /// The pause limit for the media remote control, nil when it's off.
     var mediaRemotePauseLimit: TimeInterval? {
@@ -261,5 +263,6 @@ extension Preferences {
         mediaHUD = (try? c.decodeIfPresent(MediaHUDMode.self, forKey: .mediaHUD)) ?? d.mediaHUD
         fadeMediaForAlerts = try c.decodeIfPresent(Bool.self, forKey: .fadeMediaForAlerts) ?? d.fadeMediaForAlerts
         announceAlerts = try c.decodeIfPresent(Bool.self, forKey: .announceAlerts) ?? d.announceAlerts
+        updateMode = (try? c.decodeIfPresent(UpdateMode.self, forKey: .updateMode)) ?? d.updateMode
     }
 }

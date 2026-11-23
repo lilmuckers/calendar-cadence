@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var approvals: ApprovalController?
     private var bridge: MCPBridge?
     private var drawer: EnrichmentDrawerController?
+    private var welcome: WelcomeWindows?
 
     /// Double-clicking a .cadconf settings file.
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -120,6 +121,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.drawer = drawer
         state.onShowEnrichments = { meeting in drawer.show(meeting) }
         observeDrawer()
+
+        startUpdater(router: router)
+    }
+
+    /// Update checks, the first-launch welcome and "What's new" after an update.
+    private func startUpdater(router: AlertRouter) {
+        let updater = state.updater
+        updater.mode = { [weak self] in self?.state.prefs.updateMode }
+        // Restart into an update only with no meeting on and none in the next 10 minutes.
+        updater.isQuietMoment = { [weak self] in
+            guard let state = self?.state else { return true }
+            let soon = state.now.addingTimeInterval(10 * 60)
+            return !state.activeMeetings.contains { !$0.isAllDay && $0.start < soon && $0.end > state.now }
+        }
+        updater.onNewVersion = { [weak updater] release in
+            router.notifyUpdate(release, canInstall: updater?.canInstall ?? false)
+        }
+        updater.start()
+
+        let welcome = WelcomeWindows(state: state)
+        self.welcome = welcome
+        let previous = updater.recordLaunch()
+        if state.prefs.updateMode == nil {
+            welcome.showWelcome()
+        } else if let previous, let current = updater.current, current > previous {
+            welcome.showWhatsNew(from: previous)
+        }
     }
 
     private func startCompanion(router: AlertRouter) {

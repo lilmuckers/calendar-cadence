@@ -10,6 +10,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     private static let inviteCategory = "cadence.invite"
     private static let inviteViewCategory = "cadence.invite.view"
     private static let rsvpPrefix = "cadence.rsvp."
+    private static let updateCategory = "cadence.update"
+    private static let updateAction = "cadence.update.install"
 
     private let center = UNUserNotificationCenter.current()
     private let state: AppState
@@ -27,6 +29,9 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             UNNotificationCategory(identifier: Self.category, actions: [join], intentIdentifiers: []),
             UNNotificationCategory(identifier: Self.inviteCategory, actions: replies, intentIdentifiers: []),
             UNNotificationCategory(identifier: Self.inviteViewCategory, actions: [], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.updateCategory,
+                                   actions: [UNNotificationAction(identifier: Self.updateAction, title: "Update", options: [])],
+                                   intentIdentifiers: []),
         ])
     }
 
@@ -80,6 +85,18 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    func notify(update release: GitHubRelease, canInstall: Bool) {
+        Task {
+            guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Cadence \(release.version?.description ?? release.tag) is out"
+            content.body = canInstall ? "Click Update to install it and restart Cadence." : "Click to download it from GitHub."
+            content.userInfo = ["update": release.tag]
+            if canInstall { content.categoryIdentifier = Self.updateCategory }
+            try? await center.add(UNNotificationRequest(identifier: "update:\(release.tag)", content: content, trigger: nil))
+        }
+    }
+
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
@@ -94,7 +111,14 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let id = response.notification.request.content.userInfo["meetingID"] as? String
         let inviteID = response.notification.request.content.userInfo["inviteID"] as? String
         let action = response.actionIdentifier
+        let update = response.notification.request.content.userInfo["update"] as? String
         await MainActor.run {
+            if update != nil {
+                if action == Self.updateAction || action == UNNotificationDefaultActionIdentifier {
+                    state.updater.installAvailable()
+                }
+                return
+            }
             if let inviteID {
                 guard let invite = state.invites.first(where: { $0.id == inviteID }) else { return }
                 if action.hasPrefix(Self.rsvpPrefix), let reply = RSVP(rawValue: String(action.dropFirst(Self.rsvpPrefix.count))) {

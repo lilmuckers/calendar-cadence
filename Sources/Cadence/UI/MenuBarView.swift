@@ -64,6 +64,10 @@ struct MenuBarView: View {
             header
             Divider().opacity(0.5)
             content
+            if !Self.screenshotMode, let release = state.updater.available {
+                Divider().opacity(0.5)
+                UpdateBanner(release: release, updater: state.updater)
+            }
             Divider().opacity(0.5)
             footer
         }
@@ -225,6 +229,36 @@ struct MenuBarView: View {
             IconButton(symbol: "power", help: "Quit Cadence") { NSApp.terminate(nil) }
         }
         .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+}
+
+/// "Cadence X.Y.Z is available" above the footer, with the button that installs it.
+private struct UpdateBanner: View {
+    let release: GitHubRelease
+    let updater: Updater
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Cadence \(release.version?.description ?? release.tag) is available")
+                    .font(.system(size: 12, weight: .semibold))
+                Link("What's new", destination: release.page)
+                    .font(.system(size: 11))
+            }
+            Spacer()
+            switch updater.phase {
+            case .downloading: ProgressView().controlSize(.small)
+            case .installing: Text("Restarting…").font(.system(size: 11)).foregroundStyle(.secondary)
+            default:
+                Button(updater.canInstall ? "Update" : "Download") { updater.installAvailable() }
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 18)
         .padding(.vertical, 8)
     }
 }
