@@ -63,6 +63,9 @@ struct MenuBarView: View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.5)
+            if !Self.screenshotMode, state.canShowAgenda {
+                DayMomentRow()
+            }
             content
             if !Self.screenshotMode, let release = state.updater.available {
                 Divider().opacity(0.5)

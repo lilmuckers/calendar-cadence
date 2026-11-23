@@ -62,8 +62,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             content.sound = .default
             content.interruptionLevel = .timeSensitive
             content.userInfo = ["meetingID": reminder.joinTarget.id]
-            if reminder.joinTarget.joinLink != nil, !reminder.isSummary, !reminder.isBreak { content.categoryIdentifier = Self.category }
-            if reminder.isSummary || reminder.isBreak { content.interruptionLevel = .active }
+            if reminder.joinTarget.joinLink != nil, !reminder.isAboutTheDay { content.categoryIdentifier = Self.category }
+            if reminder.isAboutTheDay { content.interruptionLevel = .active }
             try? await center.add(UNNotificationRequest(identifier: reminder.key, content: content, trigger: nil))
         }
     }

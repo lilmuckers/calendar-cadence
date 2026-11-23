@@ -18,6 +18,9 @@ final class NowPlaying {
     private(set) var musicPlaying = false
     /// Some other app (Spotify, a podcast…) is playing.
     private(set) var otherPlaying = false
+    /// Cadence stopped another app (YouTube Music, a podcast…) by taking the audio, and hasn't
+    /// offered to let it carry on yet. Cleared once anything plays again or a resume is tried.
+    private(set) var othersInterrupted = false
     private(set) var authorized = NowPlaying.libraryStatus == .authorized
 
     /// Set once Cadence has asked for Music access. Until then the status isn't read at all: on
@@ -54,6 +57,7 @@ final class NowPlaying {
             if otherPlaying && !other { stoppedAt = Date() }
             otherPlaying = other
         }
+        if other { othersInterrupted = false }
     }
 
     /// Media library access hasn't been asked for yet.
@@ -105,7 +109,7 @@ final class NowPlaying {
         let playing = player.playbackState == .playing
         if musicPlaying && !playing { stoppedAt = Date() }
         musicPlaying = playing
-        if playing { otherPlaying = false }
+        if playing { otherPlaying = false; othersInterrupted = false }
     }
 
     func pauseMusic() {
@@ -118,6 +122,12 @@ final class NowPlaying {
         player.play()
         musicPlaying = true
     }
+
+    /// Cadence just stopped another app's audio, so it can be offered the chance to resume.
+    func noteInterruptedOthers() { othersInterrupted = true }
+
+    /// One go at resuming: whether or not the app takes it, don't keep offering.
+    func clearInterruptedOthers() { othersInterrupted = false }
 
     /// Forget the grace period (the meeting hand-off stopped it: no need to hang about).
     func clearRecent() { stoppedAt = nil }
@@ -171,7 +181,8 @@ final class MeetingAudioHandoff: NSObject, AVSpeechSynthesizerDelegate {
     /// Fades out whatever's playing, announces `meeting`, then releases the audio session.
     /// `force` runs it even with nothing playing (the Settings test button).
     func run(for meeting: Meeting, now: Date, nowPlaying: NowPlaying, spotify: SpotifyRemote, announce: Bool, force: Bool = false) {
-        guard !running, force || session.isOtherAudioPlaying else { return }
+        let othersPlaying = session.isOtherAudioPlaying
+        guard !running, force || othersPlaying else { return }
         running = true
         do {
             // 1. Duck: iOS ramps the other app's volume down for us — the quick fade.
@@ -185,8 +196,11 @@ final class MeetingAudioHandoff: NSObject, AVSpeechSynthesizerDelegate {
             guard let self else { return }
             // 2. Stop it. Music is paused directly; anything else (Spotify, podcasts) is interrupted
             // by switching to audio that doesn't mix, and isn't told to resume when we let go.
-            _ = nowPlaying.pauseForMeeting()
-            _ = spotify.pauseForMeeting()
+            let music = nowPlaying.pauseForMeeting()
+            let spotifyPaused = spotify.pauseForMeeting()
+            // Some other player (YouTube Music, a podcast…) is the one being interrupted: remember,
+            // so the desk can offer to let it carry on after the call.
+            if othersPlaying && !music && !spotifyPaused { nowPlaying.noteInterruptedOthers() }
             try? self.session.setCategory(.playback, mode: .spokenAudio, options: [])
             try? self.session.setActive(true)
             // 3. Say what it is, then 4. let go.
@@ -200,13 +214,25 @@ final class MeetingAudioHandoff: NSObject, AVSpeechSynthesizerDelegate {
     }
 
     /// Stops another app's audio (Spotify etc.): grab audio that doesn't mix, then let go without
-    /// telling it to resume. There's no way to start it again from here; that's done in the app.
+    /// telling it to resume. `resumeOthers()` can later ask it to carry on.
     func interruptOthers() {
         guard !running else { return }
         do {
             try session.setCategory(.playback, mode: .default, options: [])
             try session.setActive(true)
             try session.setActive(false)
+        } catch {}
+    }
+
+    /// Lets an app Cadence stopped carry on: take the audio again, then let go *telling* others,
+    /// so iOS sends the interrupted app an "interruption ended, may resume". Only players that
+    /// honour that (as they do after a phone call) start again; the rest stay paused.
+    func resumeOthers() {
+        guard !running else { return }
+        do {
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true)
+            try session.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {}
     }
 

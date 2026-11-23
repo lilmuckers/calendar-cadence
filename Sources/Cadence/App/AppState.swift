@@ -581,6 +581,11 @@ final class AppState {
             reminders += ReminderPlanner.breakNudges(breaks: breaks, meetings: live,
                                                      nudge: schedule.defences.breakNudge, overrun: schedule.defences.overrunWarning)
         }
+        if schedule.enabled && prefs.dayWrapNotification, canShowAgenda, lastRefresh != nil,
+           let wrap = ReminderPlanner.dayWrap(meetings: activeMeetings.filter { !suppressedByClash.contains($0.id) },
+                                              schedule: schedule, now: now) {
+            reminders.append(wrap)
+        }
         if prefs.summaryEnabled, canShowAgenda, lastRefresh != nil,
            let summary = ReminderPlanner.morningSummary(meetings: activeMeetings, now: now,
                                                         hour: prefs.summaryTime / 60, minute: prefs.summaryTime % 60),

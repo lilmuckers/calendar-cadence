@@ -2,18 +2,6 @@ import CadenceCore
 import SwiftUI
 
 extension DayMoment {
-    /// The mascot for this part of the day; nil while in a meeting or in a short gap.
-    var pose: MascotPose? {
-        switch self {
-        case .beforeWork: .coffee
-        case .focus: .focus
-        case .onBreak(let b, _): b.isMeal ? .lunch : .tea
-        case .endOfDay: .wave
-        case .dayOff: .tea
-        case .between, .inMeeting: nil
-        }
-    }
-
     /// Quiet times, when the desk display can fade back.
     var isRestful: Bool {
         switch self {
@@ -59,17 +47,7 @@ struct MomentCard: View {
 
     /// A line of encouragement under the report.
     private var extra: String? {
-        switch moment {
-        case .focus:
-            let had = state.focusSoFar
-            return had >= state.schedule.focusMinimumMinutes ? "\(DayPlanner.duration(minutes: had)) of focus time so far today" : nil
-        case .onBreak:
-            return "Meetings can wait."
-        case .endOfDay(let recap) where recap.longestFocusMinutes >= 90:
-            return "Longest stretch: \(DayPlanner.duration(minutes: recap.longestFocusMinutes)). Nice!"
-        default:
-            return nil
-        }
+        moment.encouragement(focusSoFar: state.focusSoFar, focusMinimum: state.schedule.focusMinimumMinutes)
     }
 }
 

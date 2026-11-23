@@ -638,10 +638,13 @@ final class PhoneState {
         // Nothing known to resume: Music can still pick up its last queue if it's the chosen app.
         let canResume = np.hasTrack || (prefs.mediaApp == .appleMusic && np.authorized)
         switch command {
-        case .play: if canResume { np.resumeMusic() }
+        // From the Mac's keys a resume never opens the app: that would cover the desk display.
+        case .play: if canResume { np.resumeMusic() } else if np.othersInterrupted { resumeOthers(openIfStill: false) }
         case .pause: pauseMedia()
         case .togglePlayPause:
-            if np.isPlaying { pauseMedia() } else if canResume { np.resumeMusic() }
+            if np.isPlaying { pauseMedia() }
+            else if canResume { np.resumeMusic() }
+            else if np.othersInterrupted { resumeOthers(openIfStill: false) }
         case .next: np.next()
         case .previous: np.previous()
         case .volumeUp, .volumeDown, .toggleMute: break
@@ -713,6 +716,7 @@ final class PhoneState {
     /// The desk's idle media button. For Spotify it also hooks Cadence up: one tap opens Spotify,
     /// approves (first time), starts your last track and comes back with the controls showing.
     func launchMedia() {
+        if nowPlaying.othersInterrupted { resumeOthers(openIfStill: true); return }
         if prefs.mediaApp == .spotify && spotify.isAvailable {
             if spotify.connected { spotify.play() } else { spotify.authorize() }
         } else {
@@ -724,7 +728,22 @@ final class PhoneState {
     func pauseMedia() {
         if nowPlaying.musicPlaying { nowPlaying.pauseMusic() }
         else if spotify.connected && spotify.isPlaying { spotify.pause() }
-        else { audioHandoff.interruptOthers() }
+        else if nowPlaying.otherPlaying {
+            audioHandoff.interruptOthers()
+            nowPlaying.noteInterruptedOthers()
+        }
+    }
+
+    /// Asks the app Cadence stopped (YouTube Music, a podcast…) to carry on. Not every player
+    /// does; `openIfStill` opens the preferred app if nothing's playing a moment later.
+    func resumeOthers(openIfStill: Bool) {
+        nowPlaying.clearInterruptedOthers()
+        audioHandoff.resumeOthers()
+        guard openIfStill else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self, !self.audioHandoff.otherAudioPlaying else { return }
+            self.openMediaApp()
+        }
     }
 
     /// Spotify connected and the one playing (or just paused): it gets the controls.

@@ -14,6 +14,8 @@ public struct Reminder: Equatable, Sendable {
         case breakStart
         /// The live `meeting` is about to run into `breakMeeting`.
         case breakOverrun(breakMeeting: Meeting)
+        /// Working hours just ended: how the day went.
+        case dayWrap(DayRecap)
     }
 
     public var key: String
@@ -35,6 +37,7 @@ public struct Reminder: Equatable, Sendable {
         case .summary(let day, _): Calendar.current.date(byAdding: .hour, value: 4, to: fireAt) ?? day
         case .breakStart: meeting.end
         case .breakOverrun(let b): b.start
+        case .dayWrap: fireAt.addingTimeInterval(3600)
         default: meeting.start
         }
     }
@@ -58,6 +61,14 @@ public struct Reminder: Equatable, Sendable {
     public var needsActiveCall: Bool {
         if case .wrapUp = kind { return meeting.joinLink != nil }
         return false
+    }
+
+    /// A note about the day rather than a meeting: nothing to join, no need to interrupt.
+    public var isAboutTheDay: Bool {
+        switch kind {
+        case .summary, .breakStart, .breakOverrun, .dayWrap: true
+        default: false
+        }
     }
 
     /// What a "Join" action on this reminder should open.
@@ -169,11 +180,26 @@ public enum ReminderPlanner {
             return ("Time for \(r.meeting.title)", "Step away — back at \(timeString(r.meeting.end)).")
         case .breakOverrun(let b):
             return ("\(b.title) starts in 5 min", "\(r.meeting.title) runs until \(timeString(r.meeting.end)) — time to wrap up?")
+        case .dayWrap(let recap):
+            let text = DayPlanner.message(for: .endOfDay(recap), now: r.fireAt)
+            return (text.title, text.detail)
         }
     }
 
     static func timeString(_ d: Date) -> String {
         d.formatted(date: .omitted, time: .shortened)
+    }
+
+    /// "That's a wrap for today" as working hours end, with the day's meetings and focus time.
+    /// nil on a day off or with the schedule off. `meetings` are the ones that count (not muted by a clash).
+    public static func dayWrap(meetings: [Meeting], schedule: WorkSchedule, now: Date,
+                               calendar: Calendar = .current) -> Reminder? {
+        guard schedule.enabled, let hours = schedule.hours(on: now, calendar: calendar) else { return nil }
+        let recap = DayPlanner.recap(meetings: meetings, schedule: schedule, day: now, calendar: calendar)
+        let anchor = Meeting(id: "daywrap", title: "Today", start: hours.end, end: hours.end,
+                             calendar: CalendarInfo(id: "daywrap", title: "", sourceTitle: "", color: .gray))
+        let key = "daywrap:\(Int(calendar.startOfDay(for: now).timeIntervalSince1970))"
+        return Reminder(key: key, meeting: anchor, kind: .dayWrap(recap), fireAt: hours.end)
     }
 
     /// The once-a-day summary, due from `hour:minute` for 4 hours so a late wake still gets it.
