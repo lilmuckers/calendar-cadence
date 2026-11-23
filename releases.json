@@ -1,5 +1,35 @@
 [
  {
+  "tag": "v0.3.0",
+  "name": "Cadence 0.3.0",
+  "url": "https://github.com/lilmuckers/calendar-cadence/releases/tag/v0.3.0",
+  "date": "2026-11-23T13:22:21Z",
+  "pre": false,
+  "body": "## Cadence 0.3.0\n\n_Released 2026-11-23 · minor release_\n\n> [!NOTE]\n> Signed with a Developer ID and notarized by Apple.\n\n<!-- Release notes generated using configuration in .github/release.yml at v0.3.0 -->\n\n## What's Changed\n### ✨ New features\n* Cadence can keep itself up to date from GitHub releases by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/63\n\n\n**Full Changelog**: https://github.com/lilmuckers/calendar-cadence/compare/v0.2.3...v0.3.0\n\n## 📥 Install\n\n1. Download **Cadence-0.3.0.dmg** below.\n2. Open it and drag **Cadence** into **Applications**.\n3. Launch Cadence from Applications and allow calendar access when asked.\n\nRequires macOS 14 or later on Apple Silicon.\n\n<details>\n<summary>Downloads and checksums</summary>\n\n| File | What it is |\n|---|---|\n| `Cadence-0.3.0.dmg` | Disk image, drag to Applications |\n| `Cadence-0.3.0.zip` | The same app, zipped (for scripted installs) |\n| `SHA256SUMS.txt` | Checksums for both |\n\n```text\n70c37005aca3220a27ec761b978eafaca2a58ea19c49c87acfc927cbe3a9fc33  Cadence-0.3.0.dmg\n51a919f414ef14824e4a60bda13797e371d5518eb0ed0ec0d480c88617655b08  Cadence-0.3.0.zip\n```\n\nCheck a download with `shasum -a 256 -c SHA256SUMS.txt`.\n</details>\n",
+  "assets": [
+   {
+    "name": "Cadence-0.3.0.dmg",
+    "size": 6002941,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.3.0/Cadence-0.3.0.dmg"
+   },
+   {
+    "name": "Cadence-0.3.0.zip",
+    "size": 4054548,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.3.0/Cadence-0.3.0.zip"
+   },
+   {
+    "name": "Cadence.dmg",
+    "size": 6002941,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.3.0/Cadence.dmg"
+   },
+   {
+    "name": "SHA256SUMS.txt",
+    "size": 168,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.3.0/SHA256SUMS.txt"
+   }
+  ]
+ },
+ {
   "tag": "v0.2.3",
   "name": "Cadence 0.2.3",
   "url": "https://github.com/lilmuckers/calendar-cadence/releases/tag/v0.2.3",
