@@ -22,6 +22,14 @@ enum GlyphStyle {
         case .countdown: .system(size: 88 * scale, weight: .semibold, design: .rounded).monospacedDigit()
         }
     }
+
+    /// How much to shrink the countdown so it stays inside its ring: 1 for "12:34" (what the ring is
+    /// sized for), less for longer times like "17:52:59" or "-1:02:03". Colons and the minus sign are
+    /// narrower than digits, so they count for less.
+    static func countdownFit(_ text: String) -> Double {
+        let width = text.reduce(0.0) { sum, ch in sum + (ch.isNumber ? 1 : ch == ":" ? 0.48 : 0.6) }
+        return min(1, 4.5 / max(1, width))
+    }
 }
 
 /// The meltdown's state for one takeover window. A plain reference type: the TimelineView redraws every
