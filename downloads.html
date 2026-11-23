@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Download Cadence for Mac — every version</title>
+  <meta name="description" content="Download the latest Cadence for macOS, or any earlier version. Signed and notarized by Apple, with SHA-256 checksums for every release.">
+  <link rel="canonical" href="https://cadence.patrick-mckinley.com/downloads.html">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Cadence">
+  <meta property="og:title" content="Download Cadence">
+  <meta property="og:description" content="The latest Cadence for Mac and every version before it. Signed and notarized by Apple.">
+  <meta property="og:url" content="https://cadence.patrick-mckinley.com/downloads.html">
+  <meta property="og:image" content="https://cadence.patrick-mckinley.com/assets/og-cadence.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The Cadence app icon, a panicking calendar page shouting LATE!, beside the words: Cadence, your calendar, gently panicking on your behalf.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Download Cadence">
+  <meta name="twitter:description" content="The latest Cadence for Mac and every version before it.">
+  <meta name="twitter:image" content="https://cadence.patrick-mckinley.com/assets/og-cadence.jpg">
+  <link rel="stylesheet" href="style.css?v=10">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="assets/icon-192.png" alt="">Cadence</a>
+      <nav>
+        <a href="./">Home</a>
+        <a href="downloads.html" aria-current="page">Download</a>
+        <a href="help.html">Help</a>
+        <a class="nav-gh" href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap downloads">
+    <div class="downloads-head">
+      <h1>Download Cadence</h1>
+      <p>Every version of Cadence for Mac, newest first. All builds are signed with a Developer ID and notarized by Apple, so they open without Gatekeeper warnings. <span class="rel-count" data-rel-count></span></p>
+    </div>
+
+    <div class="rel-grid" data-release-grid aria-live="polite" aria-busy="true">
+      <article class="rel-card latest skeleton" aria-hidden="true"><header><h2>&nbsp;</h2></header><p class="rel-date">&nbsp;</p><ul class="rel-changes"><li>&nbsp;</li><li>&nbsp;</li></ul></article>
+      <article class="rel-card skeleton" aria-hidden="true"><header><h2>&nbsp;</h2></header><p class="rel-date">&nbsp;</p></article>
+      <article class="rel-card skeleton" aria-hidden="true"><header><h2>&nbsp;</h2></header><p class="rel-date">&nbsp;</p></article>
+      <noscript><div class="rel-error"><p>The version list needs JavaScript.</p><p><a class="cta" href="https://github.com/lilmuckers/calendar-cadence/releases">See every release on GitHub</a></p></div></noscript>
+    </div>
+
+    <section class="install" id="install">
+      <h2>Installing</h2>
+      <ol>
+        <li>Download the <strong>.dmg</strong> above.</li>
+        <li>Open it and drag <strong>Cadence</strong> into <strong>Applications</strong>.</li>
+        <li>Open Cadence from Applications. It lives in the menu bar, not the Dock.</li>
+        <li>Allow calendar access when macOS asks, then add Google, Microsoft&nbsp;365 or ICS calendars in <em>Settings → Accounts</em>.</li>
+      </ol>
+      <p>Needs macOS 14 Sonoma or later on an Apple silicon Mac. To update, download the newest version and drag it over the old one; your settings stay put. To check a download, compare it against the release's <code>SHA256SUMS.txt</code>: <code>shasum -a 256 Cadence-*.dmg</code>. Prefer to build it yourself? The source is <a href="https://github.com/lilmuckers/calendar-cadence">on GitHub</a>.</p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Patrick McKinley</span>
+      <nav>
+        <a href="automations.html">Automations</a>
+        <a href="downloads.html">Download</a>
+        <a href="help.html">Help</a>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="security.html">Security</a>
+        <a href="https://github.com/lilmuckers/calendar-cadence">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+  <script src="releases.js" defer></script>
+</body>
+</html>
