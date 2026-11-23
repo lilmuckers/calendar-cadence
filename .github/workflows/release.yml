@@ -211,6 +211,9 @@ jobs:
           mkdir -p dist
           mv "build/Cadence-$VERSION.dmg" "build/Cadence-$VERSION.zip" dist/
           (cd dist && shasum -a 256 Cadence-* | tee SHA256SUMS.txt)
+          # Same DMG under a fixed name, so .../releases/latest/download/Cadence.dmg
+          # always fetches the newest notarized build.
+          cp "dist/Cadence-$VERSION.dmg" dist/Cadence.dmg
 
       - uses: actions/upload-artifact@v4
         with:
