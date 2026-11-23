@@ -75,7 +75,7 @@ standard verification covers both apps. If Google holds up the Chat scopes, the 
   `Local.xcconfig` and as a GitHub repository variable for `release.yml`.
 - [ ] **APIs**: Google Calendar API and Google Chat API on, Gmail API off. Chat API → Configuration:
   name, icon and description filled in.
-- [ ] **Data access**: `openid`, `email`, `profile`, `.../auth/calendar.readonly`,
+- [ ] **Data access**: `openid`, `email`, `profile`, `.../auth/calendar.calendarlist.readonly`,
   `.../auth/calendar.events`, `.../auth/chat.spaces.readonly`, `.../auth/chat.spaces.create`,
   `.../auth/chat.messages.create`. Nothing else, and no `gmail.send`. One line of justification each.
 - [ ] Google Search Console: verify `patrick-mckinley.com` with the account that owns the project.
