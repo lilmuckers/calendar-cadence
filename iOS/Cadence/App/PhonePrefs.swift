@@ -42,6 +42,11 @@ struct PhonePrefs: Codable, Equatable {
     // Live Activity on the Lock Screen / StandBy.
     var liveActivityEnabled = true
     var liveActivityLeadMinutes = 30
+    /// A meeting with a link that started without a join counts up in red, then goes away after this.
+    var liveActivityMissedLinger: MissedMeetingLinger = .fiveMinutes
+    /// When that time's up, say "Missed" (with a disappointed icon) on the Lock Screen for a while
+    /// instead of disappearing.
+    var liveActivityShowsMissed = false
 
     // Home Screen / Lock Screen widgets.
     /// With nothing left today, show tomorrow's first meeting from `widgetTomorrowHour` on.
@@ -100,6 +105,8 @@ extension PhonePrefs {
         announceAlerts = v(.announceAlerts, d.announceAlerts)
         liveActivityEnabled = v(.liveActivityEnabled, d.liveActivityEnabled)
         liveActivityLeadMinutes = v(.liveActivityLeadMinutes, d.liveActivityLeadMinutes)
+        liveActivityMissedLinger = v(.liveActivityMissedLinger, d.liveActivityMissedLinger)
+        liveActivityShowsMissed = v(.liveActivityShowsMissed, d.liveActivityShowsMissed)
         widgetShowsTomorrow = v(.widgetShowsTomorrow, d.widgetShowsTomorrow)
         widgetTomorrowHour = v(.widgetTomorrowHour, d.widgetTomorrowHour)
         workSchedule = v(.workSchedule, d.workSchedule)

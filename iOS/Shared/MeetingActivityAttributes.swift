@@ -42,12 +42,29 @@ struct MeetingActivityAttributes: ActivityAttributes {
         /// is the moment's, `end` when it's over). Nil for meetings and from older builds.
         var pose: MascotPose?
         var momentDetail: String?
+        /// A meeting with a join link: once it starts without a join it's missed (red, counting up
+        /// from the start) until this date, after which it's gone. Nil for meetings without a link
+        /// (they count down to their end), focus time, and older builds.
+        var missedUntil: Date?
+        /// Once `missedUntil` passes, say "Missed" with a disappointed icon instead of going away.
+        var showsMissed: Bool?
 
         var isMoment: Bool { pose != nil }
 
         var target: Date { live ? end : start }
 
+        /// Started without a join: drawn red, counting up.
+        func missed(now: Date = Date()) -> Bool { missedUntil != nil && now >= start && !gone(now: now) }
+
+        /// Missed for longer than it should linger. The app ends the activity when it next runs; until
+        /// then the view says "Missed" (`showsMissed`) or draws next to nothing.
+        func gone(now: Date = Date()) -> Bool { missedUntil.map { now >= $0 } ?? false }
+
         func mood(now: Date = Date()) -> ActivityMood {
+            if missedUntil != nil, now >= start {
+                guard gone(now: now) else { return .panicking }
+                return showsMissed == true ? .disappointed : .calm
+            }
             if let panicFrom, now >= panicFrom { return .panicking }
             if let nervousFrom, now >= nervousFrom { return .nervous }
             return .calm

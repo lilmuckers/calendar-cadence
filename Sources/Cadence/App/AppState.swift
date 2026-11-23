@@ -924,8 +924,20 @@ final class AppState {
                                      nativeAvailable: { NSWorkspace.shared.urlForApplication(toOpen: $0) != nil })
     }
 
+    /// Meetings joined since launch, for the phone's Live Activity (it drops a joined meeting).
+    @ObservationIgnored private var joinedIDs: Set<String> = []
+
+    private func markJoined(_ meeting: Meeting) {
+        guard !joinedIDs.contains(meeting.id) else { return }
+        let cutoff = Calendar.current.startOfDay(for: Date())
+        joinedIDs = joinedIDs.filter { id in allMeetings.contains { $0.id == id && $0.end > cutoff } }
+        joinedIDs.insert(meeting.id)
+        companion.pushSnapshot()
+    }
+
     func join(_ meeting: Meeting) {
         onHandled?(meeting.id)
+        markJoined(meeting)
         browsers.refresh()
         guard let route = joinRoute(for: meeting) else { return }
         switch route {
@@ -941,6 +953,7 @@ final class AppState {
     func join(_ meeting: Meeting, in profile: BrowserProfile?, remember: ProfileMemory?) {
         guard let link = meeting.joinLink else { return }
         onHandled?(meeting.id)
+        markJoined(meeting)
         if let remember, let profile {
             switch remember {
             case .once: prefs.profileRules.meetings[meeting.id] = profile.id
@@ -994,7 +1007,8 @@ final class AppState {
                                  takeoverLeadSeconds: prefs.takeoverLeadSeconds,
                                  takeoverAutoDismissMinutes: prefs.takeoverAutoDismissMinutes,
                                  enrichments: enrichments.book.slice(for: mirrored),
-                                 workSchedule: prefs.workSchedule)
+                                 workSchedule: prefs.workSchedule,
+                                 joinedIDs: joinedIDs.isEmpty ? nil : joinedIDs.filter { id in mirrored.contains { $0.id == id } })
     }
 
     /// A meeting by id, for actions coming from the phone.

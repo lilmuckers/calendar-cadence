@@ -24,9 +24,10 @@ struct MeetingLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
                         StateIcon(state: s, height: 20)
-                        Text(s.isMoment ? "Left" : s.live ? "Now" : "Next")
+                        Text(s.isMoment ? "Left" : s.gone() ? (s.showsMissed == true ? "Missed" : "Over")
+                             : s.missed() ? "Late" : s.live ? "Now" : "Next")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(s.tint)
+                            .foregroundStyle(s.missed() || (s.gone() && s.showsMissed == true) ? Color.missed : s.tint)
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
@@ -36,7 +37,7 @@ struct MeetingLiveActivity: Widget {
                     Text(s.title).font(.headline).lineLimit(1)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    if s.hasLink { JoinLink(state: s) }
+                    if s.hasLink, !s.gone() { JoinLink(state: s) }
                     else if let detail = s.momentDetail { Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
                 }
             } compactLeading: {
@@ -44,9 +45,14 @@ struct MeetingLiveActivity: Widget {
                 StateIcon(state: s, height: 16)
             } compactTrailing: {
                 Countdown(state: s, stale: stale).monospacedDigit().frame(maxWidth: 56)
-                    .foregroundStyle(s.counting(stale: stale) ? s.tint : .secondary)
+                    .foregroundStyle(s.countdownTint(stale: stale))
             } minimal: {
-                if s.counting(stale: stale) {
+                if s.gone() {
+                    StateIcon(state: s, height: 15)
+                } else if s.missed() {
+                    Countdown(state: s, stale: stale).monospacedDigit().font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color.missed).frame(maxWidth: 36)
+                } else if s.counting(stale: stale) {
                     // Minutes left, ticking: shown when another app also has a Live Activity.
                     Text(timerInterval: Date()...max(Date(), s.target), countsDown: true, showsHours: false)
                         .monospacedDigit().font(.caption2.weight(.semibold)).foregroundStyle(s.tint)
@@ -70,7 +76,8 @@ private struct StateIcon: View {
         if let pose = state.pose {
             GooglyMascot(pose: pose, height: height, animated: false).foregroundStyle(.white)
         } else {
-            GooglyIcon(mood: state.mood(), height: height).foregroundStyle(state.iconTint)
+            GooglyIcon(mood: state.mood(), height: height)
+                .foregroundStyle(state.missed() ? Color.missed : state.iconTint)
         }
     }
 }
@@ -80,7 +87,9 @@ private struct LockScreenView: View {
     let stale: Bool
 
     var body: some View {
-        if let pose = state.pose {
+        if state.gone() {
+            goneBody
+        } else if let pose = state.pose {
             HStack(alignment: .center, spacing: 14) {
                 GooglyMascot(pose: pose, height: 48, animated: false).foregroundStyle(.white)
                 VStack(alignment: .leading, spacing: 3) {
@@ -99,15 +108,38 @@ private struct LockScreenView: View {
         }
     }
 
+    /// A missed meeting whose time is up, before the app gets to take the activity down: "Missed"
+    /// with a disappointed icon, or (when the user would rather it just went) a single quiet line.
+    @ViewBuilder private var goneBody: some View {
+        if state.showsMissed == true {
+            HStack(alignment: .center, spacing: 14) {
+                GooglyIcon(mood: .disappointed, height: 44).foregroundStyle(state.iconTint)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("MISSED").font(.caption2.weight(.bold)).foregroundStyle(Color.missed)
+                    Text(state.title).font(.headline).foregroundStyle(.white).lineLimit(1)
+                    Text("\(state.start.formatted(date: .omitted, time: .shortened)) · not joined")
+                        .font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+        } else {
+            Text(state.title).font(.caption).foregroundStyle(.white.opacity(0.5)).lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.vertical, 10)
+        }
+    }
+
     private var meetingBody: some View {
-        HStack(alignment: .center, spacing: 14) {
-            RoundedRectangle(cornerRadius: 3).fill(state.tint).frame(width: 6)
+        let missed = state.missed()
+        return HStack(alignment: .center, spacing: 14) {
+            RoundedRectangle(cornerRadius: 3).fill(missed ? Color.missed : state.tint).frame(width: 6)
             VStack(alignment: .leading, spacing: 3) {
-                Text(state.live ? "ENDS IN" : state.counting(stale: stale) ? "STARTS IN" : "NEXT AT")
-                    .font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.6))
+                Text(missed ? "STARTED" : state.live ? "ENDS IN" : state.counting(stale: stale) ? "STARTS IN" : "NEXT AT")
+                    .font(.caption2.weight(.bold)).foregroundStyle(missed ? Color.missed : .white.opacity(0.6))
                 Countdown(state: state, stale: stale)
                     .font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
-                    .foregroundStyle(.white)
+                    .foregroundStyle(missed ? Color.missed : .white)
                 Text(state.title).font(.headline).foregroundStyle(.white).lineLimit(1)
                 Text(subtitle).font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
             }
@@ -129,7 +161,12 @@ private struct Countdown: View {
     let stale: Bool
 
     var body: some View {
-        if !state.counting(stale: stale) {
+        if state.gone() {
+            Text(state.showsMissed == true ? "Missed" : "")
+        } else if state.missed() {
+            // Started without a join: counts on past zero, as minus how late it is.
+            Text("−\(Text(timerInterval: state.start...state.start.addingTimeInterval(12 * 3600), countsDown: false))")
+        } else if !state.counting(stale: stale) {
             // Not close yet: just when it starts.
             Text(state.start, style: .time)
         } else if state.target > Date() {
@@ -156,8 +193,20 @@ private struct JoinLink: View {
     }
 }
 
+extension Color {
+    /// A meeting that started without anyone joining.
+    static let missed = Color(red: 1.0, green: 0.27, blue: 0.23)
+}
+
 extension MeetingActivityAttributes.ContentState {
     var tint: Color { Color(red: red, green: green, blue: blue) }
+
+    /// The countdown's colour in the Dynamic Island.
+    func countdownTint(stale: Bool) -> Color {
+        if gone() { return showsMissed == true ? .missed : .secondary }
+        if missed() { return .missed }
+        return counting(stale: stale) ? tint : .secondary
+    }
 
     /// The googly icon's colour: the approaching meeting's calendar, lifted towards white when it's
     /// too dark to see against the black Dynamic Island.

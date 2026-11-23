@@ -484,6 +484,15 @@ private struct LockScreenScreen: View {
                 Text("A countdown to your next meeting with a Join button. Before the countdown starts it shows when the meeting begins.")
             }
             Section {
+                Picker("Missed meeting goes", selection: $state.prefs.liveActivityMissedLinger) {
+                    ForEach(MissedMeetingLinger.allCases, id: \.self) { Text($0.label).tag($0) }
+                }
+                Toggle("Then show \u{201C}Missed\u{201D}", isOn: $state.prefs.liveActivityShowsMissed)
+            } header: { Text("Joined & missed meetings") } footer: {
+                Text("A meeting goes away once you join it, here or on your Mac. If it starts and nobody joins, the countdown turns red and counts on, then goes — or says \u{201C}Missed\u{201D} on the Lock Screen for a while. iOS doesn't always wake Cadence on time to take it down while it's closed.")
+            }
+            .disabled(!state.prefs.liveActivityEnabled)
+            Section {
                 Toggle("Show tomorrow's first meeting", isOn: $state.prefs.widgetShowsTomorrow)
                 Picker("From", selection: $state.prefs.widgetTomorrowHour) {
                     ForEach(Array(12...23), id: \.self) { hour in
