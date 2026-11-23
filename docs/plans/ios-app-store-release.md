@@ -99,17 +99,34 @@ standard verification covers both apps. If Google holds up the Chat scopes, the 
 - [ ] Google verification passed.
 
 ### 3. Microsoft
-- [ ] entra.microsoft.com → App registrations → the Mac's registration (or a new one, with
+- [x] entra.microsoft.com → App registrations → the Mac's registration (or a new one, with
   *Accounts in any organizational directory and personal Microsoft accounts*).
-- [ ] Authentication → **Add a platform → iOS / macOS** → the bundle ID. That adds the redirect
-  `msauth.<id>://auth`.
+  Done 2026-11-23: one registration (client ID `1426df5d-…`) shared by the Mac and iPhone apps.
+- [x] Authentication → **Add a platform → iOS / macOS** → the bundle ID. That adds the redirect
+  `msauth.<id>://auth`. Done for `com.patrick-mckinley.cadence`, alongside the Mac's
+  `http://localhost` (*Mobile and desktop applications*). Sign-in tested on both.
 - [ ] API permissions (delegated): `User.Read`, `Calendars.ReadWrite`, `MailboxSettings.Read`,
-  `offline_access`, `openid`, `email`, `profile`.
-- [x] Put the **Application (client) ID** in `Local.xcconfig` as `MICROSOFT_CLIENT_ID`.
-- [ ] **Publisher verification** (Branding & properties): set the publisher domain to
-  `patrick-mckinley.com`, verify it, and link a Microsoft AI Cloud Partner Program ID (free to
-  join). Without it, many work and school tenants block users from consenting. Personal Microsoft
-  accounts aren't affected.
+  `offline_access`, `openid`, `email`, `profile`. Optional (both apps request them at sign-in), but
+  listing them lets tenant admins grant consent up front.
+- [x] Put the **Application (client) ID** in `Local.xcconfig` as `MICROSOFT_CLIENT_ID`, and in the
+  repo's `MICROSOFT_CLIENT_ID` Actions secret for release builds (updated 2026-11-23).
+- [ ] **Publisher verification.** Without it, many work and school tenants block users from
+  consenting, and the consent screen says "unverified". Personal Microsoft accounts aren't affected.
+  1. [ ] Join the **Microsoft AI Cloud Partner Program** (free) at partner.microsoft.com with a
+     work account in an Entra tenant (not a personal Microsoft account), and finish the
+     account verification (it can take a few days). Note the **Partner ID** (formerly MPN ID).
+  2. [ ] Entra → the app registration → **Branding & properties → Publisher domain → Update
+     domain → Verify a new domain**: `patrick-mckinley.com`. Entra shows a JSON file; serve it at
+     `https://patrick-mckinley.com/.well-known/microsoft-identity-association.json` (HTTPS,
+     `Content-Type: application/json`, no redirect), then click **Verify and save domain**. A copy lives in `Support/microsoft-identity-association.json`:
+     ```json
+     {"associatedApplications": [{"applicationId": "1426df5d-dac4-4541-a3d9-543bcba643ed"}]}
+     ```
+  3. [ ] Same page → **Publisher verification → Add Partner ID**. The Partner Center account's
+     primary domain must match the publisher domain, and the signed-in user needs the
+     Application Administrator (or Cloud Application Administrator) role in the tenant and the
+     MPN Admin or Accounts Admin role in Partner Center.
+  4. [ ] Check the consent screen now shows the blue *verified* badge.
 
 ### 4. Review notes and video
 - [ ] Tell the reviewer about **Try with sample meetings** (on the welcome's second page, the empty
