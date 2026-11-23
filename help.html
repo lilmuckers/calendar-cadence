@@ -24,7 +24,7 @@
   <meta name="twitter:title" content="Cadence help">
   <meta name="twitter:description" content="Step-by-step guides for Cadence's trickier settings.">
   <meta name="twitter:image" content="https://cadence.patrick-mckinley.com/assets/og-help.jpg">
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
   <header class="site-header">
@@ -262,6 +262,10 @@
             <div><h2>Troubleshooting</h2></div>
           </header>
           <dl class="faq">
+            <dt id="testing">The site says Cadence is <em>"in testing"</em>. What does that mean?</dt>
+            <dd>Cadence's built-in <strong>Sign in with Google</strong> isn't public yet: Google is still reviewing it, and until it approves, only accounts on the test list can use it. Everyone else sees <em>"Access blocked"</em>. You don't have to wait. <a href="#google">Create your own Google OAuth client</a> (about 5 minutes, free) and paste it into <em>Settings → Accounts → Use my own OAuth client…</em>. The rest of Cadence works as normal, including calendars from macOS Calendar and ICS feeds. Or <a href="#volunteer">volunteer for testing</a>.</dd>
+            <dt id="volunteer">Can I volunteer for testing?</dt>
+            <dd>Yes! I'm happy to add a small number of people to the testing client. <a href="mailto:cadence@patrick-mckinley.com?subject=Cadence%20testing%20volunteer">Message me</a> :) Include the Google account you'd sign in with, and I'll add it to the test list.</dd>
             <dt>Google says <em>"Access blocked"</em>.</dt>
             <dd>Your own client is in Testing mode and the account isn't a test user. Add it under <em>Audience → Test users</em>, or publish the app (see <a href="#google">Google</a>).</dd>
             <dt>A Google account keeps asking me to reconnect every week.</dt>
