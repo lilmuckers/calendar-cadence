@@ -63,8 +63,13 @@ profiles, media keys, the MCP socket). Only the iPhone app goes in the store.
   Check at developer.apple.com → Identifiers that:
   - `<id>` has **App Groups** (`group.<id>`) and **Time Sensitive Notifications**.
   - `<id>.widgets` has **App Groups** (`group.<id>`).
-- [ ] Optional: ask Apple for the **User-Assigned Device Name** entitlement for `<id>` (a form
-  linked from that capability's page), then use `Config/Cadence-DeviceName.entitlements`.
+- [x] Optional: ask Apple for the **User-Assigned Device Name** entitlement for `<id>` (a form
+  linked from that capability's page). Applied 2026-11-23 with `docs/screenshots/device-name-*.png`
+  and a blurred screen recording.
+- [ ] Once Apple grants it: turn it on for the App ID, make a new App Store profile and update the
+  `IOS_APP_PROFILE` secret, set `CADENCE_ENTITLEMENTS = Config/Cadence-DeviceName.entitlements` in
+  `Local.xcconfig`, and give `release.yml` a way to use it (its `Local.xcconfig` has no
+  `CADENCE_ENTITLEMENTS` line yet).
 - [x] App Store Connect → Apps → **+ New App** with that bundle ID, to reserve the name early.
 
 ### 2. Google: one Cloud project for both apps
@@ -73,22 +78,24 @@ Every scope is *sensitive* (the built-in client doesn't ask for the *restricted*
 standard verification covers both apps. If Google holds up the Chat scopes, the iPhone waits too.
 - [x] **Clients → Create client → iOS**, with the bundle ID. `GOOGLE_IOS_CLIENT_PREFIX` is set in
   `Local.xcconfig` and as a GitHub repository variable for `release.yml`.
-- [ ] **APIs**: Google Calendar API and Google Chat API on, Gmail API off. Chat API → Configuration:
+- [x] **APIs**: Google Calendar API and Google Chat API on, Gmail API off. Chat API → Configuration:
   name, icon and description filled in.
-- [ ] **Data access**: `openid`, `email`, `profile`, `.../auth/calendar.calendarlist.readonly`,
+- [x] **Data access**: `openid`, `email`, `profile`, `.../auth/calendar.calendarlist.readonly`,
   `.../auth/calendar.events`, `.../auth/chat.spaces.readonly`, `.../auth/chat.spaces.create`,
   `.../auth/chat.messages.create`. Nothing else, and no `gmail.send`. One line of justification each.
-- [ ] Google Search Console: verify `patrick-mckinley.com` with the account that owns the project.
-- [ ] **Branding**: app name, support email, logo, home page and privacy policy on
+- [x] Google Search Console: verify `patrick-mckinley.com` with the account that owns the project.
+- [x] **Branding**: app name, support email, logo, home page and privacy policy on
   `cadence.patrick-mckinley.com`, authorised domain `patrick-mckinley.com`.
-- [ ] Privacy policy: what's read (calendar events, Chat spaces) and why, kept on your devices and never
+- [x] Privacy policy: what's read (calendar events, Chat spaces) and why, kept on your devices and never
   sold or shared, how to delete it, and Google's Limited Use statement word for word.
-- [ ] **Audience**: External; add yourself and any TestFlight testers as test users until it's published.
-- [ ] Demo video (unlisted YouTube): sign-in with the client ID visible in the URL, meetings appearing,
+- [x] **Audience**: External; add yourself and any TestFlight testers as test users until it's published.
+- [x] Demo video (unlisted YouTube): sign-in with the client ID visible in the URL, meetings appearing,
   replying to an invite and setting a colour, and a running-late Google Chat message (needs a Workspace
   account). The iPhone sign-in too, ideally.
-- [ ] Audience → **Publish app**, then Verification Center → **Submit for verification**. Start early:
+- [x] Audience → **Publish app**, then Verification Center → **Submit for verification**. Start early:
   until it's verified, sign-in shows an "unverified app" warning and stops at 100 users.
+  Submitted 2026-11-23.
+- [ ] Google verification passed.
 
 ### 3. Microsoft
 - [ ] entra.microsoft.com → App registrations → the Mac's registration (or a new one, with
