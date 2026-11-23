@@ -1,0 +1,82 @@
+[
+ {
+  "tag": "v0.2.1",
+  "name": "Cadence 0.2.1",
+  "url": "https://github.com/lilmuckers/calendar-cadence/releases/tag/v0.2.1",
+  "date": "2026-11-23T00:33:43Z",
+  "pre": false,
+  "body": "## Cadence 0.2.1\n\n_Released 2026-11-23 · patch release_\n\n> [!NOTE]\n> Signed with a Developer ID and notarized by Apple.\n\n<!-- Release notes generated using configuration in .github/release.yml at v0.2.1 -->\n\n## What's Changed\n### 🐛 Fixes and improvements\n* Closing the iPhone sign-in sheet no longer shows an error by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/51\n* Publish a fixed-name Cadence.dmg with each release by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/53\n* Show the release version in About for local builds by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/52\n\n\n**Full Changelog**: https://github.com/lilmuckers/calendar-cadence/compare/v0.2.0...v0.2.1\n\n## 📥 Install\n\n1. Download **Cadence-0.2.1.dmg** below.\n2. Open it and drag **Cadence** into **Applications**.\n3. Launch Cadence from Applications and allow calendar access when asked.\n\nRequires macOS 14 or later on Apple Silicon.\n\n<details>\n<summary>Downloads and checksums</summary>\n\n| File | What it is |\n|---|---|\n| `Cadence-0.2.1.dmg` | Disk image, drag to Applications |\n| `Cadence-0.2.1.zip` | The same app, zipped (for scripted installs) |\n| `SHA256SUMS.txt` | Checksums for both |\n\n```text\nefdf181da3ee15e27f91b81ff51df70fd7bc68530c69c074b566e32f14dfd6d3  Cadence-0.2.1.dmg\ndaf2ebf1e72a9eb42da7e03733b0d5f20969c6740bed32a05118953bace9caa9  Cadence-0.2.1.zip\n```\n\nCheck a download with `shasum -a 256 -c SHA256SUMS.txt`.\n</details>\n",
+  "assets": [
+   {
+    "name": "Cadence-0.2.1.dmg",
+    "size": 5847122,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.2.1/Cadence-0.2.1.dmg"
+   },
+   {
+    "name": "Cadence-0.2.1.zip",
+    "size": 3919054,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.2.1/Cadence-0.2.1.zip"
+   },
+   {
+    "name": "Cadence.dmg",
+    "size": 5847122,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.2.1/Cadence.dmg"
+   },
+   {
+    "name": "SHA256SUMS.txt",
+    "size": 168,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.2.1/SHA256SUMS.txt"
+   }
+  ]
+ },
+ {
+  "tag": "v0.2.0",
+  "name": "Cadence 0.2.0",
+  "url": "https://github.com/lilmuckers/calendar-cadence/releases/tag/v0.2.0",
+  "date": "2026-11-22T21:21:43Z",
+  "pre": false,
+  "body": "## Cadence 0.2.0\n\n_Released 2026-11-22 · minor release_\n\n> [!NOTE]\n> Signed with a Developer ID and notarized by Apple.\n\n<!-- Release notes generated using configuration in .github/release.yml at v0.2.0 -->\n\n## What's Changed\n### ✨ New features\n* Gmail running-late emails need your own Google client by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/46\n\n\n**Full Changelog**: https://github.com/lilmuckers/calendar-cadence/compare/v0.1.0...v0.2.0\n\n## 📥 Install\n\n1. Download **Cadence-0.2.0.dmg** below.\n2. Open it and drag **Cadence** into **Applications**.\n3. Launch Cadence from Applications and allow calendar access when asked.\n\nRequires macOS 14 or later on Apple Silicon.\n\n<details>\n<summary>Downloads and checksums</summary>\n\n| File | What it is |\n|---|---|\n| `Cadence-0.2.0.dmg` | Disk image, drag to Applications |\n| `Cadence-0.2.0.zip` | The same app, zipped (for scripted installs) |\n| `SHA256SUMS.txt` | Checksums for both |\n\n```text\n7efeee9a8b57589c5db1e5be12ca4a9fe7f8c59384d31f276f240812a28fb8e4  Cadence-0.2.0.dmg\nd07c4191a4fd588ece5db0d9bdc91a3473ac92c973a637a8e810fc9e86b22e67  Cadence-0.2.0.zip\n```\n\nCheck a download with `shasum -a 256 -c SHA256SUMS.txt`.\n</details>\n",
+  "assets": [
+   {
+    "name": "Cadence-0.2.0.dmg",
+    "size": 5847094,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.2.0/Cadence-0.2.0.dmg"
+   },
+   {
+    "name": "Cadence-0.2.0.zip",
+    "size": 3919041,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.2.0/Cadence-0.2.0.zip"
+   },
+   {
+    "name": "SHA256SUMS.txt",
+    "size": 168,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.2.0/SHA256SUMS.txt"
+   }
+  ]
+ },
+ {
+  "tag": "v0.1.0",
+  "name": "Cadence 0.1.0",
+  "url": "https://github.com/lilmuckers/calendar-cadence/releases/tag/v0.1.0",
+  "date": "2026-11-22T21:00:54Z",
+  "pre": false,
+  "body": "## Cadence 0.1.0\n\n_Released 2026-11-22 · first release_\n\n> [!NOTE]\n> Signed with a Developer ID and notarized by Apple.\n\n<!-- Release notes generated using configuration in .github/release.yml at v0.1.0 -->\n\n## What's Changed\n### ✨ New features\n* Add CI, release pipeline, and PR/issue templates by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/3\n* Add Cadence for iPhone: desk companion, Dynamic Island and Mac pairing by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/1\n* Give the DMG a styled drag-to-Applications window by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/4\n* iPhone handles new invites and double-bookings, with a googly-eyed Dynamic Island by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/5\n* iPhone keeps the Mac's agenda offline, lets you nickname the Mac, and tints the Island icon by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/6\n* Agenda-only calendars: keep a calendar in the agenda without alerts or clashes by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/7\n* Colour labels, instant save feedback, and links that open in front by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/8\n* Media controls on the desk display, shared with the Mac, with a meeting hand-off by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/11\n* iPhone widgets: time to your next meeting on the Home Screen and Lock Screen by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/19\n* iPhone widgets show your first meeting tomorrow in the evening by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/21\n* Desk mode: tea-break mascot when the day's done; keep Join on screen by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/22\n* Assistants can attach notes, links, checklists and bingo cards to meetings by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/23\n* iPhone remembers your Mac on every network, and the Mac shows each iPhone's model or chosen name by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/24\n* Working hours, defended breaks and day moments with the mascot by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/28\n* Spotify on iPhone: bring your own client ID by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/31\n* Pair the iPhone with several Macs (and the Mac with several iPhones) by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/33\n* Export and import settings as a .cadconf file by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/35\n* About screen on Mac and iPhone, with a pokeable googly-eyed mascot by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/36\n* A key per iPhone, single-use pairing codes, and safer meeting links by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/38\n* Set up Gemini CLI and Antigravity from Settings → Assistants by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/40\n* Link analytics behind Advanced on paired device pages by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/41\n* Get the iPhone app ready for the App Store, with a volume pill on the desk by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/42\n### 🐛 Fixes and improvements\n* Clash prompts no longer ask again every time Cadence starts by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/9\n* Show the date a recurring invite next happens by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/10\n* Group repeated assistants in the Assistants status line by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/12\n* Fix Spotify connecting from the desk button, and stop the Mac holding AirPods by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/13\n* Spotify track on connect, Mac media keys remote-control the iPhone by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/14\n* Fix media remote control giving up on the phone after 12 seconds by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/15\n* Renew Spotify access quietly instead of asking every hour by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/16\n* Fix running-late card never appearing on the full-screen alert by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/17\n* Copy local build config into new Claude Code worktrees by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/18\n* Let the menu bar item be narrower so macOS hides it less by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/20\n* Option to offer only named Google colours by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/26\n* Fix Settings toolbar overflow and tidy the Work tab by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/30\n* Tidy the time fields in Settings → Work by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/32\n* Tidier Settings window on the Mac by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/34\n* Tidy the iPhone Settings into grouped pages by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/39\n* Bundle the Slack app into release builds by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/44\n* Skip the iPhone release job until it's set up by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/45\n### 📦 Other changes\n* Make the OAuth landing page prettier by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/2\n* Show paired phones as \"Name (Model)\"; device-name entitlement switch by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/37\n* Give the iPhone app a proper first launch by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/43\n\n## New Contributors\n* @lilmuckers made their first contribution in https://github.com/lilmuckers/calendar-cadence/pull/2\n\n**Full Changelog**: https://github.com/lilmuckers/calendar-cadence/commits/v0.1.0\n\n## 📥 Install\n\n1. Download **Cadence-0.1.0.dmg** below.\n2. Open it and drag **Cadence** into **Applications**.\n3. Launch Cadence from Applications and allow calendar access when asked.\n\nRequires macOS 14 or later on Apple Silicon.\n\n<details>\n<summary>Downloads and checksums</summary>\n\n| File | What it is |\n|---|---|\n| `Cadence-0.1.0.dmg` | Disk image, drag to Applications |\n| `Cadence-0.1.0.zip` | The same app, zipped (for scripted installs) |\n| `SHA256SUMS.txt` | Checksums for both |\n\n```text\ne98221ef8d4e6439246e6d231e9b1fa25641cbcb7c029b636b737c2d4da92d75  Cadence-0.1.0.dmg\nb451e658979975a8f5da022bab39203a39912e714f98b541f33da27e9e837e1a  Cadence-0.1.0.zip\n```\n\nCheck a download with `shasum -a 256 -c SHA256SUMS.txt`.\n</details>\n",
+  "assets": [
+   {
+    "name": "Cadence-0.1.0.dmg",
+    "size": 5846755,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.1.0/Cadence-0.1.0.dmg"
+   },
+   {
+    "name": "Cadence-0.1.0.zip",
+    "size": 3918882,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.1.0/Cadence-0.1.0.zip"
+   },
+   {
+    "name": "SHA256SUMS.txt",
+    "size": 168,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.1.0/SHA256SUMS.txt"
+   }
+  ]
+ }
+]

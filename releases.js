@@ -1,7 +1,8 @@
-// Fills the download button (index.html) and the version grid (downloads.html)
-// from the public GitHub Releases API, so the site never needs editing when a
-// new version ships. Without JavaScript, or if GitHub can't be reached, the
-// static links fall back to the GitHub releases page.
+// Fills the download button (index.html) and the version grid (downloads.html).
+// The release workflow writes releases.json next to this file after every
+// release (scripts/site-downloads.py on main) and bakes the newest version into
+// index.html, so the button is right even without JavaScript. If releases.json
+// is missing, this falls back to the public GitHub Releases API.
 (function () {
   "use strict";
 
@@ -38,9 +39,17 @@
     };
   }
 
-  function loadReleases() {
-    var cached = readCache();
-    if (cached) return Promise.resolve(cached);
+  function fromSite() {
+    return fetch("releases.json", { cache: "no-cache" }).then(function (res) {
+      if (!res.ok) throw new Error("releases.json: " + res.status);
+      return res.json();
+    }).then(function (list) {
+      if (!Array.isArray(list)) throw new Error("releases.json isn't a list");
+      return list;
+    });
+  }
+
+  function fromGitHub() {
     return fetch(API, { headers: { Accept: "application/vnd.github+json" } })
       .then(function (res) {
         if (!res.ok) throw new Error("GitHub said " + res.status);
@@ -51,9 +60,17 @@
           .filter(function (r) { return !r.draft; })
           .map(slim)
           .sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
-        writeCache(releases);
         return releases;
       });
+  }
+
+  function loadReleases() {
+    var cached = readCache();
+    if (cached) return Promise.resolve(cached);
+    return fromSite().catch(fromGitHub).then(function (releases) {
+      writeCache(releases);
+      return releases;
+    });
   }
 
   // Prefer the versioned file (Cadence-1.2.3.dmg); the fixed-name Cadence.dmg is a copy.
