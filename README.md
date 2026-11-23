@@ -20,6 +20,16 @@ finds the join link wherever it's hiding, and — 30 seconds before you're due �
 
 <img src="docs/screenshots/menubar.png" width="560" alt="Menu bar showing Cadence: 8m · Design Review">
 
+<br><br>
+
+<a href="https://github.com/lilmuckers/calendar-cadence/releases/latest/download/Cadence.dmg"><img height="48" alt="Download Cadence for macOS" src="https://img.shields.io/badge/Download_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white"></a>
+
+<a href="https://github.com/lilmuckers/calendar-cadence/releases/latest"><img alt="Latest version" src="https://img.shields.io/github/v/release/lilmuckers/calendar-cadence?style=flat-square&label=latest&color=34C759"></a>
+<br>
+<sub>Free and open source · macOS 14 Sonoma or later · Apple silicon · about 6 MB · signed and notarized by Apple</sub>
+<br>
+<sub><a href="#-install">How to install</a> · <a href="https://github.com/lilmuckers/calendar-cadence/releases/latest">Release notes, ZIP and checksums</a> · <a href="https://github.com/lilmuckers/calendar-cadence/releases">All versions</a></sub>
+
 </div>
 
 <br>
@@ -248,6 +258,15 @@ If your build has a Microsoft app built in, skip this and click **Sign in with M
 
 `Calendars.ReadWrite` is only used to reply to invites; Cadence never edits or deletes events. `MailboxSettings.Read` reads your Outlook category colours.
 </details>
+
+## 📦 Install
+
+1. [Download `Cadence.dmg`](https://github.com/lilmuckers/calendar-cadence/releases/latest/download/Cadence.dmg). It's always the newest release.
+2. Open it and drag **Cadence** into **Applications**.
+3. Open Cadence from Applications. It lives in the menu bar, not the Dock.
+4. Allow calendar access when macOS asks, then add Google, Microsoft 365 or ICS calendars in *Settings → Accounts*.
+
+Needs macOS 14 Sonoma or later on an Apple silicon Mac. Builds are signed and notarized, so Gatekeeper opens them without warnings. Want to check the download? Each release lists SHA-256 checksums in `SHA256SUMS.txt`. Prefer to build it yourself? See below.
 
 ## 🛠️ Build & run
 
