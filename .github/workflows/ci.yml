@@ -12,9 +12,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A new push to a PR cancels its older run. Runs on main always finish: a cancelled run there
+# would show as "failing" on the README's tests badge.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Xcode every macOS job builds with, pinned so it doesn't drift with the runner image's default
 # (scripts/ci-select-xcode.sh fails if it isn't installed). 26.6 is the newest on macos-26; local
