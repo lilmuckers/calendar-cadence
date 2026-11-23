@@ -138,7 +138,8 @@ final class AppState {
         syncMicrosoft(fetch: false)
         syncFeeds(fetch: false)
         Task {
-            await requestAccess()
+            // Before setup, leave the macOS prompt for the calendars step, which says why first.
+            if prefs.setupDone || !eventKit.isUndetermined { await requestAccess() } else { refresh() }
             await refreshRemote()
             sourcesSettled = true
             recompute()
@@ -172,6 +173,74 @@ final class AppState {
         let granted = await eventKit.requestAccess()
         access = granted ? .granted : .denied
         refresh()
+    }
+
+    // MARK: - Setup
+
+    /// Whether macOS lets Cadence post notifications; nil until known or while it hasn't asked yet.
+    private(set) var notificationsAllowed: Bool?
+    /// Settings → General → Run setup again.
+    @ObservationIgnored var onRunSetup: (() -> Void)?
+    /// The Settings tab to show next time Settings opens (setup's "When you're ready" rows).
+    var settingsTab: SettingsTab = .general
+
+    /// macOS Calendar access hasn't been asked for yet.
+    var calendarAccessUndetermined: Bool { access != .granted && eventKit.isUndetermined }
+
+    /// Skipped setup steps still open, for the menu's checklist. Empty until setup has run once.
+    var setupTasks: [SetupTask] {
+        guard prefs.setupDone, !prefs.setupChecklistDismissed, lastRemoteRefresh != nil else { return [] }
+        return SetupTask.open(hasCalendars: !calendars.isEmpty, notificationsAllowed: notificationsAllowed)
+    }
+
+    func refreshNotificationStatus() async {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        switch status {
+        case .authorized, .provisional, .ephemeral: notificationsAllowed = true
+        case .denied: notificationsAllowed = false
+        default: notificationsAllowed = prefs.setupDone ? false : nil
+        }
+    }
+
+    /// Ask macOS for notifications (once; after a "Don't Allow" it opens System Settings instead).
+    func requestNotifications() async {
+        let center = UNUserNotificationCenter.current()
+        if await center.notificationSettings().authorizationStatus == .denied {
+            openNotificationSettings()
+        } else {
+            _ = try? await center.requestAuthorization(options: [.alert, .sound])
+        }
+        await refreshNotificationStatus()
+    }
+
+    func openNotificationSettings() {
+        let id = Bundle.main.bundleIdentifier ?? ""
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// The setup preset the alert settings match, nil once tuned by hand.
+    var alertPreset: AlertPreset? {
+        get { AlertPreset.matching(prefs.alertSettings) }
+        set { if let newValue { prefs.alertSettings = newValue.settings } }
+    }
+
+    /// A sample alert for setup's "Show me an alert": always a made-up meeting, so Join opens nothing real.
+    func previewSetupAlert(_ preset: AlertPreset) {
+        let lead = preset.takesOverScreen ? preset.settings.takeoverLeadSeconds : TimeInterval(preset.settings.headsUpMinutes * 60)
+        let start = Date().addingTimeInterval(lead)
+        let sample = Meeting(
+            id: "preview-setup",
+            title: "Design Review",
+            start: start,
+            end: start.addingTimeInterval(1800),
+            calendar: CalendarInfo(id: "preview", title: "Work", sourceTitle: "Preview",
+                                   color: RGBAColor(red: 0.35, green: 0.45, blue: 1)),
+            attendeeCount: 6,
+            joinLink: MeetingLink(service: .zoom, url: URL(string: "https://example.com/cadence-preview")!)
+        )
+        onAlert?(sample, preset.takesOverScreen ? .fullScreen : .notification)
     }
 
     func openPrivacySettings() {

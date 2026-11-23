@@ -160,10 +160,31 @@ struct Preferences: Codable, Equatable {
     var announceAlerts = true
     /// How Cadence updates itself. nil = not chosen yet, so the welcome screen asks.
     @EncodesNil var updateMode: UpdateMode? = nil
+    /// The "Finish setting up" checklist in the menu was put away.
+    var setupChecklistDismissed = false
 
     /// The pause limit for the media remote control, nil when it's off.
     var mediaRemotePauseLimit: TimeInterval? {
         mediaRemotePauseLimitEnabled ? TimeInterval(max(1, mediaRemotePauseLimitSeconds)) : nil
+    }
+
+    /// Setup has been through once (finished or closed): set as soon as an update choice exists.
+    var setupDone: Bool { updateMode != nil }
+
+    /// The alert settings a setup preset touches.
+    var alertSettings: AlertSettings {
+        get {
+            AlertSettings(takeoverEnabled: takeoverEnabled, takeoverLeadSeconds: takeoverLeadSeconds,
+                          takeoverAutoDismissMinutes: takeoverAutoDismissMinutes,
+                          headsUpEnabled: headsUpEnabled, headsUpMinutes: headsUpMinutes)
+        }
+        set {
+            takeoverEnabled = newValue.takeoverEnabled
+            takeoverLeadSeconds = newValue.takeoverLeadSeconds
+            takeoverAutoDismissMinutes = newValue.takeoverAutoDismissMinutes
+            headsUpEnabled = newValue.headsUpEnabled
+            headsUpMinutes = newValue.headsUpMinutes
+        }
     }
 
     private static let key = "Cadence.preferences.v1"
@@ -270,5 +291,6 @@ extension Preferences {
         fadeMediaForAlerts = try c.decodeIfPresent(Bool.self, forKey: .fadeMediaForAlerts) ?? d.fadeMediaForAlerts
         announceAlerts = try c.decodeIfPresent(Bool.self, forKey: .announceAlerts) ?? d.announceAlerts
         updateMode = (try? c.decodeIfPresent(UpdateMode.self, forKey: .updateMode)) ?? d.updateMode
+        setupChecklistDismissed = try c.decodeIfPresent(Bool.self, forKey: .setupChecklistDismissed) ?? d.setupChecklistDismissed
     }
 }

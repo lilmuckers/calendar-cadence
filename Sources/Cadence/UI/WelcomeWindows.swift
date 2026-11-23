@@ -2,24 +2,37 @@ import AppKit
 import CadenceCore
 import SwiftUI
 
-/// The first-launch welcome (which asks how to handle updates) and the "What's new" screen shown
-/// on the first launch after an update. Plain windows, since a menu-bar app has no SwiftUI
+/// First-launch setup (also from Settings → General → Run Setup Again) and the "What's new" screen
+/// shown on the first launch after an update. Plain windows, since a menu-bar app has no SwiftUI
 /// `openWindow` until its menu has been opened.
 @MainActor
-final class WelcomeWindows {
+final class WelcomeWindows: NSObject, NSWindowDelegate {
     private let state: AppState
     private var window: NSWindow?
+    private var setupWindow: NSWindow?
 
     init(state: AppState) { self.state = state }
 
-    func showWelcome() {
-        present(title: "Welcome to Cadence", width: 480) { [state] close in
-            WelcomeView(initial: state.prefs.updateMode ?? .notify) { mode in
-                state.prefs.updateMode = mode
-                close()
-            }
-            .environment(state)
+    func showSetup() {
+        if let setupWindow, setupWindow.isVisible {
+            NSApp.activate(ignoringOtherApps: true)
+            setupWindow.makeKeyAndOrderFront(nil)
+            return
         }
+        present(title: "Set Up Cadence", width: SetupView.width) { [state] close in
+            SetupView(finish: close).environment(state)
+        }
+        setupWindow = window
+        window?.delegate = self
+    }
+
+    /// Closing setup early, however it's closed, counts as done: what's left goes to the menu's checklist.
+    func windowWillClose(_ notification: Notification) {
+        guard let closing = notification.object as? NSWindow, closing === setupWindow else { return }
+        MenuBarPointer.shared.hide()
+        if state.prefs.updateMode == nil { state.prefs.updateMode = .notify }
+        setupWindow = nil
+        Task { await state.refreshNotificationStatus() }
     }
 
     func showWhatsNew(from previous: SemVer?) {
@@ -69,112 +82,6 @@ final class WelcomeWindows {
         self.window = window
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
-    }
-}
-
-/// The sunburst and the calendar character from About, still and small, as a header.
-private struct MascotHeader: View {
-    var mood: AboutMascot.Mood = .calm
-    var height: CGFloat = 170
-
-    var body: some View {
-        TimelineView(.animation) { timeline in
-            Canvas { ctx, size in
-                let center = CGPoint(x: size.width / 2, y: size.height * 0.55)
-                let t = timeline.date.timeIntervalSinceReferenceDate
-                AboutMascot.drawSunburst(in: &ctx, size: size, center: center, time: t, mood: mood)
-                AboutMascot.draw(in: &ctx, center: center, side: size.height * 0.72, time: t, mood: mood,
-                                 pupils: [.zero, .zero], still: false)
-            }
-        }
-        .frame(height: height)
-        .clipped()
-        .accessibilityHidden(true)
-    }
-}
-
-struct WelcomeView: View {
-    let choose: (UpdateMode) -> Void
-    @State private var mode: UpdateMode
-
-    init(initial: UpdateMode, choose: @escaping (UpdateMode) -> Void) {
-        self.choose = choose
-        _mode = State(initialValue: initial)
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            MascotHeader()
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Welcome to Cadence")
-                        .font(.system(size: 26, weight: .heavy, design: .rounded))
-                        .foregroundStyle(LinearGradient(colors: [AboutMascot.pink, AboutMascot.orange],
-                                                        startPoint: .leading, endPoint: .trailing))
-                    Text("Cadence lives in your menu bar and makes sure you're never late. First, one quick question:")
-                        .font(.system(.callout, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Text("How should Cadence stay up to date?")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                VStack(spacing: 8) {
-                    ForEach([UpdateMode.automatic, .notify, .off]) { option in
-                        UpdateModeCard(mode: option, selected: mode == option) { mode = option }
-                    }
-                }
-                HStack {
-                    Text("You can change this any time in Settings → General.")
-                        .font(.system(size: 11, design: .rounded))
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Button("Get Started") { choose(mode) }
-                        .keyboardShortcut(.defaultAction)
-                        .controlSize(.large)
-                }
-            }
-            .padding(22)
-        }
-        .background(.background)
-    }
-}
-
-private struct UpdateModeCard: View {
-    let mode: UpdateMode
-    let selected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: mode.symbol)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .background((selected ? AboutMascot.orange : Color.gray).gradient,
-                                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(mode.label).font(.system(size: 13, weight: .semibold, design: .rounded))
-                    Text(mode.detail)
-                        .font(.system(size: 12, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 16))
-                    .foregroundStyle(selected ? AboutMascot.orange : .secondary)
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(selected ? AboutMascot.orange.opacity(0.12) : Color.primary.opacity(0.05)))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(selected ? AboutMascot.orange.opacity(0.6) : .clear, lineWidth: 1.5))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

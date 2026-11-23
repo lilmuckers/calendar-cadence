@@ -66,8 +66,10 @@ enum ScreenshotRenderer {
         render(Moods(phone: .connected), state: state, name: "moods-phone", to: dir, size: CGSize(width: 420, height: 110), wallpaper: false, pad: 0)
         render(Moods(phone: .displaying), state: state, name: "moods-phone-desk", to: dir, size: CGSize(width: 420, height: 110), wallpaper: false, pad: 0)
         // First launch and after an update.
-        render(WelcomeView(initial: .notify, choose: { _ in }), state: state, name: "welcome", to: dir,
-               size: CGSize(width: 480, height: 640), wallpaper: false, pad: 0)
+        for step in SetupView.Step.allCases {
+            render(SetupView(step: step, finish: {}), state: state, name: "setup-\(step.rawValue + 1)", to: dir,
+                   size: CGSize(width: SetupView.width, height: SetupView.height), wallpaper: false, pad: 0)
+        }
         let page = AboutView.repo.appending(path: "releases")
         let notes = [
             GitHubRelease(tag: "v0.3.0", body: "### ✨ New features\n* Cadence can keep itself up to date by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/63\n* A welcome screen on first launch by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/63\n### 🐛 Fixes and improvements\n* Release notes show in the app by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/63",

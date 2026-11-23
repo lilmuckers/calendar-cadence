@@ -264,7 +264,7 @@ If your build has a Microsoft app built in, skip this and click **Sign in with M
 1. [Download `Cadence.dmg`](https://github.com/lilmuckers/calendar-cadence/releases/latest/download/Cadence.dmg). It's always the newest release.
 2. Open it and drag **Cadence** into **Applications**.
 3. Open Cadence from Applications. It lives in the menu bar, not the Dock.
-4. Allow calendar access when macOS asks, then add Google, Microsoft 365 or ICS calendars in *Settings → Accounts*.
+4. A short setup walks you through connecting calendars (macOS Calendar, Google, Microsoft 365 or ICS), picking how loud alerts are, launching at login and updates. Anything you skip waits in the menu as a checklist, and *Settings → General → Run Setup Again* brings it back.
 
 Needs macOS 14 Sonoma or later on an Apple silicon Mac. Builds are signed and notarized, so Gatekeeper opens them without warnings. Want to check the download? Each release lists SHA-256 checksums in `SHA256SUMS.txt`. Prefer to build it yourself? See below.
 
