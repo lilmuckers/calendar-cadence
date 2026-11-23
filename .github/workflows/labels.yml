@@ -1,6 +1,6 @@
 name: Sync labels
 
-# Creates (or updates) the release labels the PR check and the release workflow rely on.
+# Creates (or updates) the release and build labels the PR check and the release workflow rely on.
 # Runs when this file changes on main, or by hand.
 
 on:
@@ -25,3 +25,9 @@ jobs:
           gh label create minor --force --color 0E8A16 --description "New feature: bumps the minor version"
           gh label create patch --force --color 1D76DB --description "Fix or small change: bumps the patch version"
           gh label create skip-changelog --force --color EDEDED --description "Leave this PR out of the release notes"
+          # Which build a PR changes (release notes and each app's "What's new" are split by these).
+          gh label create mac --force --color 5319E7 --description "Changes the Mac app"
+          gh label create ios --force --color FBCA04 --description "Changes the iPhone app"
+          gh label create website --force --color C2E0C6 --description "Changes the website (gh-pages)"
+          gh label create ci --force --color 0052CC --description "CI, release pipeline, build scripts or dev tooling"
+          gh label create docs --force --color 0075CA --description "README, plans or other repo docs"

@@ -5,7 +5,9 @@ name: Release
 #
 # Version: the highest major/minor/patch label among PRs merged into main since the last vX.Y.Z tag
 # (see scripts/next-version.sh). The first release uses the version in Support/Info.plist.
-# Release notes: .github/RELEASE_NOTES_TEMPLATE.md, with the merged-PR changelog grouped by .github/release.yml.
+# Release notes: .github/RELEASE_NOTES_TEMPLATE.md, with the merged-PR changelog grouped by build (the mac / ios /
+# website / ci / docs labels), then by release label (scripts/changelog.py). The iPhone build gets only the
+# iPhone section, as TestFlight's "What to Test" and as a file to paste into the App Store's "What's New".
 #
 # Signing and notarization switch on by themselves once these repository secrets exist. Until then the
 # app is ad-hoc signed, the DMG is NOT notarized, and the release is marked as a pre-release.
@@ -227,15 +229,41 @@ jobs:
     # Off until the iPhone app is set up for distribution (see above).
     if: ${{ vars.IOS_BUNDLE_ID != '' }}
     runs-on: xcode-27
-    timeout-minutes: 45
+    timeout-minutes: 75
+    permissions:
+      contents: read
+      pull-requests: read   # scripts/changelog.py lists the merged PRs
     env:
       VERSION: ${{ needs.version.outputs.version }}
       BUILD_NUMBER: ${{ github.run_number }}${{ github.run_attempt }}
       HAS_IOS_SIGNING: ${{ secrets.IOS_DISTRIBUTION_P12 != '' && secrets.IOS_APP_PROFILE != '' && secrets.IOS_WIDGET_PROFILE != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.ASC_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' && vars.IOS_BUNDLE_ID != '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the changelog needs the tags
       - name: Select Xcode
         run: scripts/ci-select-xcode.sh
+
+      # What changed in the iPhone app since the last release: only PRs labelled ios.
+      - name: iPhone changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.version.outputs.tag }}
+          PREV_TAG: ${{ needs.version.outputs.previous_tag }}
+        run: |
+          python3 -I scripts/changelog.py "$TAG" "$PREV_TAG" --target-ref "$GITHUB_SHA" --only ios --format text \
+            > "$RUNNER_TEMP/ios-notes.txt"
+          [[ -s "$RUNNER_TEMP/ios-notes.txt" ]] || echo "Behind-the-scenes changes only." > "$RUNNER_TEMP/ios-notes.txt"
+          {
+            echo "### iPhone changelog for $VERSION"
+            echo '```text'; cat "$RUNNER_TEMP/ios-notes.txt"; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cadence-iOS-${{ needs.version.outputs.version }}-notes
+          path: ${{ runner.temp }}/ios-notes.txt
 
       - name: No signing secrets
         if: env.HAS_IOS_SIGNING != 'true'
@@ -351,6 +379,23 @@ jobs:
             echo "Processing takes a few minutes; then it's under TestFlight in App Store Connect." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      # TestFlight's "What to Test" gets the iPhone changelog. Not fatal: the build is up either way, and the
+      # notes are in the run's artifacts to paste by hand.
+      - name: Set TestFlight notes
+        if: env.HAS_IOS_SIGNING == 'true' && !inputs.dry_run
+        continue-on-error: true
+        timeout-minutes: 35
+        env:
+          BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          export ASC_KEY_PATH="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$ASC_KEY_PATH"
+          trap 'rm -f "$ASC_KEY_PATH"' EXIT
+          python3 -I scripts/testflight-notes.py "$BUNDLE_ID" "$VERSION" "$BUILD_NUMBER" "$RUNNER_TEMP/ios-notes.txt"
+
       - uses: actions/upload-artifact@v4
         if: env.HAS_IOS_SIGNING == 'true' && inputs.dry_run
         with:
@@ -371,6 +416,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: read   # scripts/changelog.py lists the merged PRs
     env:
       VERSION: ${{ needs.version.outputs.version }}
       TAG: ${{ needs.version.outputs.tag }}
@@ -381,6 +427,8 @@ jobs:
       GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the changelog needs the tags
 
       - uses: actions/download-artifact@v4
         with:

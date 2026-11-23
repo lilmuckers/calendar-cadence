@@ -144,4 +144,48 @@ struct UpdateTests {
         #expect(UpdatePlanner.changes(realBody).map(\.kind) == [.fix, .fix])
         #expect(UpdatePlanner.changes(realBody).first?.title == "Render the downloads page's version list after each release too")
     }
+
+    /// What scripts/changelog.py writes: a `###` section per build, `####` per kind.
+    private static let byBuild = """
+    ## Cadence 0.5.0
+
+    ## What's Changed
+
+    ### 🖥️ Mac app
+    #### ✨ New features
+    * A setup assistant by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/74
+    #### 🐛 Fixes and improvements
+    * Countdowns fit the ring by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/73
+
+    ### 📱 iPhone app
+    #### ✨ New features
+    * Live Activity counts missed meetings by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/68
+    #### 🐛 Fixes and improvements
+    * Countdowns fit the ring by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/73
+
+    ### ⚙️ Build and release
+    #### 💥 Breaking changes
+    * Build on Xcode 27 by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/71
+
+    **Full Changelog**: https://github.com/lilmuckers/calendar-cadence/compare/v0.4.0...v0.5.0
+    """
+
+    @Test func keepsOnlyOneBuildsChanges() {
+        let mac = UpdatePlanner.changes(Self.byBuild, for: .mac)
+        #expect(mac == [
+            ReleaseChange(title: "A setup assistant", kind: .feature, pull: 74, target: .mac),
+            ReleaseChange(title: "Countdowns fit the ring", kind: .fix, pull: 73, target: .mac),
+        ])
+        #expect(UpdatePlanner.changes(Self.byBuild, for: .ios).map(\.pull) == [68, 73])
+        #expect(UpdatePlanner.changes(Self.byBuild, for: .ci).map(\.kind) == [.breaking])
+        #expect(UpdatePlanner.changes(Self.byBuild, for: .website).isEmpty)
+        // Unfiltered: every section, so a PR in two builds is listed twice.
+        #expect(UpdatePlanner.changes(Self.byBuild).count == 5)
+    }
+
+    @Test func notesFromBeforeTheSplitShowForEveryBuild() {
+        #expect(UpdatePlanner.changes(realBody, for: .mac).map(\.pull) == [59, 61])
+        #expect(UpdatePlanner.changes(realBody, for: .ios).map(\.pull) == [59, 61])
+        #expect(UpdatePlanner.changes(realBody, for: .mac).allSatisfy { $0.target == nil })
+    }
 }

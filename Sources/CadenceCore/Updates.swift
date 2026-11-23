@@ -149,14 +149,34 @@ public enum ChangeKind: Int, Comparable, CaseIterable, Sendable {
     }
 }
 
+/// Which build a change lands in, from the build labels on its pull request (scripts/changelog.py writes
+/// one `###` section per build).
+public enum ReleaseTarget: String, CaseIterable, Sendable {
+    case mac, ios, website, ci, docs, other
+
+    /// The section heading, e.g. "### 🖥️ Mac app". Keep in step with TARGETS in scripts/changelog.py.
+    init?(heading: String) {
+        let h = heading.lowercased()
+        if h.contains("mac") { self = .mac }
+        else if h.contains("iphone") || h.contains("ios") { self = .ios }
+        else if h.contains("website") { self = .website }
+        else if h.contains("build") || h.contains("ci") { self = .ci }
+        else if h.contains("docs") { self = .docs }
+        else if h.contains("other") { self = .other }
+        else { return nil }
+    }
+}
+
 /// One merged pull request in a release's notes.
 public struct ReleaseChange: Equatable, Hashable, Sendable {
     public var title: String
     public var kind: ChangeKind
     public var pull: Int?
+    /// The build section it was listed under; nil in notes from before they were split by build.
+    public var target: ReleaseTarget?
 
-    public init(title: String, kind: ChangeKind, pull: Int? = nil) {
-        self.title = title; self.kind = kind; self.pull = pull
+    public init(title: String, kind: ChangeKind, pull: Int? = nil, target: ReleaseTarget? = nil) {
+        self.title = title; self.kind = kind; self.pull = pull; self.target = target
     }
 }
 
@@ -243,16 +263,27 @@ public enum UpdatePlanner {
                                               withTemplate: " ([#$2]($1))")
     }
 
-    /// The pull requests listed in a release's notes, biggest kind first (GitHub's order within a kind).
-    public static func changes(_ body: String) -> [ReleaseChange] {
+    /// The pull requests listed in a release's notes, biggest kind first (the notes' order within a kind).
+    ///
+    /// Notes split by build have a `###` heading per build and `####` headings per kind; pass `target` to
+    /// keep only one build's changes (a PR listed under two builds then appears once). Older notes have
+    /// only `###` kind headings: their changes have no target and are kept whatever `target` is.
+    public static func changes(_ body: String, for target: ReleaseTarget? = nil) -> [ReleaseChange] {
         let notes = releaseNotes(body)
+        let lines = notes.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        let byBuild = lines.contains { $0.hasPrefix("#### ") }
         var kind = ChangeKind.other
+        var section: ReleaseTarget?
         var changes: [ReleaseChange] = []
         let pullLink = try? NSRegularExpression(pattern: #"\s*\(\[#(\d+)\]\([^)]*\)\)\s*$"#)
-        for raw in notes.components(separatedBy: "\n") {
-            let line = raw.trimmingCharacters(in: .whitespaces)
+        for line in lines {
             if line.hasPrefix("#") {
-                kind = ChangeKind(heading: line)
+                if byBuild, line.hasPrefix("### ") {
+                    section = ReleaseTarget(heading: String(line.dropFirst(4))) ?? .other
+                    kind = .other
+                } else {
+                    kind = ChangeKind(heading: line)
+                }
                 continue
             }
             guard line.hasPrefix("* ") || line.hasPrefix("- ") else { continue }
@@ -264,7 +295,8 @@ public enum UpdatePlanner {
                 title = ns.replacingCharacters(in: m.range, with: "")
             }
             guard !title.isEmpty else { continue }
-            changes.append(ReleaseChange(title: title, kind: kind, pull: pull))
+            if let target, let section, section != target { continue }
+            changes.append(ReleaseChange(title: title, kind: kind, pull: pull, target: section))
         }
         // Stable sort: biggest first, keeping GitHub's order inside each kind.
         return changes.enumerated()

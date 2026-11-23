@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fill .github/RELEASE_NOTES_TEMPLATE.md for a release.
 # Usage: scripts/release-notes.sh <tag> <previous-tag-or-empty> <bump> <notarized:true|false> <checksums-file> > notes.md
-# Needs gh authenticated (GH_TOKEN) and GH_REPO or a git remote. The tag needn't exist yet, so this can
+# Needs gh authenticated (GH_TOKEN), GH_REPO or a git remote, and git history with tags. The tag needn't exist yet, so this can
 # preview notes locally; the changelog then runs up to TARGET (default: HEAD, which must be pushed).
 set -euo pipefail
 
@@ -9,10 +9,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TAG="$1" PREV_TAG="$2" BUMP="$3" NOTARIZED="$4" CHECKSUMS_FILE="$5"
 REPO="${GH_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
 
-# GitHub's generated notes: merged PRs grouped by the categories in .github/release.yml.
-ARGS=(-f "tag_name=$TAG" -f "target_commitish=${TARGET:-$(git -C "$ROOT" rev-parse HEAD)}")
-[[ -n "$PREV_TAG" ]] && ARGS+=(-f "previous_tag_name=$PREV_TAG")
-CHANGELOG="$(gh api "repos/$REPO/releases/generate-notes" "${ARGS[@]}" --jq .body)"
+# Merged PRs grouped by build (mac / ios / website / ci / docs labels), then by release label.
+CHANGELOG="$(GH_REPO="$REPO" python3 -I "$ROOT/scripts/changelog.py" "$TAG" "$PREV_TAG" --target-ref "${TARGET:-HEAD}")"
 
 if [[ "$NOTARIZED" == "true" ]]; then
   SIGNING_NOTE="> [!NOTE]
