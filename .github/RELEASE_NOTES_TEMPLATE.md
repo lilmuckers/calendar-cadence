@@ -1,7 +1,7 @@
 <!--
   Release notes template, filled in by scripts/release-notes.sh in the Release workflow.
   Placeholders: {{VERSION}} {{TAG}} {{PREVIOUS_TAG}} {{DATE}} {{BUMP}} {{CHANGELOG}} {{SIGNING_NOTE}} {{CHECKSUMS}}
-  {{CHANGELOG}} is GitHub's generated list of merged PRs, grouped by .github/release.yml.
+  {{CHANGELOG}} is scripts/changelog.py: merged PRs grouped by build (mac / ios / …), then by release label.
 -->
 ## Cadence {{VERSION}}
 

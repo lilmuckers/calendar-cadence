@@ -104,11 +104,34 @@ def esc(s):
     return html.escape(str(s), quote=True)
 
 
-def changes(body):
-    """The bullet points of the generated release notes, without the "by @someone in …" tail."""
+# Build section headings scripts/changelog.py writes ("### 🖥️ Mac app" …), by the build they belong to.
+SECTION_KEYS = [("mac", "mac"), ("iphone", "ios"), ("ios", "ios"), ("website", "website"),
+                ("build", "ci"), ("ci", "ci"), ("docs", "docs")]
+
+
+def section_target(heading):
+    h = heading.lower()
+    return next((key for word, key in SECTION_KEYS if word in h), "other")
+
+
+def changes(body, target="mac"):
+    """One build's bullet points from the release notes, without the "by @someone in …" tail.
+
+    Notes split by build (a `###` per build, `####` per kind) only give `target`'s section. Older notes,
+    with no build sections, give every bullet. Keep in step with changes() in releases.js.
+    """
+    lines = body.splitlines()
+    by_build = any(l.strip().startswith("#### ") for l in lines)
+    section = None
     out = []
-    for line in body.splitlines():
+    for line in lines:
+        stripped = line.strip()
+        if by_build and stripped.startswith("### "):
+            section = section_target(stripped[4:])
+            continue
         if not re.match(r"^\s*[*-]\s+", line):
+            continue
+        if by_build and section != target:
             continue
         line = re.sub(r"^\s*[*-]\s+", "", line)
         line = re.sub(r"\s+by @\S+(\s+in\s+\S+)?\s*$", "", line).replace("**", "").strip()
@@ -130,8 +153,8 @@ def file_button(a, label, primary):
 
 
 def card(r, is_latest):
-    """Keep in step with card() in releases.js."""
-    items = changes(r["body"])
+    """Keep in step with card() in releases.js. The downloads page is the Mac app's, so Mac changes only."""
+    items = changes(r["body"], "mac")
     shown = items[:8 if is_latest else 4]
     more = len(items) - len(shown)
     sums = next((a for a in r["assets"] if re.search("sha256", a["name"], re.I)), None)
@@ -141,7 +164,7 @@ def card(r, is_latest):
         body = ('<ul class="rel-changes">' + "".join(f"<li>{esc(c)}</li>" for c in shown) +
                 (f'<li class="more"><a href="{esc(r["url"])}">+ {more} more</a></li>' if more > 0 else "") + "</ul>")
     else:
-        body = '<p class="rel-empty">Maintenance release.</p>'
+        body = '<p class="rel-empty">Behind-the-scenes changes only.</p>'
     return (f'<article class="rel-card{" latest" if is_latest else ""}">'
             f'<header><h2>{esc(r["tag"].lstrip("v"))}</h2>{tags}</header>'
             f'<p class="rel-date"><time datetime="{esc(r["date"])}">{esc(short_date(r["date"]))}</time></p>'

@@ -199,7 +199,8 @@ private struct ReleaseCard: View {
     let release: GitHubRelease
 
     var body: some View {
-        let changes = UpdatePlanner.changes(release.body ?? "")
+        // Only what changed in the Mac app: the notes also cover the iPhone app, the website and CI.
+        let changes = UpdatePlanner.changes(release.body ?? "", for: .mac)
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(release.version?.description ?? release.tag)

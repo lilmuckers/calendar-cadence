@@ -1,4 +1,5 @@
-# Categories for GitHub's generated release notes (used by the Release workflow's changelog).
+# Categories for GitHub's "Generate release notes" button, for releases made by hand.
+# The Release workflow writes its own changelog, grouped by build too (scripts/changelog.py).
 # Each merged PR lands in the first category whose label it has.
 changelog:
   exclude:

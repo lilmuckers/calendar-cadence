@@ -4,6 +4,11 @@
     minor — new feature or visible behaviour change
     patch — bug fix, polish, docs, refactor, CI
   Add skip-changelog as well to leave this PR out of the release notes.
+
+  Build label: add every build this PR changes (the check fails with none). Some are suggested from the files.
+    mac — the Mac app     ios — the iPhone app     website — the site (gh-pages)
+    ci  — CI, release pipeline, build scripts         docs — README, plans, repo docs
+  The release notes list the PR under each of its builds, and each app's "What's new" only shows its own.
   The PR title becomes the changelog line, so write it for users.
 -->
 
@@ -27,5 +32,6 @@
 ## Checklist
 
 - [ ] One release label added (`major` / `minor` / `patch`)
+- [ ] Build labels match what changed (`mac` / `ios` / `website` / `ci` / `docs`)
 - [ ] README updated if the change is user-facing
 - [ ] No calendar data, tokens or OAuth secrets in code, screenshots or logs

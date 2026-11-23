@@ -1,28 +1,50 @@
 name: PR labels
 
-# Every PR needs exactly one release label: major, minor or patch.
-# The release workflow reads these to decide the next version, and the release notes group changes by them.
+# Every PR needs:
+#   - exactly one release label: major, minor or patch. The release workflow reads these to decide the next
+#     version, and the release notes group changes by them;
+#   - at least one build label: mac, ios, website, ci or docs. The release notes put each PR under the builds
+#     it's labelled with, and each app's "What's new" (and TestFlight's notes) only shows its own changes.
+# When a PR opens, build labels are suggested from the files it touches (.github/labeler.yml).
 
 on:
   pull_request:
     types: [opened, reopened, labeled, unlabeled, synchronize]
 
 permissions:
-  pull-requests: read
+  contents: read
+  pull-requests: write   # actions/labeler adds the suggested build labels
 
 jobs:
-  semver-label:
+  labels:
     name: Release label
     runs-on: ubuntu-latest
     steps:
-      - name: Require exactly one of major / minor / patch
+      # Only on open, so a label the author removes isn't put back on the next push.
+      - name: Suggest build labels
+        if: github.event.action == 'opened' || github.event.action == 'reopened'
+        uses: actions/labeler@v5
+        continue-on-error: true   # PRs from forks get a read-only token
+
+      # Read the labels fresh: the event's list predates the labeler, and labels it adds don't fire new runs.
+      - name: Require one release label and a build label
         env:
-          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
-          found=$(jq -r '[.[] | select(. == "major" or . == "minor" or . == "patch")] | join(", ")' <<<"$LABELS")
+          LABELS="$(gh pr view "$PR" --json labels --jq '[.labels[].name]')"
+          release=$(jq -r '[.[] | select(. == "major" or . == "minor" or . == "patch")] | join(", ")' <<<"$LABELS")
           count=$(jq '[.[] | select(. == "major" or . == "minor" or . == "patch")] | length' <<<"$LABELS")
+          builds=$(jq -r '[.[] | select(. == "mac" or . == "ios" or . == "website" or . == "ci" or . == "docs")] | join(", ")' <<<"$LABELS")
+          ok=true
           if [[ "$count" -ne 1 ]]; then
-            echo "::error::Add exactly one release label (major, minor or patch). Found: ${found:-none}"
-            exit 1
+            echo "::error::Add exactly one release label (major, minor or patch). Found: ${release:-none}"
+            ok=false
           fi
-          echo "Release label: $found"
+          if [[ -z "$builds" ]]; then
+            echo "::error::Add a build label for what this PR changes: mac, ios, website, ci or docs (several are fine)."
+            ok=false
+          fi
+          $ok || exit 1
+          echo "Release label: $release · builds: $builds"

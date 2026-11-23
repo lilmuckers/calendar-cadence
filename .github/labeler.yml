@@ -1,0 +1,38 @@
+# Build labels actions/labeler adds when a PR opens (see .github/workflows/pr-labels.yml), from the files it
+# touches. Only paths that clearly belong to one build are here: shared code (Sources/CadenceCore,
+# CadenceShared, CadenceArt, Tests) is left to the author, because whether it changes the Mac app, the
+# iPhone app or both depends on the change. Remove a label that doesn't fit: the release notes put a PR under
+# every build it's labelled with, and each app's "What's new" only shows its own.
+mac:
+  - changed-files:
+      - any-glob-to-any-file:
+          - Sources/Cadence/**
+          - Sources/CadenceMCP/**
+          - Support/**
+          - scripts/build.sh
+          - scripts/dmg*
+          - scripts/make-dmg-background.swift
+ios:
+  - changed-files:
+      - any-glob-to-any-file:
+          - iOS/**
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+          - scripts/ci-*
+          - scripts/next-version.sh
+          - scripts/release-notes.sh
+          - scripts/changelog.py
+          - scripts/testflight-notes.py
+          - scripts/xcresult-junit.py
+          - scripts/*test*.sh
+website:
+  - changed-files:
+      - any-glob-to-any-file:
+          - scripts/site-downloads.py
+          - .github/workflows/site-downloads.yml
+docs:
+  - changed-files:
+      - all-globs-to-all-files:
+          - "{*.md,docs/**}"
