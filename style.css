@@ -576,3 +576,37 @@ code { overflow-wrap: anywhere; }
 @media (max-width: 720px) {
   .nav-features, .nav-gh, .nav-privacy { display: none; }
 }
+
+/* Live iPhone meltdown on the homepage (meltdown.js), drawn on a 400 × 869 pt screen and scaled to fit */
+.melt-frame { position: relative; width: 100%; aspect-ratio: 600 / 1304; border-radius: 28px; border: 4px solid #1d1d1f; box-shadow: var(--shadow); overflow: hidden; background: #000; isolation: isolate; }
+.melt-stage { position: absolute; left: 0; top: 0; width: 400px; height: 869px; transform-origin: 0 0; overflow: hidden; color: #fff; font-family: ui-rounded, -apple-system, "SF Pro Rounded", system-ui, sans-serif; text-align: center; -webkit-font-smoothing: antialiased; }
+.melt-stage > div { position: absolute; }
+.melt-bg { inset: 0; background: linear-gradient(#f2302c, #df1c1a 45%, #b8161a 72%, #74100f); }
+.melt-wash { inset: 0; background: #ff0000; opacity: 0; }
+.melt-glow { left: 50%; top: 50%; width: 956px; height: 956px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 31, 26, .75) 2%, rgba(255, 31, 26, 0) 75%); transform: translate(-50%, -50%) scale(.8); }
+.melt-edge { inset: 0; box-shadow: inset 0 0 44px 26px #ff0000; opacity: 0; }
+.melt-island { left: 154px; top: 13px; width: 93px; height: 37px; border-radius: 19px; background: #000; z-index: 2; }
+.melt-content { inset: 0; }
+.melt-content > div { position: absolute; left: 28px; right: 28px; display: flex; flex-wrap: wrap; justify-content: center; }
+.melt-word { display: inline-flex; }
+.melt-ch { display: inline-block; transition: opacity .5s, filter .5s; }
+.melt-ch.broken { opacity: .13; filter: blur(1.5px); transition: none; }
+.melt-head { top: 160px; column-gap: 10px; font: 800 21px/1.2 -apple-system, system-ui, "Helvetica Neue", sans-serif; }
+.melt-head .melt-word { gap: 2px; }
+.melt-content > .melt-ring { left: 89.5px; right: auto; top: 204.5px; width: 221px; height: 221px; box-sizing: border-box; border: 5px solid rgba(255, 255, 255, .25); border-radius: 50%; align-items: center; }
+.melt-clock { display: flex; font-size: 75px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.melt-clock .melt-ch.broken { opacity: .1; filter: blur(2px); }
+.melt-loose, .melt-piece { position: absolute; left: 0; top: 0; line-height: 1; white-space: pre; will-change: transform; transition: opacity .5s; }
+.melt-loose { left: 50%; top: 50%; font-size: 75px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.melt-falling { inset: 0; pointer-events: none; }
+.melt-piece.melt-head { font: 800 21px/1 -apple-system, system-ui, "Helvetica Neue", sans-serif; }
+.melt-piece.melt-title { font-size: 34px; font-weight: 700; }
+.melt-content > .melt-title { top: 440px; column-gap: 9px; font-size: 34px; font-weight: 700; line-height: 1.2; }
+.melt-content > .melt-detail { top: 500px; font-size: 20px; opacity: .8; }
+.melt-content > .melt-join { left: 81px; right: auto; top: 678px; width: 238px; height: 66px; border-radius: 33px; align-items: center; gap: 14px; background: linear-gradient(#8296ff, #5470f5); font-size: 26px; font-weight: 600; box-shadow: 0 8px 24px rgba(40, 0, 0, .35); }
+.melt-content > .melt-btns { top: 770px; flex-wrap: nowrap; gap: 14px; }
+.melt-btn { flex: 1; min-height: 66px; padding: 8px 18px; box-sizing: border-box; border-radius: 33px; background: rgba(255, 255, 255, .3); display: flex; align-items: center; justify-content: center; gap: 8px; font: 17px/1.25 -apple-system, system-ui, sans-serif; }
+.melt-zz { font-size: 14px; line-height: 1; }
+.melt-zz sup { font-size: 1em; vertical-align: .35em; }
+.melt-x { font-size: 18px; }
+.melt-frame.settling .melt-piece, .melt-frame.settling .melt-loose { opacity: 0; }
