@@ -8,7 +8,7 @@
 
   var REPO = "lilmuckers/calendar-cadence";
   var API = "https://api.github.com/repos/" + REPO + "/releases?per_page=100";
-  var CACHE_KEY = "cadence-releases-v1";
+  var CACHE_KEY = "cadence-releases-v2"; // bump when the notes format changes
   var CACHE_MS = 10 * 60 * 1000;
 
   function readCache() {
