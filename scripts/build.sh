@@ -14,7 +14,7 @@ swiftc -target "$TARGET" "${OPT[@]}" -parse-as-library -module-name Cadence \
   -framework AppKit -framework SwiftUI -framework EventKit -framework MapKit \
   -framework CoreLocation -framework ServiceManagement -framework Network -framework CoreImage -framework MediaPlayer -framework AVFoundation \
   -o "$APP/Contents/MacOS/Cadence" \
-  $(find "$ROOT/Sources/Cadence" "$ROOT/Sources/CadenceShared" -name '*.swift')
+  $(find "$ROOT/Sources/Cadence" "$ROOT/Sources/CadenceShared" "$ROOT/Sources/CadenceArt" -name '*.swift')
 
 cp "$ROOT/Support/Info.plist" "$APP/Contents/Info.plist"
 # Version from the newest release tag (or the release workflow's VERSION / BUILD_NUMBER), so About is right.

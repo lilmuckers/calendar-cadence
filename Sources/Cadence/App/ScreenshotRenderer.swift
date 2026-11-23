@@ -28,6 +28,13 @@ enum ScreenshotRenderer {
         state.prefs.panelStyle = .standard
         render(FakeMenuBar(state: state), state: state, name: "menubar", to: dir, size: CGSize(width: 560, height: 30), wallpaper: false, pad: 0)
 
+        // The menu's day card through the working day.
+        for (name, time) in [("day-morning", at(8, 20)), ("day-focus", at(15, 10)), ("day-focus-done", at(16, 1)), ("day-wrap", at(17, 50))] {
+            state.loadDemo(demo.meetings, calendars: demo.calendars, now: time)
+            render(DayMomentRow().padding(.bottom, 10), state: state, name: name, to: dir,
+                   size: CGSize(width: 380, height: 84), wallpaper: true, pad: 28)
+        }
+
         // 23 seconds before Design Review.
         state.loadDemo(demo.meetings, calendars: demo.calendars, now: at(10, 59, 37))
         let design = demo.meetings.first { $0.title == "Design Review" }!

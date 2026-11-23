@@ -114,7 +114,7 @@ Set your hours per weekday and the breaks you want kept clear (lunch, a walk, th
 - **A nudge** when a break starts, and a warning five minutes before if the meeting you're in is going to run into it.
 - **A meeting booked over a break** asks like a double-booking: keep the break (the meeting won't alert) or give it up for the day.
 
-On the iPhone desk display the googly calendar follows your day: coffee and a yawn before work, headphones on for focus time (*"Focus time — 1h 40m clear"*, and *"You got focus time!"* when a stretch ends), lunch or tea on a break, and a wave goodbye with a recap at the end of the day. The Live Activity counts down focus time and breaks when no meeting is close, and the widgets show the moment too. The phone uses the Mac's schedule while paired, or its own (*Settings → Working hours & breaks*) on its own.
+The googly calendar follows your day, at the top of the Mac's menu and on the iPhone desk display: coffee and a yawn before work, headphones on for focus time (*"Focus time — 1h 40m clear"*, and *"You got focus time!"* when a stretch ends), lunch or tea on a break, and a wave goodbye with a recap at the end of the day. As work ends the Mac also sends a notification summing up the day: how many meetings and how much focus time you got (both switchable under *Your day* in **Settings → Work**). The iPhone's Live Activity counts down focus time and breaks when no meeting is close, and the widgets show the moment too. The phone uses the Mac's schedule while paired, or its own (*Settings → Working hours & breaks*) on its own.
 
 ## 💌 RSVP without opening your calendar
 
@@ -370,6 +370,7 @@ Sources/
     ├── MCP/                  Unix-socket bridge and tool implementations for assistants
     └── UI/                   menu, panel, takeover, banner, clash, invite and approval cards, settings
 Sources/CadenceShared/    Shared by the Mac and iPhone apps: EventKit, ICS, Google and Microsoft providers, OAuth, Keychain, the encrypted link
+Sources/CadenceArt/       The googly mascot drawings (plain SwiftUI), shared by the Mac app, the iPhone app and its widgets
 Sources/CadenceMCP/       cadence-mcp, the stdio relay bundled in the app
 iOS/                      The iPhone app (Xcode project), its Live Activity, Home/Lock Screen widgets and config
 ```

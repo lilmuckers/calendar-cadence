@@ -98,6 +98,12 @@
 			path = Tests;
 			sourceTree = "<group>";
 		};
+		CA0000000000000000000S08 /* CadenceArt */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = CadenceArt;
+			path = ../Sources/CadenceArt;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -148,6 +154,7 @@
 				CA0000000000000000000S03 /* Cadence */,
 				CA0000000000000000000S05 /* Widgets */,
 				CA0000000000000000000S04 /* Shared */,
+				CA0000000000000000000S08 /* CadenceArt */,
 				CA0000000000000000000S02 /* CadenceShared */,
 				CA0000000000000000000S01 /* CadenceCore */,
 				CA0000000000000000000S07 /* Tests */,
@@ -210,6 +217,7 @@
 				CA0000000000000000000S02 /* CadenceShared */,
 				CA0000000000000000000S03 /* Cadence */,
 				CA0000000000000000000S04 /* Shared */,
+				CA0000000000000000000S08 /* CadenceArt */,
 			);
 			name = Cadence;
 			packageProductDependencies = (
@@ -234,6 +242,7 @@
 			fileSystemSynchronizedGroups = (
 				CA0000000000000000000S04 /* Shared */,
 				CA0000000000000000000S05 /* Widgets */,
+				CA0000000000000000000S08 /* CadenceArt */,
 			);
 			name = CadenceWidgets;
 			productName = CadenceWidgets;

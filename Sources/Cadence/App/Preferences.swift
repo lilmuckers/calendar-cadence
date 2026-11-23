@@ -100,8 +100,12 @@ struct Preferences: Codable, Equatable {
     var showEnrichmentDrawer = true
     /// Slide the drawer open by itself when such a meeting starts.
     var enrichmentDrawerAutoOpen = false
-    /// Working hours per weekday and daily breaks: find_free_time, break defences and the phone's day moments.
+    /// Working hours per weekday and daily breaks: find_free_time, break defences and day moments.
     var workSchedule = WorkSchedule()
+    /// The menu shows where you are in the working day (focus time, a break, the end of the day).
+    var dayMoments = true
+    /// A notification as working hours end, summing up the day.
+    var dayWrapNotification = true
     var inviteHorizon: InviteHorizon = .twoDays
     /// Ask about unanswered invites once a day, at the morning summary time.
     var inviteReviewDaily = true
@@ -245,6 +249,8 @@ extension Preferences {
         summaryEnabled = try c.decodeIfPresent(Bool.self, forKey: .summaryEnabled) ?? d.summaryEnabled
         summaryTime = try c.decodeIfPresent(Int.self, forKey: .summaryTime) ?? d.summaryTime
         tomorrowPreview = try c.decodeIfPresent(Bool.self, forKey: .tomorrowPreview) ?? d.tomorrowPreview
+        dayMoments = try c.decodeIfPresent(Bool.self, forKey: .dayMoments) ?? d.dayMoments
+        dayWrapNotification = try c.decodeIfPresent(Bool.self, forKey: .dayWrapNotification) ?? d.dayWrapNotification
         tomorrowFromHour = try c.decodeIfPresent(Int.self, forKey: .tomorrowFromHour) ?? d.tomorrowFromHour
         panelStyle = (try? c.decodeIfPresent(PanelStyle.self, forKey: .panelStyle)) ?? d.panelStyle
         panelGrow = try c.decodeIfPresent(Bool.self, forKey: .panelGrow) ?? d.panelGrow
