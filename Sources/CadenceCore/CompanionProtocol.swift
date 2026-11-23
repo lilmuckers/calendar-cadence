@@ -176,12 +176,22 @@ public struct CompanionInvite: Codable, Equatable, Sendable {
 /// A new player needs reading/controlling on the phone (`PhoneState.applyMediaCommand`,
 /// `phoneMedia`) and on the Mac (`MacPlayers`), plus a logo and colours in `MediaLook.swift`.
 public enum MediaApp: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// No particular app: follows whatever's playing (Music or a connected Spotify when they are,
+    /// otherwise just "audio"), with a neutral look and no app to open.
+    case system
     case appleMusic, spotify, youTubeMusic, podcasts
 
     public var id: String { rawValue }
 
+    /// A newer side's player this side doesn't know shows as plain audio rather than dropping the message.
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = MediaApp(rawValue: raw) ?? .system
+    }
+
     public var name: String {
         switch self {
+        case .system: "Audio"
         case .appleMusic: "Apple Music"
         case .spotify: "Spotify"
         case .youTubeMusic: "YouTube Music"
@@ -189,13 +199,17 @@ public enum MediaApp: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Opens the app on iPhone.
-    public var url: URL {
+    /// In the settings picker.
+    public var choiceName: String { self == .system ? "Default" : name }
+
+    /// Opens the app on iPhone (nil for the default: there's no one app to open).
+    public var url: URL? {
         switch self {
-        case .appleMusic: URL(string: "music://")!
-        case .spotify: URL(string: "spotify://")!
-        case .youTubeMusic: URL(string: "youtubemusic://")!
-        case .podcasts: URL(string: "podcasts://")!
+        case .system: nil
+        case .appleMusic: URL(string: "music://")
+        case .spotify: URL(string: "spotify://")
+        case .youTubeMusic: URL(string: "youtubemusic://")
+        case .podcasts: URL(string: "podcasts://")
         }
     }
 }

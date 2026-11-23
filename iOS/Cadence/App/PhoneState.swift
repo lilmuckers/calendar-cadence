@@ -577,7 +577,7 @@ final class PhoneState {
         if isActive && (displaying || link.isConnected) {
             nowPlaying.poll()
             // Something's playing that isn't Music: if it's Spotify, pick up its track quietly.
-            if nowPlaying.otherPlaying && prefs.mediaApp == .spotify {
+            if nowPlaying.otherPlaying && spotifyLikely {
                 spotify.connectIfPossible()
                 // Connected but no track yet (state can lag a reconnect): ask again.
                 if spotify.connected && (spotify.trackURI == nil || !spotify.isPlaying) { spotify.refreshState() }
@@ -711,14 +711,23 @@ final class PhoneState {
             nowPlaying.start(prompt: true) { [weak self] in self?.openMediaApp() }
             return
         }
-        UIApplication.shared.open(prefs.mediaApp.url)
+        guard let url = prefs.mediaApp.url else { return }
+        UIApplication.shared.open(url)
+    }
+
+    /// Default media app: the idle button only shows when there's something it can pick back up.
+    var canResumeDefault: Bool {
+        nowPlaying.othersInterrupted || nowPlaying.hasTrack || spotify.connected
     }
 
     /// The desk's idle media button. For Spotify it also hooks Cadence up: one tap opens Spotify,
     /// approves (first time), starts your last track and comes back with the controls showing.
     func launchMedia() {
         if nowPlaying.othersInterrupted { resumeOthers(openIfStill: true); return }
-        if prefs.mediaApp == .spotify && spotify.isAvailable {
+        if prefs.mediaApp == .system {
+            // No app to open: carry on with whatever was playing last.
+            if nowPlaying.hasTrack { nowPlaying.resumeMusic() } else if spotify.connected { spotify.play() }
+        } else if prefs.mediaApp == .spotify && spotify.isAvailable {
             if spotify.connected { spotify.play() } else { spotify.authorize() }
         } else {
             openMediaApp()
@@ -750,7 +759,12 @@ final class PhoneState {
     /// Spotify connected and the one playing (or just paused): it gets the controls.
     var spotifyActive: Bool {
         guard spotify.connected, !nowPlaying.musicPlaying else { return false }
-        return spotify.showsControls(now: now) || (nowPlaying.otherPlaying && prefs.mediaApp == .spotify)
+        return spotify.showsControls(now: now) || (nowPlaying.otherPlaying && spotifyLikely)
+    }
+
+    /// Other audio is probably Spotify: it's the chosen app, or (on the default) it's been hooked up.
+    private var spotifyLikely: Bool {
+        prefs.mediaApp == .spotify || (prefs.mediaApp == .system && spotify.isAvailable && !spotify.needsAuthorization)
     }
 
     private func haptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {

@@ -32,8 +32,9 @@ struct PhonePrefs: Codable, Equatable {
     var deskEnrichments = true
     /// Open those notes on their own when the meeting starts.
     var deskEnrichmentsAutoOpen = false
-    /// Opened by the desk's media button, and the look of the controls.
-    var mediaApp: MediaApp = .appleMusic
+    /// Opened by the desk's media button, and the look of the controls. `.system` follows
+    /// whatever's playing instead of a particular app.
+    var mediaApp: MediaApp = .system
     /// A meeting alert fades out music playing on this phone and hands the headphones over.
     var pauseMediaForAlerts = true
     /// ...and says which meeting it is before letting go.
