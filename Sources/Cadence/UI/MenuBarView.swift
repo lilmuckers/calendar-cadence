@@ -57,7 +57,18 @@ struct MenuBarView: View {
     @Environment(AppState.self) private var state
     @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismiss) private var dismiss
     @State private var expanded: String?
+
+    /// Closes the dropdown, then opens a window: left open, the dropdown flickers as the new
+    /// window takes focus and stays hanging over it.
+    private func leaveMenu(_ open: @escaping () -> Void) {
+        dismiss()
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            open()
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -71,8 +82,7 @@ struct MenuBarView: View {
                 Divider().opacity(0.5)
                 SetupChecklist(openAccounts: {
                     state.settingsTab = .accounts
-                    NSApp.activate(ignoringOtherApps: true)
-                    openSettings()
+                    leaveMenu { openSettings() }
                 })
             }
             if !Self.screenshotMode, let release = state.updater.available {
@@ -237,12 +247,10 @@ struct MenuBarView: View {
             Spacer()
             IconButton(symbol: "arrow.clockwise", help: "Refresh") { Task { await state.refreshRemote() } }
             IconButton(symbol: "gearshape", help: "Settings") {
-                NSApp.activate(ignoringOtherApps: true)
-                openSettings()
+                leaveMenu { openSettings() }
             }
             IconButton(symbol: "info.circle", help: "About Cadence") {
-                NSApp.activate(ignoringOtherApps: true)
-                openWindow(id: "about")
+                leaveMenu { openWindow(id: "about") }
             }
             IconButton(symbol: "power", help: "Quit Cadence") { NSApp.terminate(nil) }
         }

@@ -12,8 +12,9 @@ import CadenceCore
 @MainActor
 final class MediaKeyTap {
     enum Key: Int32 {
-        // NX_KEYTYPE_* from IOKit/hidsystem/ev_keymap.h
-        case volumeUp = 0, volumeDown = 1, mute = 7, play = 16, next = 17, previous = 18
+        // NX_KEYTYPE_* from IOKit/hidsystem/ev_keymap.h. Apple keyboards' ⏪/⏩ keys (F7/F9)
+        // send FAST/REWIND rather than NEXT/PREVIOUS, so both pairs mean skip.
+        case volumeUp = 0, volumeDown = 1, mute = 7, play = 16, next = 17, previous = 18, fast = 19, rewind = 20
 
         var command: MediaCommand {
             switch self {
@@ -21,8 +22,8 @@ final class MediaKeyTap {
             case .volumeDown: .volumeDown
             case .mute: .toggleMute
             case .play: .togglePlayPause
-            case .next: .next
-            case .previous: .previous
+            case .next, .fast: .next
+            case .previous, .rewind: .previous
             }
         }
     }

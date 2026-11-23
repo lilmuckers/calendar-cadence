@@ -2,67 +2,38 @@ import AppKit
 import CadenceCore
 import SwiftUI
 
-/// Top-right call-to-action shown as soon as overlapping meetings are found:
-/// "These clash — which one should I alert you for?"
+/// Call-to-action shown as soon as overlapping meetings are found:
+/// "These clash — which one should I alert you for?" Each clash is its own card in the
+/// right-hand `AlertStack`.
 @MainActor
 final class ClashPromptController {
     private let state: AppState
-    private var panel: FloatingPanel?
-    private var queue: [Clash] = []
+    private var cards: [String: AlertStack.Card] = [:]
 
     init(state: AppState) { self.state = state }
 
     func enqueue(_ clash: Clash) {
-        guard !queue.contains(where: { $0.key == clash.key }) else { return }
-        queue.append(clash)
-        if panel == nil { showNext() }
-    }
-
-    private func showNext() {
-        guard !queue.isEmpty else { return }
-        let clash = queue.removeFirst()
-        let width: CGFloat = 340
+        guard cards[clash.key] == nil else { return }
         let height = CGFloat(118 + clash.meetings.count * 54)
-        let panel = FloatingPanel(size: NSSize(width: width, height: height))
-        panel.level = .statusBar
-        panel.isMovableByWindowBackground = true
-        let view = ClashPromptView(clash: clash) { [weak self] choice in
-            self?.state.resolveClash(clash, choice: choice)
-            self?.close()
+        let isBreak = clash.meetings.contains(where: \.isBreak)
+        let titles = clash.meetings.filter { !$0.isBreak }.map(\.title)
+        let summary = AlertStack.Summary(
+            symbol: isBreak ? "cup.and.saucer.fill" : "exclamationmark.triangle.fill", tint: .orange,
+            title: isBreak ? "Break at risk" : "Double-booked: \(clash.meetings.count) meetings",
+            subtitle: (clash.meetings.first.map { Theme.range($0) + " · " } ?? "") + titles.joined(separator: " vs "))
+        let card = AlertStack.shared.add(summary: summary, height: { height }) {
+            ClashPromptView(clash: clash) { [weak self] choice in
+                self?.state.resolveClash(clash, choice: choice)
+                self?.close(clash.key)
+            }
+            .environment(state)
         }
-        .environment(state)
-        let host = NSHostingView(rootView: view)
-        host.frame = NSRect(x: 0, y: 0, width: width, height: height)
-        panel.contentView = host
-
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        let v = screen.visibleFrame
-        let final = NSRect(x: v.maxX - width - 14, y: v.maxY - height - 14, width: width, height: height)
-        panel.setFrame(final.offsetBy(dx: 40, dy: 0), display: false)
-        panel.alphaValue = 0
-        panel.orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.35
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(final, display: true)
-            panel.animator().alphaValue = 1
-        }
+        cards[clash.key] = card
         NSSound(named: "Funk")?.play()
-        self.panel = panel
     }
 
-    private func close() {
-        guard let panel else { return }
-        self.panel = nil
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.2
-            panel.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in
-            MainActor.assumeIsolated {
-                panel.orderOut(nil)
-                self?.showNext()
-            }
-        })
+    private func close(_ key: String) {
+        cards.removeValue(forKey: key)?.close()
     }
 }
 

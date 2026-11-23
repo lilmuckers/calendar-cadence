@@ -624,7 +624,8 @@ final class PhoneState {
             return
         }
         let np = nowPlaying
-        if spotify.connected && !np.musicPlaying && (spotify.isPlaying || !np.hasTrack) {
+        // Same rule as the desk's own controls (`spotifyActive`), so a key does what the buttons do.
+        if spotifyActive || (spotify.connected && !np.musicPlaying && !np.hasTrack) {
             switch command {
             case .play: spotify.play()
             case .pause: spotify.pause()
