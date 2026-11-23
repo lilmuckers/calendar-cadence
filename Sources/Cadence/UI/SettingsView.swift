@@ -667,7 +667,7 @@ private struct UpdatesSection: View {
             if let release = updater.available {
                 LabeledContent("Version \(release.version?.description ?? release.tag) is available") {
                     HStack {
-                        Link("Release Notes", destination: release.page)
+                        Button("What's New") { updater.showNotes() }
                         Button(updater.canInstall ? "Update and Restart" : "Download…") { updater.installAvailable() }
                             .disabled(updater.phase == .downloading || updater.phase == .installing)
                     }

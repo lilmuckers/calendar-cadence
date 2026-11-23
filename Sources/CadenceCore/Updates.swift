@@ -115,6 +115,51 @@ public struct GitHubRelease: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// How big a change is, from the release label on its pull request (see .github/release.yml).
+public enum ChangeKind: Int, Comparable, CaseIterable, Sendable {
+    case other, fix, feature, breaking
+
+    public static func < (a: ChangeKind, b: ChangeKind) -> Bool { a.rawValue < b.rawValue }
+
+    /// The category heading GitHub wrote, e.g. "### ✨ New features".
+    init(heading: String) {
+        let h = heading.lowercased()
+        if h.contains("💥") || h.contains("breaking") { self = .breaking }
+        else if h.contains("✨") || h.contains("feature") || h.contains("new") { self = .feature }
+        else if h.contains("🐛") || h.contains("fix") { self = .fix }
+        else { self = .other }
+    }
+
+    public var label: String {
+        switch self {
+        case .breaking: "Breaking"
+        case .feature: "New"
+        case .fix: "Fix"
+        case .other: "Other"
+        }
+    }
+
+    /// What a release whose biggest change is this kind is called.
+    public var releaseLabel: String {
+        switch self {
+        case .breaking: "Major release"
+        case .feature: "Feature release"
+        case .fix, .other: "Bug-fix release"
+        }
+    }
+}
+
+/// One merged pull request in a release's notes.
+public struct ReleaseChange: Equatable, Hashable, Sendable {
+    public var title: String
+    public var kind: ChangeKind
+    public var pull: Int?
+
+    public init(title: String, kind: ChangeKind, pull: Int? = nil) {
+        self.title = title; self.kind = kind; self.pull = pull
+    }
+}
+
 /// Picks releases and reads their assets and notes. No networking here, so it can be tested.
 public enum UpdatePlanner {
     /// Published, final releases with a version tag. Pre-releases are the un-notarized builds.
@@ -196,6 +241,35 @@ public enum UpdatePlanner {
         let ns = line as NSString
         return regex.stringByReplacingMatches(in: line, range: NSRange(location: 0, length: ns.length),
                                               withTemplate: " ([#$2]($1))")
+    }
+
+    /// The pull requests listed in a release's notes, biggest kind first (GitHub's order within a kind).
+    public static func changes(_ body: String) -> [ReleaseChange] {
+        let notes = releaseNotes(body)
+        var kind = ChangeKind.other
+        var changes: [ReleaseChange] = []
+        let pullLink = try? NSRegularExpression(pattern: #"\s*\(\[#(\d+)\]\([^)]*\)\)\s*$"#)
+        for raw in notes.components(separatedBy: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("#") {
+                kind = ChangeKind(heading: line)
+                continue
+            }
+            guard line.hasPrefix("* ") || line.hasPrefix("- ") else { continue }
+            var title = String(line.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+            var pull: Int?
+            let ns = title as NSString
+            if let m = pullLink?.firstMatch(in: title, range: NSRange(location: 0, length: ns.length)) {
+                pull = Int(ns.substring(with: m.range(at: 1)))
+                title = ns.replacingCharacters(in: m.range, with: "")
+            }
+            guard !title.isEmpty else { continue }
+            changes.append(ReleaseChange(title: title, kind: kind, pull: pull))
+        }
+        // Stable sort: biggest first, keeping GitHub's order inside each kind.
+        return changes.enumerated()
+            .sorted { $0.element.kind != $1.element.kind ? $0.element.kind > $1.element.kind : $0.offset < $1.offset }
+            .map(\.element)
     }
 
     /// What changed between two versions: every installable release after `old` up to and including

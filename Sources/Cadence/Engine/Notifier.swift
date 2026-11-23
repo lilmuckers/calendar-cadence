@@ -90,7 +90,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return }
             let content = UNMutableNotificationContent()
             content.title = "Cadence \(release.version?.description ?? release.tag) is out"
-            content.body = canInstall ? "Click Update to install it and restart Cadence." : "Click to download it from GitHub."
+            content.body = canInstall ? "Click to see what's new, or Update to install it and restart Cadence." : "Click to see what's new."
             content.userInfo = ["update": release.tag]
             if canInstall { content.categoryIdentifier = Self.updateCategory }
             try? await center.add(UNNotificationRequest(identifier: "update:\(release.tag)", content: content, trigger: nil))
@@ -114,8 +114,10 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let update = response.notification.request.content.userInfo["update"] as? String
         await MainActor.run {
             if update != nil {
-                if action == Self.updateAction || action == UNNotificationDefaultActionIdentifier {
+                if action == Self.updateAction {
                     state.updater.installAvailable()
+                } else if action == UNNotificationDefaultActionIdentifier {
+                    state.updater.showNotes()
                 }
                 return
             }

@@ -246,7 +246,8 @@ private struct UpdateBanner: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Cadence \(release.version?.description ?? release.tag) is available")
                     .font(.system(size: 12, weight: .semibold))
-                Link("What's new", destination: release.page)
+                Button("What's new") { updater.showNotes() }
+                    .buttonStyle(.link)
                     .font(.system(size: 11))
             }
             Spacer()

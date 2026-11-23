@@ -115,4 +115,33 @@ struct UpdateTests {
         #expect(list.first?.assets.first?.size == 42)
         #expect(list.first?.publishedAt != nil)
     }
+
+    @Test func listsChangesWithTheirKind() {
+        let body = """
+        ## Cadence 1.0.0
+
+        ## What's Changed
+        ### 🐛 Fixes and improvements
+        * Fix the thing by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/12
+        ### 💥 Breaking changes
+        * Settings reset by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/10
+        ### ✨ New features
+        * Updates by @dependabot[bot] in https://github.com/lilmuckers/calendar-cadence/pull/11
+        * Another feature
+        ### 📦 Other changes
+        * Tidy CI by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/13
+
+        **Full Changelog**: https://github.com/lilmuckers/calendar-cadence/compare/v0.9.0...v1.0.0
+        """
+        let changes = UpdatePlanner.changes(body)
+        #expect(changes == [
+            ReleaseChange(title: "Settings reset", kind: .breaking, pull: 10),
+            ReleaseChange(title: "Updates", kind: .feature, pull: 11),
+            ReleaseChange(title: "Another feature", kind: .feature),
+            ReleaseChange(title: "Fix the thing", kind: .fix, pull: 12),
+            ReleaseChange(title: "Tidy CI", kind: .other, pull: 13),
+        ])
+        #expect(UpdatePlanner.changes(realBody).map(\.kind) == [.fix, .fix])
+        #expect(UpdatePlanner.changes(realBody).first?.title == "Render the downloads page's version list after each release too")
+    }
 }

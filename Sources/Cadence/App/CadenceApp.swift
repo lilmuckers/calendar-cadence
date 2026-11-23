@@ -142,6 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let welcome = WelcomeWindows(state: state)
         self.welcome = welcome
+        updater.onShowNotes = { welcome.showAvailable() }
         let previous = updater.recordLaunch()
         if state.prefs.updateMode == nil {
             welcome.showWelcome()

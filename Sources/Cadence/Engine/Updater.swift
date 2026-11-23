@@ -42,6 +42,8 @@ final class Updater {
     @ObservationIgnored var isQuietMoment: () -> Bool = { true }
     /// A new version was found while in notify mode (once per version).
     @ObservationIgnored var onNewVersion: ((GitHubRelease) -> Void)?
+    /// Opens the in-app window with what the available update brings.
+    @ObservationIgnored var onShowNotes: (() -> Void)?
 
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var staged: (tag: String, app: URL)?
@@ -225,6 +227,8 @@ final class Updater {
     }
 
     // MARK: - What's new
+
+    func showNotes() { onShowNotes?() }
 
     /// The version the previous launch ran, or nil on the very first launch. Records this one.
     func recordLaunch() -> SemVer? {

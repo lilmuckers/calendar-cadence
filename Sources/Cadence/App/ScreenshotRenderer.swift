@@ -61,13 +61,15 @@ enum ScreenshotRenderer {
                size: CGSize(width: 480, height: 640), wallpaper: false, pad: 0)
         let page = AboutView.repo.appending(path: "releases")
         let notes = [
-            GitHubRelease(tag: "v0.3.0", body: "### ✨ New\n* Cadence can keep itself up to date by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/63\n### 🐛 Fixes and improvements\n* A welcome screen on first launch by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/63",
+            GitHubRelease(tag: "v0.3.0", body: "### ✨ New features\n* Cadence can keep itself up to date by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/63\n* A welcome screen on first launch by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/63\n### 🐛 Fixes and improvements\n* Release notes show in the app by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/63",
                           page: page, publishedAt: demo.day),
             GitHubRelease(tag: "v0.2.3", body: "### 🐛 Fixes and improvements\n* Request calendar.calendarlist.readonly instead of calendar.readonly by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/61",
                           page: page, publishedAt: demo.day),
         ]
-        render(WhatsNewView(version: SemVer(0, 3, 0), releases: notes, done: {}), state: state, name: "whats-new", to: dir,
-               size: CGSize(width: 520, height: 640), wallpaper: false, pad: 0)
+        render(ChangelogView(purpose: .updated(SemVer(0, 3, 0)), releases: notes, done: {}), state: state, name: "whats-new", to: dir,
+               size: CGSize(width: 520, height: 680), wallpaper: false, pad: 0)
+        render(ChangelogView(purpose: .available(notes[0], state.updater), releases: notes, done: {}), state: state,
+               name: "update-available", to: dir, size: CGSize(width: 520, height: 720), wallpaper: false, pad: 0)
         print("Screenshots written to \(dir.path)")
     }
 
