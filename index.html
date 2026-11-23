@@ -145,6 +145,7 @@
           <h2>Today, at a glance</h2>
           <p>Click the menu bar for a colour-coded agenda with times, attendees, a live <strong>NOW</strong> badge and one-click <strong>Join</strong> on everything joinable.</p>
           <p>In-person meetings get a map, live travel time and a "leave in 12m" hint, plus a "time to leave" reminder based on live traffic.</p>
+          <p>Up top, the googly calendar follows your day: a coffee before work, how long your focus time is clear for, your breaks, and a wave with the day's recap once work ends. As your hours finish, a quiet notification sums up the day's meetings and focus time.</p>
         </div>
       </div>
     </section>
@@ -229,7 +230,7 @@
               <li><strong>Desk mode turns on by itself while charging.</strong> The time, a big countdown, a <strong>Join</strong> button and the rest of your day, in portrait or landscape. It dims when nothing's close.</li>
               <li><strong>Your Mac goes quiet.</strong> While the phone is connected and on screen, banners, reminders, invites and clash prompts go to the phone. Pick it up and the Mac is back to normal.</li>
               <li><strong>Join opens on the Mac</strong> while they're connected, or on the phone when they're not. Snooze or dismiss on either one closes the alert on both.</li>
-              <li><strong>Dynamic Island, Lock Screen and StandBy.</strong> A Live Activity counts down to your next meeting, with a Join button and a googly icon in the calendar's colour.</li>
+              <li><strong>Dynamic Island, Lock Screen and StandBy.</strong> A Live Activity counts down to your next meeting, with a Join button and a googly icon in the calendar's colour. Join on the phone or any Mac and it steps aside; skip a meeting and it turns red and counts up until you join or it gives up.</li>
               <li><strong>It follows your day.</strong> Coffee and a yawn before work, headphones on for focus time, lunch on a break, and a wave goodbye with a recap at the end of the day. The Live Activity and widgets count down focus time and breaks when no meeting is close.</li>
               <li><strong>Works on its own too.</strong> It reads its own calendars (iPhone Calendar, Google, Microsoft 365, ICS), keeps the Mac's last agenda for when you're away, and runs its own alerts.</li>
             </ul>
@@ -241,7 +242,7 @@
           <div class="media"><img class="phone-wide" src="assets/ios-media.jpg" alt="iPhone desk mode in landscape: Up next in 11:54, Join Zoom, later today 1:1 with Sam and Vendor call, and a Spotify card playing Midnight Drive"></div>
           <div>
             <ul class="ticks">
-              <li><strong>Music on the desk.</strong> In landscape the desk shows what's playing in Apple Music or Spotify, with artwork and controls (Spotify needs a free developer app of your own: <a href="help.html#spotify">here's how</a>). When a meeting's due, the music fades out, the phone says which meeting it is, and your headphones are free for the Mac to take the call.</li>
+              <li><strong>Music on the desk.</strong> In landscape the desk shows what's playing in Apple Music or Spotify, with artwork and controls (Spotify needs a free developer app of your own: <a href="help.html#spotify">here's how</a>). Other players, like YouTube Music, get pause, and play picks up what Cadence paused. When a meeting's due, the music fades out, the phone says which meeting it is, and your headphones are free for the Mac to take the call.</li>
               <li><strong>Your Mac's media keys drive the phone</strong> (optional). Volume, play/pause and skip control the phone while it shows the desk, with a small mini-player. During calls the keys stay with the Mac.</li>
               <li><strong>Home and Lock Screen widgets.</strong> <em>Next Meeting</em> counts down to your next meeting, with a nervous googly icon and a Join button. In the evening it shows when tomorrow starts.</li>
               <li><strong>Notes from your assistant</strong> sit beside the countdown, so the agenda, links and bingo card are a glance away.</li>
@@ -266,7 +267,7 @@
         </div>
         <div>
           <h2>Ask your assistant about your day</h2>
-          <p>Cadence includes a local <a href="https://modelcontextprotocol.io">MCP</a> server, so Claude (including Cowork), Cursor, Windsurf or any other MCP client on your Mac can read your merged calendar, find free time, reply to invites, pin notes to your meetings and hear about meetings as they start and end.</p>
+          <p>Cadence includes a local <a href="https://modelcontextprotocol.io">MCP</a> server, so Claude (including Cowork), Cursor, Windsurf, Gemini CLI, Antigravity or any other MCP client on your Mac can read your merged calendar, find free time, reply to invites, pin notes to your meetings and hear about meetings as they start and end.</p>
           <p>Set it up in one click from <em>Settings → Assistants</em>. Every action pops a card in Cadence first (<strong>Allow</strong>, <strong>Deny</strong> or <strong>Always allow</strong>), and an activity view shows exactly what each assistant did.</p>
           <p><a href="automations.html">Browse the automation catalog →</a> Ready-made prompts for morning briefings, prep packs, invite triage, follow-ups and more.</p>
         </div>
@@ -308,8 +309,8 @@
           <div class="card"><h3>🧹 Filters</h3><p>Hide all-day, declined, tentative or link-less events; include or exclude by keyword. Make a calendar <em>agenda only</em> to keep it on screen but out of alerts.</p></div>
           <div class="card"><h3>😰 An icon with feelings</h3><p>Calm, nervous at 15 minutes, sweating at 5. A little phone appears beside it while your iPhone is paired.</p></div>
           <div class="card"><h3>📏 A menu bar your way</h3><p>Show the full title, just the countdown or only the icon, and cap how long titles get, so it fits beside everything else up there.</p></div>
-          <div class="card"><h3>🧠 It remembers</h3><p>Which side of a clash you picked and what you hid from the panel both survive a restart.</p></div>
-          <div class="card"><h3>🤖 Automations</h3><p>Ready-made prompts for Claude, Cursor and friends. <a href="automations.html">Browse the catalog</a>.</p></div>
+          <div class="card"><h3>👋 Set up in a minute</h3><p>The first launch walks you through calendars, how loud alerts are (with a test alert), launch at login and updates. Skip anything and it waits in the menu as a checklist.</p></div>
+          <div class="card"><h3>⬆️ Keeps itself up to date</h3><p>Hear about new versions with a one-click update, or let it install them in the background and restart when no meeting is close. Every download is checked before it's used, and What's New shows what changed.</p></div>
         </div>
       </div>
     </section>
@@ -318,7 +319,7 @@
       <div class="wrap">
         <div class="privacy-callout">
           <h2>🔒 Your calendar stays on your Mac</h2>
-          <p>No Cadence accounts, no analytics, no servers. Cadence only talks to the services you connect (like Google, Microsoft 365 and Slack) plus Apple Maps for travel times and, on iPhone, Spotify if you connect it. Slack sign-in passes through a small page on this site that stores nothing. Your iPhone and Mac talk to each other directly over an encrypted link, and assistants reach it through a private local socket with no network port.</p>
+          <p>No Cadence accounts, no analytics, no servers. Cadence only talks to the services you connect (like Google, Microsoft 365 and Slack) plus Apple Maps for travel times, GitHub to check for updates (you can turn that off) and, on iPhone, Spotify if you connect it. Slack sign-in passes through a small page on this site that stores nothing. Your iPhone and Mac talk to each other directly over an encrypted link, and assistants reach it through a private local socket with no network port.</p>
           <a href="privacy.html">Read the privacy policy →</a>
         </div>
       </div>
