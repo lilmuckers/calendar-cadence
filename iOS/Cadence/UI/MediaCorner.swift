@@ -73,14 +73,16 @@ struct MediaCorner: View {
                 playPause: { np.musicPlaying ? np.pauseMusic() : np.resumeMusic() },
                 next: { np.next() }, previous: { np.previous() }, open: nil)
         }
-        // Other apps can be stopped from here but only started again in the app itself. Spotify
+        // Other apps can be stopped from here; one Cadence stopped can be asked to carry on (players
+        // that honour an ended interruption resume, else the app opens). Spotify
         // that isn't hooked up yet offers to connect (a quick hop to Spotify to approve).
         let connect = app == .spotify && state.spotify.isAvailable && !state.spotify.connected
         return MediaCardModel(
             app: app, title: np.otherPlaying ? "Playing on this iPhone" : "Paused",
             subtitle: connect ? (state.spotify.lastError ?? "Tap the link to show the track") : app.name, artwork: nil,
             isPlaying: np.otherPlaying, canSkip: false,
-            playPause: np.otherPlaying ? { state.pauseMedia() } : nil,
+            playPause: np.otherPlaying ? { state.pauseMedia() }
+                : np.othersInterrupted ? { state.resumeOthers(openIfStill: true) } : nil,
             next: nil, previous: nil,
             open: connect ? { state.spotify.authorize() } : { state.openMediaApp() },
             openSymbol: connect ? "link" : nil)
