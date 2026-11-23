@@ -138,7 +138,7 @@ struct AlertOverlay: View {
 
     /// The countdown. During a meltdown it sits in a ring (the "bottle") its broken-off characters rattle around in.
     @ViewBuilder private func countdown(urgency u: TakeoverUrgency, melting: Bool, pulse: Double) -> some View {
-        let font = GlyphStyle.countdown.font(level: u.level, scale: scale)
+        let font = GlyphStyle.countdown.font(level: u.level, scale: scale * GlyphStyle.countdownFit(clockText))
         ZStack {
             Circle().stroke(.white.opacity(melting ? 0.25 : 0), lineWidth: 5)
                 .animation(.easeIn(duration: 1.5), value: melting)

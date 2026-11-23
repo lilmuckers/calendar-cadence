@@ -165,6 +165,11 @@ struct TakeoverView: View {
         remaining > 0 ? CountdownFormatter.clock(remaining) : "-" + CountdownFormatter.clock(-remaining)
     }
 
+    /// Shrunk for long times ("17:52:59") so they stay inside the ring.
+    private func countdownFont(_ u: TakeoverUrgency) -> Font {
+        GlyphStyle.countdown.font(level: u.level, scale: GlyphStyle.countdownFit(clockText))
+    }
+
     @ViewBuilder private func content(urgency u: TakeoverUrgency, phase: Double, pulse: Double, date: Date) -> some View {
         let shake = reduceMotion ? 0 : u.shake
         // Three minutes late and still ignored: things start falling off.
@@ -221,13 +226,13 @@ struct TakeoverView: View {
                         .animation(.linear(duration: 1), value: state.now)
                     if melting {
                         BreakableCountdown(text: clockText, broken: meltdown.brokenSlots)
-                            .font(GlyphStyle.countdown.font(level: u.level))
+                            .font(countdownFont(u))
                             .foregroundStyle(.white)
                         // Broken-off characters keep counting while they rattle around the ring.
                         ForEach(meltdown.bottle, id: \.slot) { piece in
                             if let ch = BreakableCountdown.character(in: clockText, slot: piece.slot) {
                                 Text(String(ch))
-                                    .font(GlyphStyle.countdown.font(level: u.level))
+                                    .font(countdownFont(u))
                                     .foregroundStyle(.white)
                                     .rotationEffect(.radians(piece.angle))
                                     .offset(x: piece.position.x, y: piece.position.y)
@@ -235,7 +240,9 @@ struct TakeoverView: View {
                         }
                     } else {
                         Text(clockText)
-                            .font(GlyphStyle.countdown.font(level: u.level))
+                            .font(countdownFont(u))
+                            .lineLimit(1).minimumScaleFactor(0.5)
+                            .padding(.horizontal, 12)
                             .foregroundStyle(.white)
                             .contentTransition(.numericText(countsDown: true))
                             .animation(.snappy, value: Int(remaining))
