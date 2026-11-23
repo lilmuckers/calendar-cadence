@@ -233,7 +233,7 @@ About five minutes in [Google Cloud Console](https://console.cloud.google.com/):
 3. **Consent screen:** *Google Auth Platform → Get started* (older consoles: *APIs & Services → OAuth consent screen*). App name `Cadence`, your email as support contact, then pick an **Audience**:
    - **Internal**: Google Workspace accounts only, signing in within your own domain. Simplest option: no test users, and sign-ins don't expire.
    - **External**: personal `@gmail.com` accounts, or more than one domain. See the note below.
-4. *(Optional)* **Data Access → Add or remove scopes →** `.../auth/calendar.readonly` and `.../auth/calendar.events`. Cadence requests both anyway (the second lets it reply to invites and set event colours); adding them here makes the consent screen accurate.
+4. *(Optional)* **Data Access → Add or remove scopes →** `.../auth/calendar.calendarlist.readonly` and `.../auth/calendar.events`. Cadence requests both anyway (the first lists your calendars; the second reads events, replies to invites and sets event colours); adding them here makes the consent screen accurate.
 5. **Create the client:** *Clients → Create client →* Application type **Desktop app**. Copy the **Client ID** and **Client secret**. You don't need a redirect URI: Desktop clients accept Cadence's `http://127.0.0.1:<port>` loopback automatically.
 6. Either **build it in** for everyone who uses your build (next section), or paste both values into **Cadence → Settings → Accounts → Use my own OAuth client…**. Then click **Sign in with Google**, choose your account and **Allow**. The browser tab says *"Cadence is connected"* when it's done.
 
@@ -242,7 +242,7 @@ About five minutes in [Google Cloud Console](https://console.cloud.google.com/):
 >
 > To stop the weekly re-sign-in, click **Publish app** under *Audience* so its status becomes *In production*. You don't need Google's verification for personal use. Sign-in then shows *"Google hasn't verified this app"*: choose **Advanced → Go to Cadence (unsafe)**. That's expected, because the OAuth client is your own.
 
-Cadence uses the loopback redirect + PKCE flow and asks for `calendar.readonly` plus `calendar.events` (to reply to invites and colour events). Accounts connected before replies existed are read-only until you click **Reconnect**. It keeps the client secret and refresh token in your Keychain; after an ad-hoc-signed rebuild, macOS may ask to allow Keychain access, so choose **Always Allow**. Add as many Google accounts as you like with **Add Another Account**; Google shows its account chooser each time. If one stops working (for example, after the 7-day Testing-mode expiry), it's marked **Reconnect** rather than removed. Meetings that appear in several accounts, or in macOS Calendar too, are merged automatically.
+Cadence uses the loopback redirect + PKCE flow and asks for `calendar.calendarlist.readonly` (to list your calendars) plus `calendar.events` (to read events, reply to invites and colour events). Accounts connected before replies existed are read-only until you click **Reconnect**. It keeps the client secret and refresh token in your Keychain; after an ad-hoc-signed rebuild, macOS may ask to allow Keychain access, so choose **Always Allow**. Add as many Google accounts as you like with **Add Another Account**; Google shows its account chooser each time. If one stops working (for example, after the 7-day Testing-mode expiry), it's marked **Reconnect** rather than removed. Meetings that appear in several accounts, or in macOS Calendar too, are merged automatically.
 </details>
 
 <details>
@@ -306,7 +306,7 @@ SLACK_CLIENT_ID=1234567890.1234567890                      # optional, for runni
 
 > [!NOTE]
 > Google treats Desktop-app client secrets as non-confidential: PKCE protects the sign-in itself, and anyone with the `.app` can read the secret. Keep it out of git anyway, so nobody else's builds use your project's quota.
-> To let people outside your test-user list sign in, **publish** the consent screen. Unverified apps are capped at 100 users and show a warning. Above that, Google requires verification for the `calendar.readonly` scope: a privacy policy, a homepage, and a demo video.
+> To let people outside your test-user list sign in, **publish** the consent screen. Unverified apps are capped at 100 users and show a warning. Above that, Google requires verification for the Calendar scopes: a privacy policy, a homepage, and a demo video.
 
 ### More build options
 
