@@ -343,6 +343,24 @@ jobs:
             MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             archive
 
+      # Prebuilt frameworks (Spotify's SpotifyiOS.xcframework) ship without dSYMs, so the export's symbol
+      # upload warns "The archive did not include a dSYM for the SpotifyiOS.framework". Give each embedded
+      # framework that lacks one a dSYM made with dsymutil: no DWARF in it (the vendor stripped that), but its
+      # UUID matches, which satisfies the upload and lets crash reports name the framework's exported symbols.
+      - name: Add missing framework dSYMs
+        if: env.HAS_IOS_SIGNING == 'true'
+        run: |
+          ARCHIVE="$RUNNER_TEMP/Cadence.xcarchive"
+          mkdir -p "$ARCHIVE/dSYMs"
+          for fw in "$ARCHIVE/Products/Applications/"*.app/Frameworks/*.framework; do
+            [[ -d "$fw" ]] || continue
+            name="$(basename "$fw" .framework)"
+            dsym="$ARCHIVE/dSYMs/$name.framework.dSYM"
+            [[ -e "$dsym" ]] && continue
+            xcrun dsymutil "$fw/$name" -o "$dsym" 2>&1 | grep -v "no debug symbols" || true
+            echo "Made $(basename "$dsym"): $(dwarfdump --uuid "$dsym" | awk '{print $2}' | paste -sd, -)"
+          done
+
       - name: Export and upload to TestFlight
         if: env.HAS_IOS_SIGNING == 'true'
         env:
