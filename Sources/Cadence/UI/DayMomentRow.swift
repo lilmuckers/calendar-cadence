@@ -22,9 +22,12 @@ struct DayMomentRow: View {
 
     private func row(pose: MascotPose, title: String, detail: String, extra: String?) -> some View {
         HStack(spacing: 12) {
-            GooglyMascot(pose: pose, height: 30)
-                .foregroundStyle(.primary.opacity(0.85))
-                .frame(width: 42)
+            // Drawn for the phone's dark desk (white page, props coloured to show on black), so it
+            // sits on a dark tile in light mode too.
+            GooglyMascot(pose: pose, height: 26)
+                .foregroundStyle(.white.opacity(0.92))
+                .frame(width: 52, height: 40)
+                .background(Color(white: 0.13), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))

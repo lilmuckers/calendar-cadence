@@ -33,6 +33,8 @@ enum ScreenshotRenderer {
             state.loadDemo(demo.meetings, calendars: demo.calendars, now: time)
             render(DayMomentRow().padding(.bottom, 10), state: state, name: name, to: dir,
                    size: CGSize(width: 380, height: 84), wallpaper: true, pad: 28)
+            render(DayMomentRow().padding(.bottom, 10).background(Color(white: 0.96)), state: state, name: "\(name)-light", to: dir,
+                   size: CGSize(width: 380, height: 84), wallpaper: true, pad: 28, scheme: .light)
         }
 
         // 23 seconds before Design Review.
@@ -80,7 +82,8 @@ enum ScreenshotRenderer {
         print("Screenshots written to \(dir.path)")
     }
 
-    private static func render<V: View>(_ view: V, state: AppState, name: String, to dir: URL, size: CGSize, wallpaper: Bool, pad: CGFloat) {
+    private static func render<V: View>(_ view: V, state: AppState, name: String, to dir: URL, size: CGSize, wallpaper: Bool, pad: CGFloat,
+                                         scheme: ColorScheme = .dark) {
         let content = view
             .frame(width: size.width, height: size.height)
             .clipShape(RoundedRectangle(cornerRadius: pad > 0 ? 14 : 0, style: .continuous))
@@ -88,7 +91,7 @@ enum ScreenshotRenderer {
             .padding(pad)
             .background { if wallpaper { Wallpaper() } }
             .environment(state)
-            .environment(\.colorScheme, .dark)
+            .environment(\.colorScheme, scheme)
             .transaction { $0.disablesAnimations = true; $0.animation = nil }
         let renderer = ImageRenderer(content: content)
         renderer.scale = 2
