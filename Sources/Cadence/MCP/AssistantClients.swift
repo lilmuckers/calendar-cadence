@@ -124,21 +124,44 @@ final class AssistantClients {
     private(set) var geminiCLI: String?
 
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    @ObservationIgnored private var searchedCLIs = false
 
     var helperPath: String { MCPBridge.helperPath }
 
-    init() {
-        let center = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
-            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.refresh() }
-            })
+    /// Does nothing: a view holding this in `@State` builds a new one every time its parent redraws
+    /// and keeps only the first, so the work lives in `startWatching()`.
+    init() {}
+
+    /// The Assistants page is on screen: keep the status current as apps open and quit, and look
+    /// for the command-line tools (once; that can mean starting a login shell).
+    func startWatching() {
+        refresh()
+        if observers.isEmpty {
+            let center = NSWorkspace.shared.notificationCenter
+            for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+                observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.refresh() }
+                })
+            }
         }
-        Task {
-            self.claudeCLI = await Self.findCLI("claude")
-            self.geminiCLI = await Self.findCLI("gemini")
+        guard !searchedCLIs else { return }
+        searchedCLIs = true
+        Task { [weak self] in
+            async let claude = Self.findCLI("claude")
+            async let gemini = Self.findCLI("gemini")
+            let (c, g) = await (claude, gemini)
+            guard let self else { return }
+            self.claudeCLI = c
+            self.geminiCLI = g
             self.refresh()
         }
+    }
+
+    /// The page went away: stop re-reading every config file whenever any app opens or quits.
+    func stopWatching() {
+        let center = NSWorkspace.shared.notificationCenter
+        observers.forEach(center.removeObserver)
+        observers = []
     }
 
     func appURL(_ c: AssistantClient) -> URL? {
@@ -221,7 +244,9 @@ final class AssistantClients {
 
     /// Rewrites a JSON config, keeping a backup of the previous version next to it.
     private func editConfig(_ c: AssistantClient, _ change: (JSONValue?) -> JSONValue?) throws {
-        let url = c.configURL
+        // Write through a symlink (dotfiles managed with stow, chezmoi…) rather than replacing it:
+        // an atomic write to the link's path would swap the link for a plain file.
+        let url = c.configURL.resolvingSymlinksInPath()
         let fm = FileManager.default
         let data = try? Data(contentsOf: url)
         let current = try MCPClientConfig.parse(data)

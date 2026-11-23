@@ -53,7 +53,7 @@ final class AvatarStore {
         inFlight.insert(key)
         Task {
             defer { inFlight.remove(key) }
-            guard let (data, response) = try? await URLSession.shared.data(from: url),
+            guard let (data, response) = try? await HTTP.session.data(from: url),
                   (response as? HTTPURLResponse)?.statusCode == 200 else { return }
             save(data, for: key)
         }

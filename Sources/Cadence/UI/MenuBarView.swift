@@ -52,6 +52,22 @@ struct MenuBarLabel: View {
     }
 }
 
+/// "12:34" to `target`, redrawn every second on its own so the agenda around it isn't.
+struct SecondsCountdown: View {
+    let clock: Clock
+    let to: Date
+    let tint: Color
+
+    var body: some View {
+        Text(CountdownFormatter.clock(to.timeIntervalSince(clock.now)))
+            .font(.system(size: 22, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(tint)
+            .contentTransition(.numericText(countsDown: true))
+            .animation(.default, value: Int(clock.now.timeIntervalSince1970))
+    }
+}
+
 /// The dropdown: today's agenda.
 struct MenuBarView: View {
     @Environment(AppState.self) private var state
@@ -68,6 +84,7 @@ struct MenuBarView: View {
             footer
         }
         .frame(width: 380)
+        .trackingWindowVisibility()
     }
 
     // MARK: Header
@@ -100,12 +117,7 @@ struct MenuBarView: View {
                     Text("Next in")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
-                    Text(CountdownFormatter.clock(next.start.timeIntervalSince(state.now)))
-                        .font(.system(size: 22, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(next.tint)
-                        .contentTransition(.numericText(countsDown: true))
-                        .animation(.default, value: Int(state.now.timeIntervalSince1970))
+                    SecondsCountdown(clock: state.clock, to: next.start, tint: next.tint)
                 }
             } else if !state.todayMeetings.isEmpty {
                 Text("All done for today")

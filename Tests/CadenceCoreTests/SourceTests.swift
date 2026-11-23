@@ -82,6 +82,21 @@ struct ICSParserTests {
         #expect(RGBAColor(css: "nonsense") == nil)
     }
 
+    @Test func relevantDropsOnlyFinishedHistory() {
+        func event(_ uid: String, _ lines: String) -> String {
+            "BEGIN:VEVENT\nUID:\(uid)\nSUMMARY:\(uid)\n\(lines)\nEND:VEVENT\n"
+        }
+        let ics = "BEGIN:VCALENDAR\n"
+            + event("old", "DTSTART:20200101T100000Z\nDTEND:20200101T110000Z")
+            + event("future", "DTSTART:20261120T100000Z\nDTEND:20261120T110000Z")
+            + event("weekly", "DTSTART:20200106T100000Z\nDTEND:20200106T110000Z\nRRULE:FREQ=WEEKLY")
+            + event("ended-series", "DTSTART:20200106T100000Z\nDTEND:20200106T110000Z\nRRULE:FREQ=WEEKLY;UNTIL=20210101T000000Z")
+            + event("weekly", "RECURRENCE-ID:20261123T100000Z\nDTSTART:20261123T090000Z\nDTEND:20261123T093000Z")
+            + "END:VCALENDAR"
+        let kept = ICSParser.relevant(ICSParser.parse(ics), from: date("20261119T000000")).map(\.uid)
+        #expect(kept.sorted() == ["future", "weekly", "weekly"])
+    }
+
     @Test func windowsTimeZoneAndDuration() {
         #expect(ICSParser.timeZone(for: "Pacific Standard Time")?.identifier == "America/Los_Angeles")
         #expect(ICSParser.timeZone(for: "\"Europe/Paris\"")?.identifier == "Europe/Paris")

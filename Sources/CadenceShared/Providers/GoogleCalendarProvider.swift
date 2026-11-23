@@ -270,7 +270,7 @@ final class GoogleCalendarProvider: CalendarProvider {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await HTTP.session.data(for: req)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         if code == 403, String(data: data, encoding: .utf8)?.contains("insufficient") == true, let account {
             auth.setCanWrite(false, for: account.id)
@@ -285,7 +285,7 @@ final class GoogleCalendarProvider: CalendarProvider {
         comps.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
         var req = URLRequest(url: comps.url!)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await HTTP.session.data(for: req)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: "Google API HTTP \(code)"])

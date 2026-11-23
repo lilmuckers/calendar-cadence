@@ -246,7 +246,7 @@ struct CountdownPanelView: View {
 
     // MARK: Styles
 
-    private func remaining(_ f: PanelFocus) -> TimeInterval { f.target.timeIntervalSince(state.now) }
+    private func remaining(_ f: PanelFocus) -> TimeInterval { f.target.timeIntervalSince(state.clock.now) }
     private func urgent(_ f: PanelFocus) -> Bool { !f.live && remaining(f) <= 300 }
 
     private func symbol(_ f: PanelFocus) -> String {
@@ -273,7 +273,7 @@ struct CountdownPanelView: View {
                 .trim(from: 0, to: ring(f))
                 .stroke(m.tint.gradient, style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(.linear(duration: 1), value: state.now)
+                .animation(.linear(duration: 1), value: state.clock.now)
             Image(systemName: symbol(f))
                 .font(.system(size: icon, weight: .semibold))
                 .foregroundStyle(m.tint)
@@ -352,7 +352,7 @@ struct CountdownPanelView: View {
                     wash(f)
                     Rectangle().fill(m.tint.gradient)
                         .frame(width: geo.size.width * ring(f), height: 2)
-                        .animation(.linear(duration: 1), value: state.now)
+                        .animation(.linear(duration: 1), value: state.clock.now)
                 }
             }
         }
@@ -389,10 +389,10 @@ struct CountdownPanelView: View {
         let m = f.meeting
         if f.live {
             guard m.duration > 0 else { return 1 }
-            return CGFloat(min(1, max(0, state.now.timeIntervalSince(m.start) / m.duration)))
+            return CGFloat(min(1, max(0, state.clock.now.timeIntervalSince(m.start) / m.duration)))
         }
         let window: TimeInterval = 3600
-        return CGFloat(min(1, max(0.02, 1 - m.start.timeIntervalSince(state.now) / window)))
+        return CGFloat(min(1, max(0.02, 1 - m.start.timeIntervalSince(state.clock.now) / window)))
     }
 }
 

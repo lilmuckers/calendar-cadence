@@ -329,6 +329,14 @@ final class CompanionHub {
             }
         }
         channel.start()
+        // Holding a key gets a phone through TLS; it still has to say hello (and prove which key)
+        // before anything counts. One that never does is closed rather than kept open forever.
+        Timer.scheduledTimer(withTimeInterval: CompanionService.timeout, repeats: false) { [weak self, weak channel] _ in
+            MainActor.assumeIsolated {
+                guard let self, let channel, let entry = self.channels[id], entry.phoneID == nil else { return }
+                channel.close(URLError(.timedOut))
+            }
+        }
     }
 
     private func handle(_ message: CompanionMessage, from id: ObjectIdentifier) {

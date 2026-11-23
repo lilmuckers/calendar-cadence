@@ -15,6 +15,9 @@ enum SettingsTransfer {
     /// Setting that lets assistants act without asking; importing it is called out.
     private static let autoApproveKey = "mcpAutoApprove"
 
+    /// Bigger than any real settings file.
+    private static let maxFileSize = 1_000_000
+
     /// Remembered so an import can be undone from Settings.
     private(set) static var beforeLastImport: Preferences?
 
@@ -71,6 +74,10 @@ enum SettingsTransfer {
     static func importFile(_ url: URL, into state: AppState) {
         let imported: SettingsArchive.Imported<Preferences>
         do {
+            // Exports are a few kilobytes; don't read something huge into memory.
+            if let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > maxFileSize {
+                throw CocoaError(.fileReadTooLarge)
+            }
             let text = try String(contentsOf: url, encoding: .utf8)
             imported = try SettingsArchive.read(text, over: state.prefs)
         } catch {
@@ -125,7 +132,7 @@ enum SettingsTransfer {
         return Set(a.keys).union(b.keys).filter { key in
             var one = a
             one[key] = b[key]
-            guard let data = try? JSONSerialization.data(withJSONObject: one),
+            guard JSONSerialization.isValidJSONObject(one), let data = try? JSONSerialization.data(withJSONObject: one),
                   let candidate = try? JSONDecoder().decode(Preferences.self, from: data) else { return true }
             return candidate != old
         }
