@@ -1,5 +1,35 @@
 [
  {
+  "tag": "v0.2.2",
+  "name": "Cadence 0.2.2",
+  "url": "https://github.com/lilmuckers/calendar-cadence/releases/tag/v0.2.2",
+  "date": "2026-11-23T01:41:57Z",
+  "pre": false,
+  "body": "## Cadence 0.2.2\n\n_Released 2026-11-23 · patch release_\n\n> [!NOTE]\n> Signed with a Developer ID and notarized by Apple.\n\n<!-- Release notes generated using configuration in .github/release.yml at v0.2.2 -->\n\n## What's Changed\n### 🐛 Fixes and improvements\n* Add a download button and install steps to the README by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/54\n* Only cancel superseded CI runs on pull requests by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/55\n* Update the website's download links after each release by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/58\n\n\n**Full Changelog**: https://github.com/lilmuckers/calendar-cadence/compare/v0.2.1...v0.2.2\n\n## 📥 Install\n\n1. Download **Cadence-0.2.2.dmg** below.\n2. Open it and drag **Cadence** into **Applications**.\n3. Launch Cadence from Applications and allow calendar access when asked.\n\nRequires macOS 14 or later on Apple Silicon.\n\n<details>\n<summary>Downloads and checksums</summary>\n\n| File | What it is |\n|---|---|\n| `Cadence-0.2.2.dmg` | Disk image, drag to Applications |\n| `Cadence-0.2.2.zip` | The same app, zipped (for scripted installs) |\n| `SHA256SUMS.txt` | Checksums for both |\n\n```text\n5324bffbbeeaf13e3f8896048288a8b46c5e8ae4130b41d69700b93f5585b729  Cadence-0.2.2.dmg\nb16fe7ccacc6e2c54e571e55c46cf1417005d343cc0fc90fd3464cc02e9b4d5e  Cadence-0.2.2.zip\n```\n\nCheck a download with `shasum -a 256 -c SHA256SUMS.txt`.\n</details>\n",
+  "assets": [
+   {
+    "name": "Cadence-0.2.2.dmg",
+    "size": 5847136,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.2.2/Cadence-0.2.2.dmg"
+   },
+   {
+    "name": "Cadence-0.2.2.zip",
+    "size": 3919079,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.2.2/Cadence-0.2.2.zip"
+   },
+   {
+    "name": "Cadence.dmg",
+    "size": 5847136,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.2.2/Cadence.dmg"
+   },
+   {
+    "name": "SHA256SUMS.txt",
+    "size": 168,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.2.2/SHA256SUMS.txt"
+   }
+  ]
+ },
+ {
   "tag": "v0.2.1",
   "name": "Cadence 0.2.1",
   "url": "https://github.com/lilmuckers/calendar-cadence/releases/tag/v0.2.1",
