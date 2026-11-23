@@ -309,7 +309,7 @@ build/Cadence.app/Contents/MacOS/Cadence --screenshots docs/screenshots   # rege
 - **Release** ([`release.yml`](.github/workflows/release.yml)): start it from *Actions → Release → Run workflow* on `main`. It:
   1. Works out the next version from the highest label on PRs merged since the last `vX.Y.Z` tag (`scripts/next-version.sh`; the first release uses the version in `Info.plist`). You can force a bump instead.
   2. Runs the tests, builds `Cadence.app`, and packages `Cadence-<version>.dmg`, `Cadence-<version>.zip` and `SHA256SUMS.txt`.
-  3. Tags the commit `v<version>` and publishes a GitHub release with those files attached. The notes come from [`RELEASE_NOTES_TEMPLATE.md`](.github/RELEASE_NOTES_TEMPLATE.md), with a changelog of the merged PRs grouped by label ([`.github/release.yml`](.github/release.yml)).
+  3. Tags the commit `v<version>` and publishes a GitHub release with those files attached, plus a copy of the DMG named `Cadence.dmg`. That copy gives a permanent link to the newest build: <https://github.com/lilmuckers/calendar-cadence/releases/latest/download/Cadence.dmg>. GitHub's "latest" skips pre-releases, so the link only moves on notarized releases. The notes come from [`RELEASE_NOTES_TEMPLATE.md`](.github/RELEASE_NOTES_TEMPLATE.md), with a changelog of the merged PRs grouped by label ([`.github/release.yml`](.github/release.yml)).
   - `dry_run` builds everything without tagging or releasing; `draft` creates the release as a draft.
 - **Signing.** Signing and notarization turn on when the Developer ID and notary secrets listed at the top of `release.yml` are added. Until then builds are ad-hoc signed and published as **pre-releases**, and Gatekeeper blocks them on other Macs.
 
