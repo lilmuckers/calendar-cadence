@@ -30,6 +30,16 @@ private struct WorkTab: View {
         Form {
             WorkScheduleEditor(schedule: $state.prefs.workSchedule,
                                defencesFooter: "Nudges and break questions also go to your paired iPhone. A meeting over a break asks like a double-booking: keep the break (the meeting won't alert) or give it up for the day.")
+            Section {
+                Toggle("Show how the day's going in the menu", isOn: $state.prefs.dayMoments)
+                Toggle("Sum up the day when work ends", isOn: $state.prefs.dayWrapNotification)
+            } header: {
+                Text("Your day")
+            } footer: {
+                Text("The menu shows a coffee before work, focus time and how long it's clear for, your breaks, and a wave at the end of the day. The sum-up is a notification with the day's meetings and focus time.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .disabled(!state.prefs.workSchedule.enabled)
         }
         .formStyle(.grouped)
     }

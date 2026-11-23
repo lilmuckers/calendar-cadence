@@ -155,3 +155,47 @@ struct WorkScheduleTests {
         #expect(back == .snapshot(snap))
     }
 }
+
+@Suite("End-of-day wrap")
+struct DayWrapTests {
+    let schedule = WorkSchedule()
+
+    @Test func firesAsWorkEndsWithTheDaysRecap() throws {
+        let meetings = [m("a", 10, 11), m("b", 15, 15.25)]
+        let wrap = try #require(ReminderPlanner.dayWrap(meetings: meetings, schedule: schedule, now: at(14)))
+        #expect(wrap.fireAt == at(17.5))
+        #expect(wrap.isAboutTheDay)
+        #expect(wrap.joinTarget.joinLink == nil)
+        guard case .dayWrap(let recap) = wrap.kind else { Issue.record("not a day wrap"); return }
+        #expect(recap.meetingCount == 2)
+        let text = ReminderPlanner.message(for: wrap)
+        #expect(text.title == "That's a wrap for today")
+        #expect(text.body.hasPrefix("2 meetings · you got "))
+    }
+
+    @Test func dueOnlyAroundTheEndOfTheDay() throws {
+        let wrap = try #require(ReminderPlanner.dayWrap(meetings: [], schedule: schedule, now: at(9)))
+        #expect(ReminderPlanner.due([wrap], now: at(17), sent: []).isEmpty)
+        #expect(ReminderPlanner.due([wrap], now: at(17.51), sent: []).count == 1)
+        #expect(ReminderPlanner.due([wrap], now: at(17.51), sent: [wrap.key]).isEmpty)
+        // Asleep through it: no stale wrap-up hours later.
+        #expect(ReminderPlanner.due([wrap], now: at(19), sent: []).isEmpty)
+    }
+
+    @Test func noneOnDaysOffOrWithTheScheduleOff() {
+        let saturday = cal.date(byAdding: .day, value: 3, to: wednesday)!
+        #expect(ReminderPlanner.dayWrap(meetings: [], schedule: schedule, now: at(12, saturday)) == nil)
+        var off = schedule
+        off.enabled = false
+        #expect(ReminderPlanner.dayWrap(meetings: [], schedule: off, now: at(12)) == nil)
+    }
+
+    @Test func oneKeyPerDay() throws {
+        let a = try #require(ReminderPlanner.dayWrap(meetings: [], schedule: schedule, now: at(9)))
+        let b = try #require(ReminderPlanner.dayWrap(meetings: [m("x", 10, 11)], schedule: schedule, now: at(16)))
+        let thursday = cal.date(byAdding: .day, value: 1, to: wednesday)!
+        let c = try #require(ReminderPlanner.dayWrap(meetings: [], schedule: schedule, now: at(9, thursday)))
+        #expect(a.key == b.key)
+        #expect(a.key != c.key)
+    }
+}
