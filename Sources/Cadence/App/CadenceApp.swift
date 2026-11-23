@@ -144,8 +144,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.welcome = welcome
         updater.onShowNotes = { welcome.showAvailable() }
         let previous = updater.recordLaunch()
-        if state.prefs.updateMode == nil {
-            welcome.showWelcome()
+        state.onRunSetup = { welcome.showSetup() }
+        // `--setup` opens setup at launch even when it's been done (for trying it out).
+        if !state.prefs.setupDone || CommandLine.arguments.contains("--setup") {
+            welcome.showSetup()
         } else if let previous, let current = updater.current, current > previous {
             welcome.showWhatsNew(from: previous)
         }

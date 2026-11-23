@@ -67,6 +67,14 @@ struct MenuBarView: View {
                 DayMomentRow()
             }
             content
+            if !Self.screenshotMode, !state.setupTasks.isEmpty {
+                Divider().opacity(0.5)
+                SetupChecklist(openAccounts: {
+                    state.settingsTab = .accounts
+                    NSApp.activate(ignoringOtherApps: true)
+                    openSettings()
+                })
+            }
             if !Self.screenshotMode, let release = state.updater.available {
                 Divider().opacity(0.5)
                 UpdateBanner(release: release, updater: state.updater)
@@ -75,6 +83,7 @@ struct MenuBarView: View {
             footer
         }
         .frame(width: 380)
+        .task { await state.refreshNotificationStatus() }
     }
 
     // MARK: Header
@@ -139,8 +148,14 @@ struct MenuBarView: View {
                 action: state.openPrivacySettings
             )
         case .unknown:
-            EmptyState(symbol: "calendar", title: "Connecting…", message: "Waiting for calendar access.",
-                       actionTitle: "Grant Access", action: { Task { await state.requestAccess() } })
+            if state.prefs.setupDone && state.calendarAccessUndetermined {
+                EmptyState(symbol: "calendar", title: "No calendars yet",
+                           message: "Let Cadence read macOS Calendar, or add Google, Microsoft or a calendar link in Settings → Accounts.",
+                           actionTitle: "Allow Access", action: { Task { await state.requestAccess() } })
+            } else {
+                EmptyState(symbol: "calendar", title: "Connecting…", message: "Waiting for calendar access.",
+                           actionTitle: "Grant Access", action: { Task { await state.requestAccess() } })
+            }
         case .granted:
             if state.todayMeetings.isEmpty && !state.showsTomorrow {
                 EmptyState(symbol: "sun.max", title: "Nothing today", message: tomorrowHint, actionTitle: nil, action: {})
@@ -233,6 +248,54 @@ struct MenuBarView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
+    }
+}
+
+/// "Finish setting up": the setup steps that were skipped, until they're done or put away.
+private struct SetupChecklist: View {
+    @Environment(AppState.self) private var state
+    let openAccounts: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label("Finish setting up", systemImage: "checklist")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("\(state.setupTasks.count) left")
+                    .font(.system(size: 10, weight: .semibold))
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.18)))
+                Spacer()
+                Button { state.prefs.setupChecklistDismissed = true } label: {
+                    Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Hide this checklist. Settings → General → Run Setup Again brings setup back.")
+            }
+            ForEach(state.setupTasks) { task in
+                Button { act(task) } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "circle").font(.system(size: 12)).foregroundStyle(.secondary)
+                        Text(task.label).font(.system(size: 12))
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold)).foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+    }
+
+    private func act(_ task: SetupTask) {
+        switch task {
+        case .connectCalendar:
+            if state.calendarAccessUndetermined { Task { await state.requestAccess() } } else { openAccounts() }
+        case .allowNotifications:
+            Task { await state.requestNotifications() }
+        }
     }
 }
 

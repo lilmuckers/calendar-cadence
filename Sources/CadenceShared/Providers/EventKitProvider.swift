@@ -32,6 +32,11 @@ final class EventKitProvider: CalendarProvider {
         return status == .denied || status == .restricted
     }
 
+    /// macOS hasn't asked about calendar access yet.
+    var isUndetermined: Bool {
+        EKEventStore.authorizationStatus(for: .event) == .notDetermined
+    }
+
     func requestAccess() async -> Bool {
         if isAuthorized { return true }
         do {

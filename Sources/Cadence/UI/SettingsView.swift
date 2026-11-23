@@ -2,21 +2,29 @@ import CadenceCore
 import ServiceManagement
 import SwiftUI
 
+/// The tabs of Settings, so other windows (setup's "When you're ready" rows) can open one.
+enum SettingsTab: Hashable {
+    case general, accounts, calendars, filters, alerts, messages, work, phone, browser, assistants
+}
+
 struct SettingsView: View {
+    @Environment(AppState.self) private var state
+
     var body: some View {
+        @Bindable var state = state
         // General first (macOS convention), then where events come from, what happens before
         // meetings, and the integrations.
-        TabView {
-            GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
-            AccountsTab().tabItem { Label("Accounts", systemImage: "person.crop.circle") }
-            CalendarsTab().tabItem { Label("Calendars", systemImage: "calendar") }
-            FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }
-            AlertsTab().tabItem { Label("Alerts", systemImage: "bell.badge") }
-            MessagesTab().tabItem { Label("Messages", systemImage: "paperplane") }
-            WorkTab().tabItem { Label("Work", systemImage: "briefcase") }
-            PhoneTab().tabItem { Label("iPhone", systemImage: "iphone") }
-            BrowserTab().tabItem { Label("Browser", systemImage: "globe") }
-            AssistantsTab().tabItem { Label("Assistants", systemImage: "sparkles") }
+        TabView(selection: $state.settingsTab) {
+            GeneralTab().tabItem { Label("General", systemImage: "gearshape") }.tag(SettingsTab.general)
+            AccountsTab().tabItem { Label("Accounts", systemImage: "person.crop.circle") }.tag(SettingsTab.accounts)
+            CalendarsTab().tabItem { Label("Calendars", systemImage: "calendar") }.tag(SettingsTab.calendars)
+            FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }.tag(SettingsTab.filters)
+            AlertsTab().tabItem { Label("Alerts", systemImage: "bell.badge") }.tag(SettingsTab.alerts)
+            MessagesTab().tabItem { Label("Messages", systemImage: "paperplane") }.tag(SettingsTab.messages)
+            WorkTab().tabItem { Label("Work", systemImage: "briefcase") }.tag(SettingsTab.work)
+            PhoneTab().tabItem { Label("iPhone", systemImage: "iphone") }.tag(SettingsTab.phone)
+            BrowserTab().tabItem { Label("Browser", systemImage: "globe") }.tag(SettingsTab.browser)
+            AssistantsTab().tabItem { Label("Assistants", systemImage: "sparkles") }.tag(SettingsTab.assistants)
         }
         .frame(width: 680, height: 560)
     }
@@ -532,6 +540,12 @@ private struct GeneralTab: View {
                 if let loginError {
                     Text(loginError).font(.caption).foregroundStyle(.red)
                 }
+                LabeledContent {
+                    Button("Run Setup Again…") { state.onRunSetup?() }
+                } label: {
+                    Text("Setup assistant")
+                    Text("Walks through setup with your current choices filled in. Nothing is reset.")
+                }
             }
             Section {
                 HStack {
@@ -561,13 +575,8 @@ private struct GeneralTab: View {
     }
 
     private func setLaunchAtLogin(_ on: Bool) {
-        do {
-            if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-            loginError = nil
-        } catch {
-            loginError = "Couldn't update login item: \(error.localizedDescription). Move Cadence to /Applications and try again."
-            launchAtLogin = SMAppService.mainApp.status == .enabled
-        }
+        loginError = LoginItem.set(on)
+        if loginError != nil { launchAtLogin = LoginItem.isEnabled }
     }
 }
 
