@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cadence help: Spotify, Google, Microsoft and other setup guides</title>
+  <title>Cadence help: Setup, updates, Spotify, Google, Microsoft and other guides</title>
   <meta name="description" content="Step-by-step guides for Cadence's trickier settings: your own Spotify app, your own Google or Microsoft sign-in, calendar feeds, browser profiles, working hours, pairing several Macs and iPhones, media keys and AI assistants.">
   <link rel="canonical" href="https://cadence.patrick-mckinley.com/help.html">
   <link rel="icon" href="favicon.ico" sizes="any">
@@ -51,6 +51,8 @@
     <div class="help-layout">
       <nav class="help-toc" aria-label="On this page">
         <p class="toc-title">On this page</p>
+        <a href="#setup">👋 First launch</a>
+        <a href="#updates">⬆️ Updates</a>
         <a href="#spotify">🎵 Spotify on iPhone</a>
         <a href="#google">🟦 Your own Google client</a>
         <a href="#microsoft">🟧 Your own Microsoft app</a>
@@ -65,6 +67,41 @@
       </nav>
 
       <div class="help-body">
+
+        <article class="guide" id="setup">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">👋</span>
+            <div><h2>First launch: a quick setup</h2>
+            <p class="guide-meta"><span>Mac</span><span>1 minute</span></p></div>
+          </header>
+          <p>The first time Cadence opens, a short setup walks you through the basics:</p>
+          <ol class="steps">
+            <li><strong>Welcome.</strong> An arrow points at Cadence's icon in the menu bar, where it lives from now on.</li>
+            <li><strong>Calendars.</strong> Connect macOS Calendar, Google, Microsoft 365 or an ICS link, and untick the calendars you don't want alerts for, like holidays and birthdays. macOS asks for calendar access here, not before.</li>
+            <li><strong>How loud.</strong> <em>Gentle</em> (a notification 2 minutes before, nothing full screen), <em>Normal</em> (a full-screen alert 30 seconds before) or <em>Never let me be late</em> (a notification 5 minutes before, then a full-screen alert a minute before that stays until you act). Try a test alert before you choose.</li>
+            <li><strong>Stay running.</strong> Open Cadence at login, and pick how it <a href="#updates">stays up to date</a>.</li>
+            <li><strong>Done.</strong> Your next meeting, and shortcuts to the extras: browser profiles, running-late messages, working hours, music and AI assistants.</li>
+          </ol>
+          <p>Skip anything you like. A calendar not connected yet or notifications turned off wait in the menu as a <em>Finish setting up</em> checklist, which you can dismiss.</p>
+          <p class="fine">To see it again, choose <em>Settings → General → Run Setup Again</em>. It starts from your current settings and resets nothing. If launch at login fails, setup explains why and opens <em>System Settings → Login Items</em>.</p>
+        </article>
+
+        <article class="guide" id="updates">
+          <header>
+            <span class="guide-emoji" aria-hidden="true">⬆️</span>
+            <div><h2>Keeping Cadence up to date</h2>
+            <p class="guide-meta"><span>Mac</span><span>No setup</span></p></div>
+          </header>
+          <p>Choose a mode during setup or in <em>Settings → General → Updates</em>:</p>
+          <ul class="steps plain">
+            <li><strong>Tell me about updates</strong> (recommended): Cadence checks a few times a day and lets you know when a new version is out. One click updates and restarts it.</li>
+            <li><strong>Update automatically:</strong> new versions download and install in the background. Cadence only restarts when no meeting is on or starting within 10 minutes.</li>
+            <li><strong>Don't check for updates:</strong> Cadence never contacts GitHub. <strong>Check Now</strong> in Settings still works when you want it.</li>
+          </ul>
+          <p>Updates come from Cadence's <a href="https://github.com/lilmuckers/calendar-cadence/releases">GitHub releases</a>, stable versions only. Before installing, Cadence checks each download against the release's SHA-256 checksums and checks that the new app is signed with the same Apple Developer ID. If either check fails, it doesn't install.</p>
+          <p><strong>What's New</strong> in the menu, in Settings and on the update notification opens a window listing each change since your version, marked <em>Breaking</em>, <em>New</em>, <em>Fix</em> or <em>Other</em>. It also opens by itself the first time a new version runs.</p>
+          <p class="fine">Cadence needs to be able to write to the folder it's in to update itself, so keep it in Applications. Builds you made yourself aren't signed with the Developer ID, so they offer a download link instead.</p>
+        </article>
 
         <article class="guide" id="spotify">
           <header>
@@ -278,6 +315,8 @@
             <dd>Accounts connected before replies existed are read-only. Click <strong>Reconnect</strong> in <em>Settings → Accounts</em>.</dd>
             <dt>My assistant can't see Cadence.</dt>
             <dd>Restart the assistant app after installing. If you've moved Cadence since, install again so the path is right. Apps that only connect to remote MCP servers, like the Gemini desktop app, can't reach it; it never opens a network port. Use Gemini CLI or Antigravity instead.</dd>
+            <dt>Cadence says it can't update itself.</dt>
+            <dd>Move it to Applications (it needs to replace itself in place), then click <strong>Check Now</strong> in <em>Settings → General</em>. Or download the new version from the <a href="downloads.html">downloads page</a>.</dd>
             <dt>The iPhone can't find the Mac.</dt>
             <dd>Make sure Cadence is running on the Mac and that the phone allowed <strong>Local Network</strong> access (<em>iPhone Settings → Privacy &amp; Security → Local Network</em>).</dd>
           </dl>
