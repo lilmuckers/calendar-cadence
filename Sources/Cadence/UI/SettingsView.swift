@@ -645,6 +645,8 @@ struct PhoneMediaSection: View {
                 ForEach(MediaHUDMode.allCases, id: \.self) { Text($0.label).tag($0) }
             }
             .disabled(!on)
+            Toggle("Compact until the pointer's over it", isOn: $state.prefs.mediaHUDCompact)
+                .disabled(!on || state.prefs.mediaHUD == .never)
             if on && !conflicts.isEmpty {
                 Label("Also catching media keys: \(conflicts.joined(separator: ", ")). Whichever app sees a key first wins, so some keys may not reach the iPhone (or the Mac).",
                       systemImage: "exclamationmark.triangle")

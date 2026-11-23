@@ -158,6 +158,7 @@ final class MediaBridge {
             return
         }
         model.phoneName = hub.remotePhone?.name ?? "iPhone"
+        hud.compact = prefs.mediaHUDCompact
         let ready = MediaRemoteGate.phoneReady(gateInput, now: Date())
         guard prefs.mediaRemoteControl, prefs.mediaHUD != .never, ready || hud.isVisible else {
             if hud.isVisible { hud.hide() }

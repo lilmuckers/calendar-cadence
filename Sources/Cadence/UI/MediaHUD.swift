@@ -18,21 +18,96 @@ final class MediaHUDModel {
     var highlight: Part?
     /// The phone's player last time it said, for the look while nothing's playing.
     var lastApp: MediaApp = .spotify
+    /// Showing the small pill (compact mode, not hovered).
+    var collapsed = false
     var app: MediaApp { media?.app ?? lastApp }
 }
 
-/// A small floating mini-player in the bottom-right corner of the main screen: what the phone's
-/// playing, its volume, and previous / play-pause / next. Never takes focus.
+/// A small floating mini-player, bottom-right of the main screen until dragged somewhere else
+/// (where it then stays): what the phone's playing, its volume, and previous / play-pause / next.
+/// In compact mode it's a small pill (artwork, track, playing or paused) that opens into the full
+/// player while the pointer is over it. Never takes focus.
 @MainActor
 final class MediaHUDController {
     private static let size = NSSize(width: 340, height: 104)
+    static let compactSize = NSSize(width: 240, height: 52)
     let model = MediaHUDModel()
     var send: (MediaCommand) -> Void = { _ in }
+    /// Small until hovered (Settings → iPhone → Music).
+    var compact = false {
+        didSet {
+            guard compact != oldValue else { return }
+            hovering = false
+            if isVisible { place(animated: true) }
+        }
+    }
 
     private var panel: FloatingPanel?
     private var hideTimer: Timer?
     private var highlightTimer: Timer?
+    private var collapseTimer: Timer?
+    private var hovering = false
     private(set) var pinned = false
+    private var moveObserver: NSObjectProtocol?
+    /// Set while Cadence moves the panel itself, so only a drag is remembered.
+    private var placing = false
+    /// The bottom-right corner it was dragged to: both sizes grow out of that corner.
+    private static let anchorKey = "Cadence.mediaHUD.anchor"
+
+    private var showsCompact: Bool { compact && !hovering }
+    private var currentSize: NSSize { showsCompact ? Self.compactSize : Self.size }
+
+    /// Where it goes at `size`: the dragged-to corner if it's still on a screen, else bottom-right,
+    /// always kept fully on screen.
+    private func frame(for size: NSSize) -> NSRect? {
+        var anchor: NSPoint?
+        if let text = UserDefaults.standard.string(forKey: Self.anchorKey) { anchor = NSPointFromString(text) }
+        let probe = anchor.map { NSRect(x: $0.x - size.width, y: $0.y, width: size.width, height: size.height) }
+        let screen = probe.flatMap { p in
+            NSScreen.screens.filter { $0.visibleFrame.intersects(p) }
+                .max { $0.visibleFrame.intersection(p).area < $1.visibleFrame.intersection(p).area }
+        } ?? NSScreen.main ?? NSScreen.screens.first
+        guard let screen else { return nil }
+        let v = screen.visibleFrame
+        let corner = (probe != nil && screen.visibleFrame.intersects(probe!)) ? anchor! : NSPoint(x: v.maxX - 16, y: v.minY + 16)
+        let x = min(max(corner.x - size.width, v.minX), v.maxX - size.width)
+        let y = min(max(corner.y, v.minY), v.maxY - size.height)
+        return NSRect(x: x, y: y, width: size.width, height: size.height)
+    }
+
+    /// Moves/resizes the panel to match the mode and hover.
+    private func place(animated: Bool) {
+        guard let panel, let target = frame(for: currentSize) else { return }
+        let collapsed = showsCompact
+        placing = true
+        withAnimation(.easeOut(duration: 0.18)) { model.collapsed = collapsed }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = animated ? 0.18 : 0
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(target, display: true)
+        }, completionHandler: { [weak self] in MainActor.assumeIsolated { self?.placing = false } })
+    }
+
+    fileprivate func hoverChanged(_ inside: Bool) {
+        collapseTimer?.invalidate()
+        if inside {
+            hideTimer?.invalidate()
+            guard compact, !hovering else { return }
+            hovering = true
+            place(animated: true)
+        } else {
+            if !pinned { scheduleHide(after: 2.2) }
+            guard hovering else { return }
+            // A beat before closing, so brushing past the edge doesn't make it jump.
+            collapseTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.hovering else { return }
+                    self.hovering = false
+                    self.place(animated: true)
+                }
+            }
+        }
+    }
 
     var isVisible: Bool { panel?.isVisible == true && panel?.alphaValue ?? 0 > 0 }
 
@@ -69,9 +144,10 @@ final class MediaHUDController {
 
     private func show() {
         let panel = self.panel ?? makePanel()
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        let v = screen.visibleFrame
-        let frame = NSRect(x: v.maxX - Self.size.width - 16, y: v.minY + 16, width: Self.size.width, height: Self.size.height)
+        model.collapsed = showsCompact
+        guard let frame = frame(for: currentSize) else { return }
+        placing = true
+        defer { placing = false }
         if !isVisible {
             panel.setFrame(frame.offsetBy(dx: 0, dy: -12), display: false)
             panel.alphaValue = 0
@@ -82,13 +158,13 @@ final class MediaHUDController {
                 panel.animator().setFrame(frame, display: true)
                 panel.animator().alphaValue = 1
             }
-        } else if panel.frame != frame {
-            panel.setFrame(frame, display: true)
         }
     }
 
     func hide() {
         hideTimer?.invalidate()
+        collapseTimer?.invalidate()
+        hovering = false
         pinned = false
         guard let panel, isVisible else { return }
         NSAnimationContext.runAnimationGroup({ ctx in
@@ -102,10 +178,20 @@ final class MediaHUDController {
     private func makePanel() -> FloatingPanel {
         let panel = FloatingPanel(size: Self.size)
         panel.level = .statusBar
-        panel.isMovableByWindowBackground = false
-        let host = NSHostingView(rootView: MediaHUDView(model: model, send: { [weak self] in self?.tapped($0) }))
+        panel.isMovableByWindowBackground = true
+        let host = HoverHostingView(rootView: MediaHUDView(model: model, send: { [weak self] in self?.tapped($0) }))
+        host.onHover = { [weak self] inside in self?.hoverChanged(inside) }
+        host.sizingOptions = []
+        host.autoresizingMask = [.width, .height]
         host.frame = NSRect(origin: .zero, size: Self.size)
         panel.contentView = host
+        moveObserver = NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) { [weak self] note in
+            MainActor.assumeIsolated {
+                guard let self, !self.placing, let window = note.object as? NSWindow else { return }
+                let corner = NSPoint(x: window.frame.maxX, y: window.frame.minY)
+                UserDefaults.standard.set(NSStringFromPoint(corner), forKey: Self.anchorKey)
+            }
+        }
         self.panel = panel
         return panel
     }
@@ -121,10 +207,52 @@ private struct MediaHUDView: View {
     let send: (MediaCommand) -> Void
 
     var body: some View {
+        if model.collapsed { pill.transition(.opacity) } else { full.transition(.opacity) }
+    }
+
+    /// Compact: laid out like the phone's media card, showing only what's playing and whether
+    /// it's playing. Hovering opens the full player.
+    private var pill: some View {
         let app = model.app
         let theme = app.theme
         let media = model.media
-        VStack(alignment: .leading, spacing: 8) {
+        return HStack(spacing: 8) {
+            Group {
+                if let image = model.artwork {
+                    Image(nsImage: image).resizable().scaledToFill()
+                } else {
+                    MediaLogo(app: app, size: 32)
+                }
+            }
+            .frame(width: 32, height: 32)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            VStack(alignment: .leading, spacing: 0) {
+                Text(media?.title ?? (media == nil ? "Nothing playing" : app.name))
+                    .font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                Text(media?.title == nil ? "on \(model.phoneName)" : media?.artist ?? "on \(model.phoneName)")
+                    .font(.system(size: 10.5)).foregroundStyle(theme.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: media?.isPlaying == true ? "pause.fill" : "play.fill")
+                .font(.system(size: 12, weight: .bold))
+                .frame(width: 28, height: 28)
+                .background(theme.accentFill ? theme.accent : theme.foreground.opacity(0.12), in: Circle())
+                .foregroundStyle(theme.accentFill ? theme.onAccent : theme.foreground)
+                .scaleEffect(model.highlight == .playPause ? 1.15 : 1)
+        }
+        .foregroundStyle(theme.foreground)
+        .padding(.horizontal, 10)
+        .frame(width: MediaHUDController.compactSize.width, height: MediaHUDController.compactSize.height)
+        .background(theme.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(theme.accent.opacity(0.35), lineWidth: 1))
+        .animation(.easeOut(duration: 0.2), value: model.highlight)
+    }
+
+    private var full: some View {
+        let app = model.app
+        let theme = app.theme
+        let media = model.media
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 artwork
                 VStack(alignment: .leading, spacing: 2) {
@@ -202,5 +330,35 @@ private struct MediaHUDView: View {
                 .scaleEffect(lit ? 1.12 : 1)
         }
         .buttonStyle(.plain)
+    }
+}
+
+private extension NSRect {
+    var area: CGFloat { isNull ? 0 : width * height }
+}
+
+/// The mini-player's view, telling the controller when the pointer comes and goes (even while
+/// Cadence isn't the active app, which SwiftUI's own hover doesn't).
+private final class HoverHostingView<Content: View>: NSHostingView<Content> {
+    var onHover: (Bool) -> Void = { _ in }
+    private var area: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let area { removeTrackingArea(area) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                  owner: self, userInfo: nil)
+        addTrackingArea(area)
+        self.area = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        onHover(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        onHover(false)
     }
 }

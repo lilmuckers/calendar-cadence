@@ -2,12 +2,12 @@ import AppKit
 import CadenceCore
 import SwiftUI
 
-/// Top-right card listing invitations that still need a reply, with Accept / Maybe / Decline
-/// and (for calendars that ask for it) a colour picker.
+/// Card listing invitations that still need a reply, with Accept / Maybe / Decline and (for
+/// calendars that ask for it) a colour picker. One card in the right-hand `AlertStack`.
 @MainActor
 final class InviteReviewController {
     private let state: AppState
-    private var panel: FloatingPanel?
+    private var card: AlertStack.Card?
     private let model = InviteReviewModel()
 
     init(state: AppState) { self.state = state }
@@ -15,10 +15,11 @@ final class InviteReviewController {
     func show(_ invites: [Meeting], reason: InvitePromptReason) {
         guard !invites.isEmpty else { return }
         // New arrivals join whatever is already on screen.
-        if panel != nil {
+        if let card {
             for m in invites where !model.items.contains(where: { $0.id == m.id }) { model.items.append(m) }
             model.reason = reason == .new && model.reason == .new ? .new : model.reason
-            resize(animated: true)
+            card.setSummary(summary)
+            card.relayout()
             return
         }
         model.items = invites
@@ -27,64 +28,35 @@ final class InviteReviewController {
         present()
     }
 
-    private func size() -> NSSize {
+    private func height() -> CGFloat {
         let rows = model.items.prefix(4).reduce(CGFloat(0)) { $0 + (state.wantsColorPrompt($1) ? 134 : 88) }
-        return NSSize(width: 360, height: 76 + max(rows, 84) + (model.items.count > 4 ? 18 : 0))
+        return 76 + max(rows, 84) + (model.items.count > 4 ? 18 : 0)
+    }
+
+    private var summary: AlertStack.Summary {
+        let n = model.items.count
+        return AlertStack.Summary(
+            symbol: model.reason == .new ? "envelope.badge.fill" : "envelope.open.fill", tint: .accentColor,
+            title: n == 1 ? "Invite to answer" : "\(n) invites to answer",
+            subtitle: model.items.prefix(3).map(\.title).joined(separator: ", "))
     }
 
     private func present() {
-        let size = size()
-        let panel = FloatingPanel(size: size)
-        panel.level = .statusBar
-        let view = InviteReviewView(model: model, close: { [weak self] in self?.close() },
-                                    changed: { [weak self] in self?.itemsChanged() })
-            .environment(state)
-        let host = NSHostingView(rootView: view)
-        host.sizingOptions = []
-        host.autoresizingMask = [.width, .height]
-        host.frame = NSRect(origin: .zero, size: size)
-        panel.contentView = host
-
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        let v = screen.visibleFrame
-        let final = NSRect(x: v.maxX - size.width - 14, y: v.maxY - size.height - 14, width: size.width, height: size.height)
-        panel.setFrame(final.offsetBy(dx: 40, dy: 0), display: false)
-        panel.alphaValue = 0
-        panel.orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.35
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(final, display: true)
-            panel.animator().alphaValue = 1
+        card = AlertStack.shared.add(summary: summary, height: { [weak self] in self?.height() ?? 160 }) {
+            InviteReviewView(model: model, close: { [weak self] in self?.close() },
+                             changed: { [weak self] in self?.itemsChanged() })
+                .environment(state)
         }
         NSSound(named: "Glass")?.play()
-        self.panel = panel
     }
 
     private func itemsChanged() {
-        if model.items.isEmpty { close() } else { resize(animated: true) }
-    }
-
-    private func resize(animated: Bool) {
-        guard let panel else { return }
-        let size = size()
-        var f = panel.frame
-        f = NSRect(x: f.maxX - size.width, y: f.maxY - size.height, width: size.width, height: size.height)
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = animated ? 0.25 : 0
-            panel.animator().setFrame(f, display: true)
-        }
+        if model.items.isEmpty { close() } else { card?.setSummary(summary); card?.relayout() }
     }
 
     private func close() {
-        guard let panel else { return }
-        self.panel = nil
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.2
-            panel.animator().alphaValue = 0
-        }, completionHandler: {
-            MainActor.assumeIsolated { panel.orderOut(nil) }
-        })
+        card?.close()
+        card = nil
     }
 }
 

@@ -12,78 +12,58 @@ struct ApprovalRequest: Identifiable {
 
 enum ApprovalResult { case allowed, denied, timedOut }
 
-/// Asks the user to allow or deny an AI assistant's action, one card at a time (top right).
-/// Unanswered requests are denied after a minute.
+/// Asks the user to allow or deny an AI assistant's action. Each request is its own card in the
+/// right-hand `AlertStack`. Unanswered requests are denied after a minute.
 @MainActor
 final class ApprovalController {
     private let state: AppState
-    private var panel: FloatingPanel?
-    private var queue: [(ApprovalRequest, CheckedContinuation<ApprovalResult, Never>)] = []
-    private var current: (ApprovalRequest, CheckedContinuation<ApprovalResult, Never>)?
-    private var timeout: DispatchWorkItem?
+    private final class Pending {
+        let request: ApprovalRequest
+        let cont: CheckedContinuation<ApprovalResult, Never>
+        var card: AlertStack.Card?
+        var timeout: DispatchWorkItem?
+        init(_ request: ApprovalRequest, _ cont: CheckedContinuation<ApprovalResult, Never>) {
+            self.request = request
+            self.cont = cont
+        }
+    }
+    private var pending: [UUID: Pending] = [:]
 
     init(state: AppState) { self.state = state }
 
     func request(_ r: ApprovalRequest) async -> ApprovalResult {
-        await withCheckedContinuation { cont in
-            queue.append((r, cont))
-            if current == nil { showNext() }
-        }
+        await withCheckedContinuation { cont in show(Pending(r, cont)) }
     }
 
-    private func showNext() {
-        guard !queue.isEmpty else { return }
-        let next = queue.removeFirst()
-        current = next
-        let request = next.0
-        let size = NSSize(width: 360, height: 164)
-        let panel = FloatingPanel(size: size)
-        panel.level = .statusBar
-        let view = ApprovalCardView(request: request) { [weak self] decision in self?.finish(decision) }
-            .environment(state)
-        let host = NSHostingView(rootView: view)
-        host.frame = NSRect(origin: .zero, size: size)
-        panel.contentView = host
-
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { finish(.deny); return }
-        let v = screen.visibleFrame
-        let final = NSRect(x: v.maxX - size.width - 14, y: v.maxY - size.height - 14, width: size.width, height: size.height)
-        panel.setFrame(final.offsetBy(dx: 40, dy: 0), display: false)
-        panel.alphaValue = 0
-        panel.orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.3
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(final, display: true)
-            panel.animator().alphaValue = 1
+    private func show(_ p: Pending) {
+        let request = p.request
+        let id = request.id
+        pending[id] = p
+        let summary = AlertStack.Summary(symbol: "sparkles", tint: .purple,
+                                         title: "\(request.client): \(request.summary)",
+                                         subtitle: request.meeting.title)
+        p.card = AlertStack.shared.add(summary: summary, height: { 164 }) {
+            ApprovalCardView(request: request) { [weak self] decision in self?.finish(id, decision) }
+                .environment(state)
         }
         NSSound(named: "Tink")?.play()
-        self.panel = panel
-
-        let work = DispatchWorkItem { [weak self] in self?.finish(.timeout) }
-        timeout = work
+        let work = DispatchWorkItem { [weak self] in self?.finish(id, .timeout) }
+        p.timeout = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: work)
     }
 
     enum Decision { case allow, deny, always, timeout }
 
-    private func finish(_ decision: Decision) {
-        guard let (request, cont) = current else { return }
-        current = nil
-        timeout?.cancel()
-        if decision == .always { state.prefs.mcpAutoApprove.insert(request.tool) }
+    private func finish(_ id: UUID, _ decision: Decision) {
+        guard let p = pending.removeValue(forKey: id) else { return }
+        p.timeout?.cancel()
+        if decision == .always { state.prefs.mcpAutoApprove.insert(p.request.tool) }
         switch decision {
-        case .allow, .always: cont.resume(returning: .allowed)
-        case .deny: cont.resume(returning: .denied)
-        case .timeout: cont.resume(returning: .timedOut)
+        case .allow, .always: p.cont.resume(returning: .allowed)
+        case .deny: p.cont.resume(returning: .denied)
+        case .timeout: p.cont.resume(returning: .timedOut)
         }
-        if let panel {
-            self.panel = nil
-            NSAnimationContext.runAnimationGroup({ $0.duration = 0.18; panel.animator().alphaValue = 0 }, completionHandler: {
-                MainActor.assumeIsolated { panel.orderOut(nil) }
-            })
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.showNext() }
+        p.card?.close()
     }
 }
 

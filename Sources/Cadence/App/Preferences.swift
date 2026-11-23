@@ -154,6 +154,8 @@ struct Preferences: Codable, Equatable {
     var mediaRemotePauseLimitSeconds = 30
     /// The Mac's mini-player for the phone.
     var mediaHUD: MediaHUDMode = .onKeys
+    /// The mini-player sits as a small pill and opens out while the pointer's over it.
+    var mediaHUDCompact = false
     /// A meeting alert fades out Music or Spotify on this Mac...
     var fadeMediaForAlerts = false
     /// ...and says which meeting it is.
@@ -288,6 +290,7 @@ extension Preferences {
         mediaRemotePauseLimitEnabled = try c.decodeIfPresent(Bool.self, forKey: .mediaRemotePauseLimitEnabled) ?? d.mediaRemotePauseLimitEnabled
         mediaRemotePauseLimitSeconds = try c.decodeIfPresent(Int.self, forKey: .mediaRemotePauseLimitSeconds) ?? d.mediaRemotePauseLimitSeconds
         mediaHUD = (try? c.decodeIfPresent(MediaHUDMode.self, forKey: .mediaHUD)) ?? d.mediaHUD
+        mediaHUDCompact = try c.decodeIfPresent(Bool.self, forKey: .mediaHUDCompact) ?? d.mediaHUDCompact
         fadeMediaForAlerts = try c.decodeIfPresent(Bool.self, forKey: .fadeMediaForAlerts) ?? d.fadeMediaForAlerts
         announceAlerts = try c.decodeIfPresent(Bool.self, forKey: .announceAlerts) ?? d.announceAlerts
         updateMode = (try? c.decodeIfPresent(UpdateMode.self, forKey: .updateMode)) ?? d.updateMode
