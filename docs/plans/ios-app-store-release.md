@@ -50,22 +50,22 @@ profiles, media keys, the MCP socket). Only the iPhone app goes in the store.
 ## You: once the developer account is active
 
 ### 1. Apple identifiers
-- [ ] Find your **Team ID**: developer.apple.com → Account → Membership details.
-- [ ] Choose a bundle ID you own, e.g. `com.<you>.cadence` (the widget becomes `<id>.widgets`, the
+- [x] Find your **Team ID**: developer.apple.com → Account → Membership details.
+- [x] Choose a bundle ID you own, e.g. `com.<you>.cadence` (the widget becomes `<id>.widgets`, the
   App Group `group.<id>`).
-- [ ] Put both in `iOS/Config/Local.xcconfig`:
+- [x] Put both in `iOS/Config/Local.xcconfig`:
   ```
   DEVELOPMENT_TEAM = <Team ID>
   CADENCE_BUNDLE_ID = com.<you>.cadence
   ```
-- [ ] Open the project in Xcode, select the **Cadence** and **CadenceWidgets** targets → Signing &
+- [x] Open the project in Xcode, select the **Cadence** and **CadenceWidgets** targets → Signing &
   Capabilities. With automatic signing Xcode registers both App IDs and the App Group itself.
   Check at developer.apple.com → Identifiers that:
   - `<id>` has **App Groups** (`group.<id>`) and **Time Sensitive Notifications**.
   - `<id>.widgets` has **App Groups** (`group.<id>`).
 - [ ] Optional: ask Apple for the **User-Assigned Device Name** entitlement for `<id>` (a form
   linked from that capability's page), then use `Config/Cadence-DeviceName.entitlements`.
-- [ ] App Store Connect → Apps → **+ New App** with that bundle ID, to reserve the name early.
+- [x] App Store Connect → Apps → **+ New App** with that bundle ID, to reserve the name early.
 
 ### 2. Google: one Cloud project for both apps
 The Mac and iPhone share the Mac's existing Cloud project, with a Desktop client and an iOS client.
@@ -97,7 +97,7 @@ standard verification covers both apps. If Google holds up the Chat scopes, the 
   `msauth.<id>://auth`.
 - [ ] API permissions (delegated): `User.Read`, `Calendars.ReadWrite`, `MailboxSettings.Read`,
   `offline_access`, `openid`, `email`, `profile`.
-- [ ] Put the **Application (client) ID** in `Local.xcconfig` as `MICROSOFT_CLIENT_ID`.
+- [x] Put the **Application (client) ID** in `Local.xcconfig` as `MICROSOFT_CLIENT_ID`.
 - [ ] **Publisher verification** (Branding & properties): set the publisher domain to
   `patrick-mckinley.com`, verify it, and link a Microsoft AI Cloud Partner Program ID (free to
   join). Without it, many work and school tenants block users from consenting. Personal Microsoft
@@ -140,20 +140,20 @@ standard verification covers both apps. If Google holds up the Chat scopes, the 
 ### 6. GitHub Actions (TestFlight uploads)
 The Release workflow's `ios` job does the archive and upload; it never submits for review. Add these
 under the repo's Settings → Secrets and variables → Actions:
-- [ ] **Distribution certificate**: Xcode → Settings → Accounts → Manage Certificates → **+ Apple
+- [x] **Distribution certificate**: Xcode → Settings → Accounts → Manage Certificates → **+ Apple
   Distribution**. Then in Keychain Access, export it (with its private key) as a `.p12` with a
   password. Secrets: `IOS_DISTRIBUTION_P12` = `base64 -i cert.p12 | pbcopy`,
   `IOS_DISTRIBUTION_P12_PASSWORD`.
-- [ ] **Provisioning profiles**: developer.apple.com → Profiles → **+** → *App Store Connect* → the
+- [x] **Provisioning profiles**: developer.apple.com → Profiles → **+** → *App Store Connect* → the
   app's ID → that certificate. Again for `<id>.widgets`. Download both and save as secrets
   `IOS_APP_PROFILE` and `IOS_WIDGET_PROFILE` (`base64 -i file.mobileprovision | pbcopy`).
   Profiles expire with the certificate (a year): renew both and update the secrets.
-- [ ] **App Store Connect API key**: App Store Connect → Users and Access → Integrations → Team
+- [x] **App Store Connect API key**: App Store Connect → Users and Access → Integrations → Team
   Keys → **+**, role *App Manager*. Secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (the
   whole `.p8` file; it can only be downloaded once).
-- [ ] `APPLE_TEAM_ID` and `MICROSOFT_CLIENT_ID` secrets (shared with the Mac build).
-- [ ] Variables: `IOS_BUNDLE_ID`, `GOOGLE_IOS_CLIENT_PREFIX` (and optionally `SPOTIFY_CLIENT_ID`).
-- [ ] Try it: run **Release** with *dry_run* on; it builds a signed `.ipa` as an artifact without
+- [x] `APPLE_TEAM_ID` and `MICROSOFT_CLIENT_ID` secrets (shared with the Mac build).
+- [x] Variables: `IOS_BUNDLE_ID`, `GOOGLE_IOS_CLIENT_PREFIX` (and optionally `SPOTIFY_CLIENT_ID`).
+- [x] Try it: run **Release** with *dry_run* on; it builds a signed `.ipa` as an artifact without
   uploading. Then a real release uploads to TestFlight.
 - The marketing version is the release version (`v1.2.0` → 1.2.0); the build number is the run
   number followed by the attempt. CI builds with Xcode 26.6 (iOS 26 SDK, which App Store Connect
@@ -161,8 +161,8 @@ under the repo's Settings → Secrets and variables → Actions:
   starts requiring the iOS 27 SDK (usually each April).
 
 ### 7. Before submitting
-- [ ] Publish the notarized Mac DMG, so the links in the app and review notes work.
-- [ ] Run the **Release** workflow to upload to TestFlight. Test on your own phone, then external
+- [x] Publish the notarized Mac DMG, so the links in the app and review notes work.
+- [x] Run the **Release** workflow to upload to TestFlight. Test on your own phone, then external
   TestFlight (its beta review is a cheap dry run for App Review).
 - [ ] In App Store Connect, pick that build for the version and **Submit for Review**.
 - [ ] Submit once Google verification has passed.
