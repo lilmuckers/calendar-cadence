@@ -20,11 +20,10 @@ concurrency:
   cancel-in-progress: true
 
 # Xcode every macOS job builds with, pinned so it doesn't drift with the runner image's default
-# (scripts/ci-select-xcode.sh fails if it isn't installed). 26.6 is the newest on macos-26; local
-# development is on Xcode 27, so CI also checks the code still builds on the older compiler.
-# Move to Xcode 27 once GitHub ships a stable macOS 27 runner (only the xcode-27 preview has it today).
+# (scripts/ci-select-xcode.sh fails if it isn't installed). Matches local development (Xcode 27).
+# The xcode-27 runner label (macOS 27, Apple Silicon) is GitHub's GA image carrying Xcode 27.
 env:
-  XCODE_VERSION: "26.6"
+  XCODE_VERSION: "27.2"
 
 permissions:
   contents: read
@@ -34,8 +33,8 @@ permissions:
 jobs:
   test:
     name: Unit tests
-    # The app uses macOS 26 SDK APIs, so stay on the macOS 26 image. Xcode is pinned above.
-    runs-on: macos-26
+    # Xcode 27 image (macOS 27). Xcode is pinned above.
+    runs-on: xcode-27
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +68,7 @@ jobs:
 
   ios:
     name: iPhone build and tests
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4

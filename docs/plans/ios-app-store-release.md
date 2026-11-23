@@ -163,9 +163,8 @@ under the repo's Settings → Secrets and variables → Actions:
 - [x] Try it: run **Release** with *dry_run* on; it builds a signed `.ipa` as an artifact without
   uploading. Then a real release uploads to TestFlight.
 - The marketing version is the release version (`v1.2.0` → 1.2.0); the build number is the run
-  number followed by the attempt. CI builds with Xcode 26.6 (iOS 26 SDK, which App Store Connect
-  requires today); move `XCODE_VERSION` to 27 when GitHub has a stable macOS 27 runner, before Apple
-  starts requiring the iOS 27 SDK (usually each April).
+  number followed by the attempt. CI builds with Xcode 27.2 (iOS 27 SDK) on GitHub's
+  `xcode-27` runner.
 
 ### 7. Before submitting
 - [x] Publish the notarized Mac DMG, so the links in the app and review notes work.
