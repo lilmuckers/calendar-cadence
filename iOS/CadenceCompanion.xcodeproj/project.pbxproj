@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		CA0000000000000000000SP3 /* SpotifyiOS in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000SP2 /* SpotifyiOS */; };
 		CA0000000000000000000B01 /* libCadenceCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CA0000000000000000000P01 /* libCadenceCore.a */; };
 		CA0000000000000000000B02 /* CadenceWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CA0000000000000000000P03 /* CadenceWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CA0000000000000000000SP3 /* SpotifyiOS in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000SP2 /* SpotifyiOS */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -492,9 +492,9 @@
 				INFOPLIST_FILE = "Config/Cadence-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Cadence shows what the Music app is playing on the desk display, with play, pause and skip.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Cadence reads your calendars to show upcoming meetings, countdowns and join links.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Cadence uses the camera to scan the pairing code shown on your Mac.";
-				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Cadence shows what the Music app is playing on the desk display, with play, pause and skip.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cadence connects to Cadence on your Mac to show your meetings and join them on the Mac.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
@@ -510,8 +510,8 @@
 					"$(BUILT_PRODUCTS_DIR)/libCadenceCore.a",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID)";
-				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_APP_PROFILE)";
 				PRODUCT_NAME = Cadence;
+				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_APP_PROFILE)";
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
@@ -527,9 +527,9 @@
 				INFOPLIST_FILE = "Config/Cadence-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Cadence shows what the Music app is playing on the desk display, with play, pause and skip.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Cadence reads your calendars to show upcoming meetings, countdowns and join links.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Cadence uses the camera to scan the pairing code shown on your Mac.";
-				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Cadence shows what the Music app is playing on the desk display, with play, pause and skip.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cadence connects to Cadence on your Mac to show your meetings and join them on the Mac.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
@@ -540,8 +540,8 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID)";
-				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_APP_PROFILE)";
 				PRODUCT_NAME = Cadence;
+				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_APP_PROFILE)";
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
@@ -550,9 +550,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/Widgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = Config/Widgets.entitlements;
 				INFOPLIST_FILE = "Config/Widgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -561,8 +561,8 @@
 					"@executable_path/../../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID).widgets";
-				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_WIDGET_PROFILE)";
 				PRODUCT_NAME = CadenceWidgets;
+				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_WIDGET_PROFILE)";
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -572,9 +572,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/Widgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = Config/Widgets.entitlements;
 				INFOPLIST_FILE = "Config/Widgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -583,8 +583,8 @@
 					"@executable_path/../../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CADENCE_BUNDLE_ID).widgets";
-				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_WIDGET_PROFILE)";
 				PRODUCT_NAME = CadenceWidgets;
+				PROVISIONING_PROFILE_SPECIFIER = "$(CADENCE_WIDGET_PROFILE)";
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
