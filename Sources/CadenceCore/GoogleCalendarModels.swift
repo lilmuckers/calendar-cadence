@@ -18,6 +18,21 @@ public struct GoogleCalendarListEntry: Decodable, Sendable {
     public var title: String { summaryOverride ?? summary ?? id }
 }
 
+/// The Google Calendar scopes Cadence signs in with. Kept here so a test guards the set.
+public enum GoogleScopes {
+    /// Reads (and, on a click, replies to or colours) events on every calendar.
+    public static let events = "https://www.googleapis.com/auth/calendar.events"
+    /// Lists the calendars so the user can choose which to show.
+    public static let calendarList = "https://www.googleapis.com/auth/calendar.calendarlist.readonly"
+    /// Reads each calendar's own properties (`GET calendars/{id}`), which is where its colour label names live.
+    /// calendarlist.readonly doesn't cover that call: without this scope Google answers 403 and the colour
+    /// pickers fall back to Google's plain names.
+    public static let calendars = "https://www.googleapis.com/auth/calendar.calendars.readonly"
+    /// The narrowest set that works. calendar.readonly is broader (settings, sharing, free/busy) and Google's
+    /// verification rejects it here.
+    public static let calendar = [calendarList, calendars, events].joined(separator: " ")
+}
+
 /// A calendar's own colour labels (Calendars resource `labelProperties`): the names the user gave
 /// event colours in Google Calendar, plus any custom colours.
 public struct GoogleEventLabel: Decodable, Hashable, Sendable {

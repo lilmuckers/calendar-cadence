@@ -47,6 +47,15 @@ struct InviteTests {
         #expect(EventColorChoice.choice(id: "5")?.name == "Banana")
     }
 
+    @Test func signInAsksForTheScopeThatReadsColourLabels() {
+        // Calendars.get (colour label names) needs calendars.readonly; calendarlist.readonly alone gets a 403.
+        let scopes = Set(GoogleScopes.calendar.split(separator: " ").map(String.init))
+        #expect(scopes.contains("https://www.googleapis.com/auth/calendar.calendars.readonly"))
+        #expect(scopes.contains("https://www.googleapis.com/auth/calendar.calendarlist.readonly"))
+        #expect(scopes.contains("https://www.googleapis.com/auth/calendar.events"))
+        #expect(!scopes.contains("https://www.googleapis.com/auth/calendar.readonly"))
+    }
+
     @Test func calendarLabelsRenameSwatchesAndAddCustomColours() throws {
         let json = """
         {"labelProperties": {"eventLabels": [
