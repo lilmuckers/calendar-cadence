@@ -19,7 +19,7 @@ struct CadenceApp: App {
         }
 
         Window("About Cadence", id: "about") {
-            AboutView()
+            AboutView(showVersionNotes: delegate.showVersionNotes)
                 .frame(width: 440)
                 .fixedSize(horizontal: false, vertical: true)
                 .ignoresSafeArea()
@@ -43,6 +43,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var bridge: MCPBridge?
     private var drawer: EnrichmentDrawerController?
     private var welcome: WelcomeWindows?
+
+    /// From the version in the About window. Nil in builds without a version (nothing to look up).
+    var showVersionNotes: (() -> Void)? {
+        guard let version = state.updater.current else { return nil }
+        return { [weak self] in self?.welcome?.showNotes(for: version) }
+    }
 
     /// Double-clicking a .cadconf settings file.
     func application(_ application: NSApplication, open urls: [URL]) {
