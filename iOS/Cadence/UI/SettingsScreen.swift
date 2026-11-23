@@ -31,7 +31,7 @@ struct SettingsScreen: View {
                             value: state.prefs.deskWhenCharging ? "While charging" : "Manual")
                     }
                     NavigationLink { MediaScreen() } label: {
-                        row("Music & Media", icon: "music.note", tint: .pink, value: state.prefs.mediaApp.name)
+                        row("Music & Media", icon: "music.note", tint: .pink, value: state.prefs.mediaApp.choiceName)
                     }
                     NavigationLink { LockScreenScreen() } label: {
                         row("Lock Screen & Widgets", icon: "platter.filled.bottom.iphone", tint: .blue,
@@ -411,7 +411,7 @@ private struct MediaScreen: View {
             Section {
                 Picker("Media app", selection: $state.prefs.mediaApp) {
                     ForEach(MediaApp.allCases) { app in
-                        Label { Text(app.name) } icon: { MediaLogo(app: app, size: 22) }.tag(app)
+                        Label { Text(app.choiceName) } icon: { MediaLogo(app: app, size: 22) }.tag(app)
                     }
                 }
                 // Picking Apple Music is a good moment to ask for access to what it's playing.
@@ -462,7 +462,10 @@ private struct MediaScreen: View {
     }
 
     private var mediaFooter: String {
-        "Apple Music shows track details and skip; other apps show that they're playing and can be paused. While connected, the desk also shows and controls the Mac's Music or Spotify."
+        if state.prefs.mediaApp == .system {
+            return "Follows whatever's playing on this iPhone: Apple Music (and Spotify, once connected) show the track and skip; anything else shows that it's playing and can be paused. While connected, the desk also shows and controls the Mac's Music or Spotify."
+        }
+        return "Apple Music shows track details and skip; other apps show that they're playing and can be paused. While connected, the desk also shows and controls the Mac's Music or Spotify."
     }
 }
 

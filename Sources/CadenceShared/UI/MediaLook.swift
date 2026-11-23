@@ -18,6 +18,10 @@ struct MediaTheme {
 extension MediaApp {
     var theme: MediaTheme {
         switch self {
+        case .system:
+            MediaTheme(accent: .white,
+                       background: AnyShapeStyle(LinearGradient(colors: [Color(hex: 0x3A3A3C), Color(hex: 0x1C1C1E)], startPoint: .topLeading, endPoint: .bottomTrailing)),
+                       secondary: .white.opacity(0.7), onAccent: Color(hex: 0x1C1C1E))
         case .appleMusic:
             MediaTheme(accent: .white,
                        background: AnyShapeStyle(LinearGradient(colors: [Color(hex: 0xFA2D48), Color(hex: 0xB0122E)], startPoint: .topLeading, endPoint: .bottomTrailing)),
@@ -42,6 +46,10 @@ struct MediaLogo: View {
     var body: some View {
         ZStack {
             switch app {
+            case .system:
+                RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+                    .fill(LinearGradient(colors: [Color(hex: 0x636366), Color(hex: 0x3A3A3C)], startPoint: .top, endPoint: .bottom))
+                Image(systemName: "waveform").font(.system(size: size * 0.5, weight: .semibold)).foregroundStyle(.white)
             case .appleMusic:
                 RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
                     .fill(LinearGradient(colors: [Color(hex: 0xFB5C74), Color(hex: 0xFA233B)], startPoint: .top, endPoint: .bottom))

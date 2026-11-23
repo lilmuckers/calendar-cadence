@@ -19,13 +19,15 @@ struct MediaCorner: View {
                 MediaCard(model: phoneModel).transition(.move(edge: .trailing).combined(with: .opacity))
             case .mac(let media):
                 MediaCard(model: macModel(media)).transition(.move(edge: .trailing).combined(with: .opacity))
+            case .none:
+                EmptyView()
             case .launcher:
                 Button { state.launchMedia() } label: {
                     MediaLogo(app: app, size: 44)
                         .shadow(color: app.theme.accent.opacity(0.35), radius: 8)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Open \(app.name)")
+                .accessibilityLabel(app == .system ? "Resume" : "Open \(app.name)")
                 .transition(.scale.combined(with: .opacity))
             }
         }
@@ -37,9 +39,10 @@ struct MediaCorner: View {
     }
 
     private enum Mode {
-        case phone, mac(CompanionMedia), launcher
+        case phone, mac(CompanionMedia), launcher, none
         var key: String {
             switch self {
+            case .none: "none"
             case .phone: "phone"
             case .mac: "mac"
             case .launcher: "launcher"
@@ -51,6 +54,8 @@ struct MediaCorner: View {
     private var mode: Mode {
         if state.nowPlaying.showsControls(now: state.now) || state.spotifyActive { return .phone }
         if let mac = state.macMedia { return .mac(mac) }
+        // The default has no app to open, so its button only shows when it can resume something.
+        if state.prefs.mediaApp == .system && !state.canResumeDefault { return .none }
         return .launcher
     }
 
@@ -84,7 +89,7 @@ struct MediaCorner: View {
             playPause: np.otherPlaying ? { state.pauseMedia() }
                 : np.othersInterrupted ? { state.resumeOthers(openIfStill: true) } : nil,
             next: nil, previous: nil,
-            open: connect ? { state.spotify.authorize() } : { state.openMediaApp() },
+            open: connect ? { state.spotify.authorize() } : app.url == nil ? nil : { state.openMediaApp() },
             openSymbol: connect ? "link" : nil)
     }
 

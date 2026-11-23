@@ -41,6 +41,7 @@ struct CompanionProtocolTests {
         .media(CompanionMedia(app: .appleMusic, title: "Song", artist: "Band", isPlaying: true,
                               artwork: Data([0xFF, 0xD8]), trackID: "appleMusic-1", canSkip: true)),
         .media(CompanionMedia(app: .spotify, isPlaying: false)),
+        .media(CompanionMedia(app: .system, isPlaying: true, trackID: "other-system")),
         .media(nil),
         .mediaCommand(.togglePlayPause),
         .mediaCommand(.next),
@@ -86,6 +87,13 @@ struct CompanionProtocolTests {
         frame.append(future)
         var decoder = CompanionFrameDecoder()
         #expect(try decoder.append(frame + CompanionFraming.encode(.ping)) == [.ping])
+    }
+
+    @Test func unknownMediaAppShowsAsAudio() throws {
+        let json = Data(#"{"app":"tidal","isPlaying":true,"canSkip":false}"#.utf8)
+        let media = try JSONDecoder().decode(CompanionMedia.self, from: json)
+        #expect(media.app == .system)
+        #expect(media.isPlaying)
     }
 
     @Test func oversizedFrameRejected() {
