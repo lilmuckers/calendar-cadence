@@ -24,7 +24,7 @@
   <meta name="twitter:title" content="Cadence help">
   <meta name="twitter:description" content="Step-by-step guides for Cadence's trickier settings.">
   <meta name="twitter:image" content="https://cadence.patrick-mckinley.com/assets/og-help.jpg">
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
   <header class="site-header">
@@ -165,6 +165,7 @@
             <li>In <em>Settings → Accounts</em>, turn on running-late messages for a Google or Microsoft account. Cadence asks for the extra permissions it needs to send mail and chat messages (see the <a href="privacy.html">privacy policy</a> for exactly which).</li>
             <li>To use Slack, connect your workspace in the same place. Messages are sent as you, not as a bot.</li>
             <li>Add <strong>domain rules</strong> to pick a channel by who's in the meeting, like <em>@client.com → Slack</em>. Without a rule, Cadence tries the meeting's own chat first (Teams meeting chat, Google Chat for Meet, the Slack huddle's channel), then email.</li>
+            <li><strong>Email from Google:</strong> Cadence's built-in Google sign-in can post to Google Chat but not send Gmail, so email goes from a Microsoft account if you have one. To send Gmail too, use your own Google OAuth client (see <a href="#google">above</a>) with the Gmail API turned on.</li>
             <li>Edit the suggested messages if you like. Cadence picks one based on what came before: wrapping up the last meeting, a breather between back-to-backs, or just running behind.</li>
           </ol>
         </article>
