@@ -47,6 +47,19 @@ final class WelcomeWindows: NSObject, NSWindowDelegate {
         }
     }
 
+    /// The notes for the version that's running, from the version in the About window.
+    func showNotes(for version: SemVer) {
+        let updater = state.updater
+        Task {
+            var releases = updater.releases
+            if !releases.contains(where: { $0.version == version }) { releases = (try? await updater.fetchReleases()) ?? [] }
+            let log = UpdatePlanner.changelog(releases, from: nil, to: version)
+            present(title: "Cadence \(version)", width: 520) { close in
+                ChangelogView(purpose: .version(version), releases: log, done: close)
+            }
+        }
+    }
+
     /// What the available update brings, with the button that installs it.
     func showAvailable() {
         let updater = state.updater
@@ -62,7 +75,8 @@ final class WelcomeWindows: NSObject, NSWindowDelegate {
     }
 
     private func present<Content: View>(title: String, width: CGFloat, @ViewBuilder _ content: (@escaping () -> Void) -> Content) {
-        window?.close()
+        // Setup stays open (closing it counts as finishing it); anything else here is replaced.
+        if window !== setupWindow { window?.close() }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 560),
                               styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
         window.title = title
@@ -90,6 +104,8 @@ struct ChangelogView: View {
     enum Purpose {
         /// Just updated to this version.
         case updated(SemVer)
+        /// The notes for one version, opened from the About window.
+        case version(SemVer)
         /// This release is available; the updater installs it.
         case available(GitHubRelease, Updater)
     }
@@ -128,6 +144,7 @@ struct ChangelogView: View {
     private var title: String {
         switch purpose {
         case .updated(let version): "Updated to \(version)"
+        case .version(let version): "Cadence \(version)"
         case .available(let release, _): "Cadence \(release.version?.description ?? release.tag) is out"
         }
     }
@@ -137,6 +154,8 @@ struct ChangelogView: View {
         switch purpose {
         case .updated:
             return count > 1 ? "Here's what changed in the last \(count) releases." : "Here's what changed."
+        case .version:
+            return "Here's what changed in this version."
         case .available(_, let updater):
             let since = "You have \(updater.currentVersionText)"
             return count > 1 ? "\(since). Here's what the \(count) releases since then bring." : "\(since). Here's what it brings."
@@ -156,7 +175,7 @@ struct ChangelogView: View {
     @ViewBuilder private var buttons: some View {
         HStack {
             switch purpose {
-            case .updated:
+            case .updated, .version:
                 Spacer()
                 Button("Done", action: done)
                     .keyboardShortcut(.defaultAction)

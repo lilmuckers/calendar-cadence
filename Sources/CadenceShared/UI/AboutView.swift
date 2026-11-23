@@ -12,6 +12,8 @@ struct AboutView: View {
         ("macbook", "Paired with Cadence on your Mac")
         #endif
     }()
+    /// Set where this copy can show release notes: clicking the version shows what changed in it.
+    var showVersionNotes: (() -> Void)?
 
     @State private var mood: AboutMascot.Mood = .calm
     @State private var target: CGPoint = .zero
@@ -106,13 +108,8 @@ struct AboutView: View {
                     .font(.system(.callout, design: .rounded))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                Text(Self.version)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(.primary.opacity(0.06), in: Capsule())
+                versionBadge
                     .padding(.top, 4)
-                    .textSelection(.enabled)
             }
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
@@ -138,6 +135,22 @@ struct AboutView: View {
         .padding(.bottom, 22)
     }
 
+    @ViewBuilder private var versionBadge: some View {
+        if let showVersionNotes {
+            Button(action: showVersionNotes) {
+                VersionBadge(tappable: true)
+            }
+            .buttonStyle(.plain)
+            #if os(macOS)
+            .help("What's new in this version")
+            #endif
+            .accessibilityHint("Shows what changed in this version")
+        } else {
+            VersionBadge(tappable: false)
+                .textSelection(.enabled)
+        }
+    }
+
     static let repo = URL(string: "https://github.com/lilmuckers/calendar-cadence")!
 
     static var version: String {
@@ -145,6 +158,26 @@ struct AboutView: View {
         let short = info["CFBundleShortVersionString"] as? String ?? "dev"
         let build = info["CFBundleVersion"] as? String
         return build.map { "Version \(short) (\($0))" } ?? "Version \(short)"
+    }
+}
+
+/// "Version 1.2.3 (45)" in a capsule; with a sparkle and a hover highlight when it opens the notes.
+private struct VersionBadge: View {
+    let tappable: Bool
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Text(AboutView.version)
+            if tappable { Image(systemName: "sparkles").font(.system(size: 9, weight: .bold)) }
+        }
+        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10).padding(.vertical, 4)
+        .background(tappable && hovering ? AnyShapeStyle(AboutMascot.orange.opacity(0.18)) : AnyShapeStyle(.primary.opacity(0.06)),
+                    in: Capsule())
+        .contentShape(Capsule())
+        .onHover { hovering = $0 }
     }
 }
 
