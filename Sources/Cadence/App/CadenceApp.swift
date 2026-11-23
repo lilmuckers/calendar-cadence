@@ -86,11 +86,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 inviteReview.show(invites, reason: .new)
             }
         }
-        // While the iPhone is connected, new invites and clashes pop up there instead of here.
+        // New invites and clashes pop up here, and on a connected iPhone too.
         let phonePrompts = PhonePrompts(state: state, hub: state.companion,
                                         showClashOnMac: { clashPrompt.enqueue($0) },
-                                        showInvitesOnMac: showNewInvitesOnMac)
+                                        showInvitesOnMac: showNewInvitesOnMac,
+                                        dismissClashOnMac: { clashPrompt.close($0) },
+                                        dismissInviteOnMac: { inviteReview.remove($0) })
         self.phonePrompts = phonePrompts
+        clashPrompt.onSettled = { [weak phonePrompts] key in phonePrompts?.settledOnMac(clash: key) }
         state.onClash = { clash in phonePrompts.clash(clash) }
         state.onInvites = { invites, reason in
             if reason == .new {

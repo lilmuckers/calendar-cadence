@@ -9,6 +9,8 @@ import SwiftUI
 final class ClashPromptController {
     private let state: AppState
     private var cards: [String: AlertStack.Card] = [:]
+    /// Settled here (any answer, "decide later" included), so a phone showing it can drop it.
+    var onSettled: (String) -> Void = { _ in }
 
     init(state: AppState) { self.state = state }
 
@@ -25,6 +27,7 @@ final class ClashPromptController {
             ClashPromptView(clash: clash) { [weak self] choice in
                 self?.state.resolveClash(clash, choice: choice)
                 self?.close(clash.key)
+                self?.onSettled(clash.key)
             }
             .environment(state)
         }
@@ -32,7 +35,8 @@ final class ClashPromptController {
         NSSound(named: "Funk")?.play()
     }
 
-    private func close(_ key: String) {
+    /// Closes the card for `key` if it's up (it was settled on the phone).
+    func close(_ key: String) {
         cards.removeValue(forKey: key)?.close()
     }
 }
