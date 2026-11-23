@@ -64,10 +64,13 @@ struct PhoneTab: View {
                     Picker("If you're still late", selection: $state.prefs.companionEscalation) {
                         ForEach(CompanionEscalation.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
+                    Picker("Clash and invite prompts", selection: $state.prefs.promptPlace) {
+                        ForEach(PromptPlace.allCases) { Text($0.label).tag($0) }
+                    }
                 } header: {
                     Text("While the iPhone is displaying")
                 } footer: {
-                    Text("\"If you're still late\" brings the alert up on this Mac too once the meeting has started and you haven't joined, snoozed or dismissed it on the phone. Join on the phone joins on this Mac while they're connected.")
+                    Text("\"If you're still late\" brings the alert up on this Mac too once the meeting has started and you haven't joined, snoozed or dismissed it on the phone. Join on the phone joins on this Mac while they're connected. Prompts answered on one side clear from the other; with \"iPhone only\", any still waiting move to this Mac when the phone leaves its desk display.")
                         .foregroundStyle(.secondary)
                 }
 

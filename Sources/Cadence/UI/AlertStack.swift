@@ -2,9 +2,10 @@ import AppKit
 import SwiftUI
 
 /// The column of Cadence's own cards down the right of the screen (clashes, invites, assistant
-/// approvals). One card is open at a time — the top one unless another was clicked — and the rest
-/// sit folded under it as one-line drawers saying what they are. Resolving the open card closes
-/// it, the rest move up, and the top one opens.
+/// approvals). The open card is always the top one; the rest sit under it as one-line drawers
+/// saying what they are. Clicking a drawer moves it to the top and opens it (the card that was
+/// open folds into a drawer under it). Resolving the open card closes it, the rest move up, and
+/// the new top one opens.
 @MainActor
 final class AlertStack {
     static let shared = AlertStack()
@@ -25,22 +26,22 @@ final class AlertStack {
     @MainActor private final class Entry {
         let id: UUID
         let panel: FloatingPanel
-        let host: NSView
         let model: StackCardModel
         var height: () -> CGFloat
 
-        init(id: UUID, panel: FloatingPanel, host: NSView, model: StackCardModel, height: @escaping () -> CGFloat) {
+        init(id: UUID, panel: FloatingPanel, model: StackCardModel, height: @escaping () -> CGFloat) {
             self.id = id
             self.panel = panel
-            self.host = host
             self.model = model
             self.height = height
         }
     }
 
+    /// Top to bottom; the first is the open one.
     private var entries: [Entry] = []
-    private var openID: UUID?
     private var screen: NSScreen?
+    /// Bumped on every layout, so a finished animation from an older layout leaves things alone.
+    private var generation = 0
 
     /// A handle a card's owner keeps to update or close it.
     struct Card {
@@ -56,34 +57,27 @@ final class AlertStack {
     /// Adds a card at the bottom of the column (open straight away if it's the only one).
     /// `height` is the open card's height, asked again on every `relayout()`.
     func add<Content: View>(summary: Summary, height: @escaping () -> CGFloat, @ViewBuilder content: () -> Content) -> Card {
-        let model = StackCardModel(summary: summary)
-        let full = NSSize(width: Self.width, height: height())
-        let panel = FloatingPanel(size: full)
+        let id = UUID()
+        let model = StackCardModel(summary: summary, fullHeight: height())
+        let panel = FloatingPanel(size: NSSize(width: Self.width, height: Self.drawerHeight))
         panel.level = .statusBar
         panel.isMovableByWindowBackground = false
-
-        // The card's SwiftUI view is pinned to the top of a clipping container, so the panel can
-        // grow and shrink around it without the content being squashed mid-animation.
-        let container = TopAnchoredView(frame: NSRect(origin: .zero, size: full))
-        container.autoresizingMask = [.width, .height]
-        let id = UUID()
         let root = StackCardView(model: model, open: { [weak self] in self?.open(id) }, content: content())
         let host = NSHostingView(rootView: root)
         host.sizingOptions = []
-        host.frame = NSRect(origin: .zero, size: full)
-        container.addSubview(host)
-        panel.contentView = container
+        host.autoresizingMask = [.width, .height]
+        panel.contentView = host
 
-        let entry = Entry(id: id, panel: panel, host: host, model: model, height: height)
+        let entry = Entry(id: id, panel: panel, model: model, height: height)
         entries.append(entry)
-        if openID == nil { openID = id }
         if screen == nil { screen = NSScreen.main ?? NSScreen.screens.first }
 
         // Slide in from the right at its place in the column.
-        model.expanded = openID == id
-        let target = frames()[id] ?? NSRect(origin: .zero, size: full)
-        if !model.expanded { host.frame = NSRect(x: 0, y: 0, width: Self.width, height: Self.drawerHeight) }
-        panel.setFrame(target.offsetBy(dx: 40, dy: 0), display: false)
+        model.expanded = entries.first === entry
+        if let target = frames()[id] {
+            panel.setFrame(target.offsetBy(dx: 40, dy: 0), display: false)
+            host.frame = NSRect(origin: .zero, size: target.size)
+        }
         panel.alphaValue = 0
         panel.orderFrontRegardless()
         layout(animated: true)
@@ -94,16 +88,16 @@ final class AlertStack {
 
     private func entry(_ id: UUID) -> Entry? { entries.first { $0.id == id } }
 
+    /// A drawer was clicked: it moves to the top and opens.
     private func open(_ id: UUID) {
-        guard openID != id, entry(id) != nil else { return }
-        openID = id
+        guard let index = entries.firstIndex(where: { $0.id == id }), index > 0 else { return }
+        entries.insert(entries.remove(at: index), at: 0)
         layout(animated: true)
     }
 
     private func remove(_ id: UUID) {
         guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
-        let entry = entries.remove(at: index)
-        let panel = entry.panel
+        let panel = entries.remove(at: index).panel
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.2
             panel.animator().alphaValue = 0
@@ -111,36 +105,34 @@ final class AlertStack {
         }, completionHandler: {
             MainActor.assumeIsolated { panel.orderOut(nil) }
         })
-        if openID == id { openID = entries.first?.id }
         if entries.isEmpty { screen = nil }
         layout(animated: true)
     }
 
-    /// Where each card goes: top-right down, the open one at full height, the others as drawers.
+    /// Where each card goes: top-right down, the open (first) one at full height, the others as drawers.
     private func frames() -> [UUID: NSRect] {
         guard let screen = screen ?? NSScreen.main ?? NSScreen.screens.first else { return [:] }
         let v = screen.visibleFrame
         var top = v.maxY - Self.margin
         var out: [UUID: NSRect] = [:]
-        for entry in entries {
-            let id = entry.id
-            let h = id == openID ? entry.height() : Self.drawerHeight
-            out[id] = NSRect(x: v.maxX - Self.width - Self.margin, y: top - h, width: Self.width, height: h)
+        for (i, entry) in entries.enumerated() {
+            let h = i == 0 ? entry.height() : Self.drawerHeight
+            out[entry.id] = NSRect(x: v.maxX - Self.width - Self.margin, y: top - h, width: Self.width, height: h)
             top -= h + Self.gap
         }
         return out
     }
 
     func layout(animated: Bool) {
+        generation += 1
+        let pass = generation
         let targets = frames()
-        for entry in entries {
-            let id = entry.id
-            guard let target = targets[id] else { continue }
-            let open = id == openID
-            if open != entry.model.expanded || open {
-                // Opening: give the content its full height first, then let the panel grow round it.
-                if open { entry.host.frame = NSRect(x: 0, y: 0, width: Self.width, height: target.height) }
-                withAnimation(.easeOut(duration: 0.2)) { entry.model.expanded = open }
+        for (i, entry) in entries.enumerated() {
+            guard let target = targets[entry.id] else { continue }
+            let open = i == 0
+            entry.model.fullHeight = entry.height()
+            if entry.model.expanded != open {
+                withAnimation(.easeOut(duration: 0.22)) { entry.model.expanded = open }
             }
             let panel = entry.panel
             NSAnimationContext.runAnimationGroup({ ctx in
@@ -150,32 +142,20 @@ final class AlertStack {
                 panel.animator().alphaValue = 1
             }, completionHandler: { [weak self] in
                 MainActor.assumeIsolated {
-                    guard let self, self.entries.contains(where: { $0 === entry }) else { return }
-                    // An interrupted or dropped window animation can leave a card short of its
-                    // place (part off the edge of the screen): snap it to where it belongs now.
-                    if let now = self.frames()[entry.id], entry.panel.frame != now {
-                        entry.panel.setFrame(now, display: true)
+                    guard let self, pass == self.generation, self.entries.contains(where: { $0 === entry }) else { return }
+                    // A dropped window animation can leave a card short of its place (part off
+                    // the edge of the screen): snap it there.
+                    if entry.panel.frame != target {
+                        entry.panel.setFrame(target, display: true)
                         entry.panel.alphaValue = 1
                     }
-                    // Closed down to a drawer: trim the content to match.
-                    if entry.id != self.openID {
-                        entry.host.frame = NSRect(x: 0, y: 0, width: Self.width, height: Self.drawerHeight)
-                    }
+                    // The window's shadow follows the shape it had when first drawn: redo it for
+                    // the new size, or a drawer keeps the open card's outline.
+                    entry.panel.invalidateShadow()
                 }
             })
         }
     }
-}
-
-/// Keeps its subviews' origin at the top-left and clips them, so a panel shrinking around a card
-/// cuts off the bottom rather than pushing the content down.
-private final class TopAnchoredView: NSView {
-    override var isFlipped: Bool { true }
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        clipsToBounds = true
-    }
-    required init?(coder: NSCoder) { fatalError() }
 }
 
 @MainActor
@@ -183,10 +163,17 @@ private final class TopAnchoredView: NSView {
 final class StackCardModel {
     var summary: AlertStack.Summary
     var expanded = false
-    init(summary: AlertStack.Summary) { self.summary = summary }
+    /// The open card's height: its content is laid out at this size and clipped while the
+    /// window is smaller, so it doesn't squash as the window grows or shrinks.
+    var fullHeight: CGFloat
+    init(summary: AlertStack.Summary, fullHeight: CGFloat) {
+        self.summary = summary
+        self.fullHeight = fullHeight
+    }
 }
 
-/// One card in the stack: its full content when open, a one-line drawer otherwise.
+/// One card in the stack: its full content when open, a one-line drawer otherwise. Both are
+/// pinned to the top of the window and clipped to it.
 private struct StackCardView<Content: View>: View {
     let model: StackCardModel
     let open: () -> Void
@@ -195,13 +182,16 @@ private struct StackCardView<Content: View>: View {
     var body: some View {
         ZStack(alignment: .top) {
             content
+                .frame(height: model.fullHeight)
                 .opacity(model.expanded ? 1 : 0)
                 .allowsHitTesting(model.expanded)
-            if !model.expanded {
-                drawer.transition(.opacity)
-            }
+            drawer
+                .opacity(model.expanded ? 0 : 1)
+                .allowsHitTesting(!model.expanded)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .clipped()
+        .ignoresSafeArea()
     }
 
     private var drawer: some View {
@@ -223,8 +213,8 @@ private struct StackCardView<Content: View>: View {
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 12)
-            .frame(height: AlertStack.drawerHeight)
             .frame(maxWidth: .infinity)
+            .frame(height: AlertStack.drawerHeight)
             .background(VisualEffect(material: .hudWindow))
             .background(LinearGradient(colors: [s.tint.opacity(0.14), .clear], startPoint: .leading, endPoint: .trailing))
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))

@@ -13,6 +13,19 @@ enum InviteAlertStyle: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Where clash and new-invite prompts show while an iPhone is connected in desk mode.
+enum PromptPlace: String, Codable, CaseIterable, Identifiable {
+    case both, mac, phone
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .both: "Mac and iPhone"
+        case .mac: "This Mac only"
+        case .phone: "iPhone only"
+        }
+    }
+}
+
 /// How much the menu bar item shows. macOS hides items that don't fit (behind the notch or
 /// off the left edge) and offers apps no way to claim priority, so a narrower item survives longer.
 enum MenuBarStyle: String, Codable, CaseIterable, Identifiable {
@@ -110,6 +123,8 @@ struct Preferences: Codable, Equatable {
     /// Ask about unanswered invites once a day, at the morning summary time.
     var inviteReviewDaily = true
     var newInviteAlert: InviteAlertStyle = .card
+    /// Where clash and invite prompts show while the iPhone is on its desk display.
+    var promptPlace: PromptPlace = .both
     /// Calendars whose invites also ask for an event colour.
     var colorPromptCalendarIDs: Set<String> = []
     /// Colours Cadence keeps itself (for sources that can't store one): seriesID or meeting id → palette id.
@@ -264,6 +279,7 @@ extension Preferences {
         inviteHorizon = (try? c.decodeIfPresent(InviteHorizon.self, forKey: .inviteHorizon)) ?? d.inviteHorizon
         inviteReviewDaily = try c.decodeIfPresent(Bool.self, forKey: .inviteReviewDaily) ?? d.inviteReviewDaily
         newInviteAlert = (try? c.decodeIfPresent(InviteAlertStyle.self, forKey: .newInviteAlert)) ?? d.newInviteAlert
+        promptPlace = (try? c.decodeIfPresent(PromptPlace.self, forKey: .promptPlace)) ?? d.promptPlace
         colorPromptCalendarIDs = try c.decodeIfPresent(Set<String>.self, forKey: .colorPromptCalendarIDs) ?? d.colorPromptCalendarIDs
         localEventColors = try c.decodeIfPresent([String: String].self, forKey: .localEventColors) ?? d.localEventColors
         wrapUpEnabled = try c.decodeIfPresent(Bool.self, forKey: .wrapUpEnabled) ?? d.wrapUpEnabled

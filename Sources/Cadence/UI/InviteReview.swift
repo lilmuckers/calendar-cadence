@@ -50,6 +50,13 @@ final class InviteReviewController {
         NSSound(named: "Glass")?.play()
     }
 
+    /// Drops an invite answered elsewhere (on the phone).
+    func remove(_ id: String) {
+        guard card != nil, model.items.contains(where: { $0.id == id }) else { return }
+        model.items.removeAll { $0.id == id }
+        itemsChanged()
+    }
+
     private func itemsChanged() {
         if model.items.isEmpty { close() } else { card?.setSummary(summary); card?.relayout() }
     }
