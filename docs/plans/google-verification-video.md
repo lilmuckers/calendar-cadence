@@ -16,6 +16,9 @@ from `shots.txt` and the title cards, and writes one 1080p MP4.
   matches the submission.
 - [ ] **Use the built-in client.** A release build (or `scripts/build.sh` with `Support/Secrets.env`),
   *not* "Use my own OAuth client". The client ID in the browser must start `106641200883-`.
+- [ ] **Rebuild from current main first.** A build older than the gmail.send change still asks for
+  "Send email on your behalf" on the running-late consent screen, which doesn't match the submission.
+  If that happened, Sign Out the demo account (it revokes every grant) and record shot 5 again.
 - [ ] **A fresh test account in the Workspace** as the demo account, so no real calendar or chat shows and the
   consent screen is clean (it has never granted Cadence access):
   - **Demo account** (`tester.bee@`): signs in to Cadence on camera, on the Mac and the iPhone.
