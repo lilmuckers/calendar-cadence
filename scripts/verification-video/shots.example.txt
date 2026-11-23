@@ -1,0 +1,31 @@
+# Copy to your clips folder as shots.txt, rename files to match your recordings, and set trims (seconds).
+# file | caption | start | end
+card | Calendar Cadence\nGoogle OAuth verification demo\nmacOS and iPhone · client 106641200883-….apps.googleusercontent.com
+
+01-mac-signin.mov | Settings → Accounts → Sign in with Google opens Google's sign-in in the browser
+01-mac-signin.mov | The OAuth client ID is in the address bar
+01-mac-signin.mov | Consent screen: Cadence asks to see and edit your calendar events
+01-mac-signin.mov | Signed in. Tokens are stored only in this Mac's Keychain
+
+02-mac-calendar.mov | calendar.readonly: Cadence reads your events to show countdowns, alerts and Join links
+
+03-mac-rsvp.mov | calendar.events: replying to an invitation from Cadence…
+03-mac-rsvp.mov | …and the reply in Google Calendar
+
+04-mac-colour.mov | calendar.events: setting an event's colour…
+04-mac-colour.mov | …and the new colour in Google Calendar
+
+05-mac-chat-consent.mov | Optional: "Allow running-late messages" asks separately for Google Chat
+05-mac-chat-consent.mov | Consent screen: the three Google Chat permissions
+
+06-mac-chat-send.mov | Running late: Cadence offers a Google Chat message to the organiser
+06-mac-chat-send.mov | chat.spaces.readonly finds your DM with them; chat.spaces.create starts one if there isn't one
+06-mac-chat-send.mov | chat.messages.create: the message, sent only when you click, as you
+
+07-iphone.mp4 | iPhone: Settings → Calendars → Sign in with Google
+07-iphone.mp4 | Consent screen for the same client project, calendar access only
+07-iphone.mp4 | calendar.readonly: the same meetings on the iPhone
+
+08-mac-signout.mov | Sign Out revokes Cadence's access and deletes the stored token
+
+card | Your calendar data stays on your devices\nCadence has no server and never sells or shares Google data\ncadence.patrick-mckinley.com/privacy
