@@ -17,6 +17,10 @@ swiftc -target "$TARGET" "${OPT[@]}" -parse-as-library -module-name Cadence \
   $(find "$ROOT/Sources/Cadence" "$ROOT/Sources/CadenceShared" -name '*.swift')
 
 cp "$ROOT/Support/Info.plist" "$APP/Contents/Info.plist"
+# Version from the newest release tag (or the release workflow's VERSION / BUILD_NUMBER), so About is right.
+source "$ROOT/scripts/version.sh"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
+echo "Version $VERSION ($BUILD_NUMBER)"
 [[ -f "$ROOT/Support/AppIcon.icns" ]] && cp "$ROOT/Support/AppIcon.icns" "$APP/Contents/Resources/"
 
 # Optional built-in Google OAuth client and Microsoft app registration, so users can just click "Sign in with Google".
