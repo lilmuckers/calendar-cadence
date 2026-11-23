@@ -172,12 +172,13 @@ final class SpotifyRemote: NSObject {
         guard let sessions else { return }
         wantConnected = true
         lastError = nil
-        guard sessions.isSpotifyAppInstalled else {
-            lastError = "Spotify isn't installed on this iPhone."
-            openStore()
-            return
-        }
-        sessions.initiateSession(with: .appRemoteControl, options: .clientOnly, campaign: nil)
+        // The SDK's installed check (canOpenURL on "spotify:") can say no with Spotify right there,
+        // which sent people to the App Store. Don't trust a no: open Spotify directly instead, and
+        // the SDK signs in on the web if it really isn't installed.
+        let installed = sessions.isSpotifyAppInstalled
+        if !installed { NSLog("Cadence: Spotify installed check said no; opening it directly") }
+        sessions.initiateSession(with: .appRemoteControl,
+                                 options: installed ? .clientOnly : .spotifySchemeNotRegistered, campaign: nil)
     }
 
     /// Spotify's redirect back to Cadence. True if it was ours (the session manager takes it from
@@ -209,10 +210,6 @@ final class SpotifyRemote: NSObject {
         wantConnected = false
         remote?.disconnect()
         clear()
-    }
-
-    private func openStore() {
-        UIApplication.shared.open(URL(string: "https://apps.apple.com/app/id\(SPTAppRemote.spotifyItunesItemIdentifier())")!)
     }
 
     // MARK: Controls
