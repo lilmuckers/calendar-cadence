@@ -82,6 +82,8 @@ final class CompanionHub {
     @ObservationIgnored var onPhoneConnected: (() -> Void)?
     /// The last connected phone went away.
     @ObservationIgnored var onPhonesGone: (() -> Void)?
+    /// A phone started or stopped showing its desk display.
+    @ObservationIgnored var onDisplayChanged: (() -> Void)?
 
     @ObservationIgnored private var listener: NWListener?
     /// Waiting for the old listener to let go of the port before starting one with the new keys.
@@ -382,6 +384,7 @@ final class CompanionHub {
             if displaying, !phones[i].displaying { phones[i].since = Date() }
             phones[i].displaying = displaying
             remoteChanged()
+            onDisplayChanged?()
         case .join(let meetingID):
             onJoin?(meetingID)
             broadcast(.dismissAlert(meetingID: meetingID))
