@@ -6,7 +6,11 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG="${CONFIG:-Debug}"
-ARGS=(-project "$ROOT/iOS/CadenceCompanion.xcodeproj" -scheme Cadence -configuration "$CONFIG" -derivedDataPath "$ROOT/build/ios")
+# Version from the newest release tag (or VERSION / BUILD_NUMBER), so About is right.
+source "$ROOT/scripts/version.sh"
+echo "Version $VERSION ($BUILD_NUMBER)"
+ARGS=(-project "$ROOT/iOS/CadenceCompanion.xcodeproj" -scheme Cadence -configuration "$CONFIG" -derivedDataPath "$ROOT/build/ios"
+  MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER")
 
 if [[ "${1:-}" == "--device" ]]; then
   xcodebuild "${ARGS[@]}" -destination 'generic/platform=iOS' -allowProvisioningUpdates build
