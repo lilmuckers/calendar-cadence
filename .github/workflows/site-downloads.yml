@@ -1,0 +1,66 @@
+name: Update website downloads
+
+# Keeps the website (gh-pages) in step with the GitHub releases: writes releases.json, which the
+# downloads page and the home page's button read, and bakes the newest stable version, its DMG link,
+# size and date into index.html so the button is right before any JavaScript runs.
+# See scripts/site-downloads.py.
+#
+# Runs at the end of the Release workflow (releases it creates with GITHUB_TOKEN don't fire `release`
+# events), when a release is published, edited or deleted by hand, and on demand.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  release:
+    types: [published, edited, deleted, unpublished]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site-downloads
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update releases.json and the download button
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The script always comes from main: a `release` event runs at its tag, which may predate it.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: src
+          sparse-checkout: scripts
+
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+
+      - name: Update the site
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 src/scripts/site-downloads.py site
+
+      - name: Push to gh-pages
+        working-directory: site
+        run: |
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "Already up to date." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add releases.json index.html
+          LATEST="$(python3 -c 'import json; r=[x for x in json.load(open("releases.json")) if not x["pre"]]; print(r[0]["tag"] if r else "no stable release")')"
+          git commit -m "Update downloads for $LATEST"
+          # Someone may have pushed to gh-pages meanwhile; rebase onto it and try again.
+          for attempt in 1 2 3; do
+            git push origin HEAD:gh-pages && break
+            [[ $attempt == 3 ]] && exit 1
+            git pull --rebase origin gh-pages
+          done
+          echo "Website downloads updated for $LATEST." >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,7 @@
 name: Release
 
-# Release flow: work out the version → test → build Cadence.app → DMG + zip → tag → GitHub release.
+# Release flow: work out the version → test → build Cadence.app → DMG + zip → tag → GitHub release
+# → website download links (site-downloads.yml).
 #
 # Version: the highest major/minor/patch label among PRs merged into main since the last vX.Y.Z tag
 # (see scripts/next-version.sh). The first release uses the version in Support/Info.plist.
@@ -409,3 +410,12 @@ jobs:
             echo "### Released $TAG"
             gh release view "$TAG" --json url --jq '"- " + .url'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  site:
+    name: Update website downloads
+    needs: release
+    # Drafts aren't public, so the site would have nothing new to show.
+    if: ${{ !inputs.dry_run && !inputs.draft }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/site-downloads.yml
