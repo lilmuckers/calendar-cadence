@@ -101,10 +101,13 @@ final class GoogleCalendarProvider: CalendarProvider {
     private func refreshLabels(_ entries: [GoogleCalendarListEntry], token: String) async {
         var fresh: [String: [GoogleEventLabel]] = [:]
         for entry in entries {
-            if let resource: GoogleCalendarResource = try? await get("calendars/\(escape(entry.id))", query: [:], token: token) {
+            do {
+                let resource: GoogleCalendarResource = try await get("calendars/\(escape(entry.id))", query: [:], token: token)
                 if !resource.labels.isEmpty { fresh[entry.id] = resource.labels }
-            } else if let old = labels[entry.id] {
-                fresh[entry.id] = old
+            } catch {
+                // A 403 here usually means the token lacks calendar.calendars.readonly: Reconnect the account.
+                NSLog("Cadence: couldn't read colour labels for Google calendar \(entry.id): \(error)")
+                if let old = labels[entry.id] { fresh[entry.id] = old }
             }
         }
         labels = fresh
@@ -118,6 +121,7 @@ final class GoogleCalendarProvider: CalendarProvider {
         do {
             return try await get(path, query: labelled, token: token)
         } catch where error.localizedDescription.hasSuffix("HTTP 400") {
+            NSLog("Cadence: Google rejected eventLabelVersion on \(calendarID), reading events without labels: \(error)")
             labelReadsRejected = true
             return try await get(path, query: query, token: token)
         }
@@ -288,7 +292,9 @@ final class GoogleCalendarProvider: CalendarProvider {
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            throw URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: "Google API HTTP \(code)"])
+            // Google's reason (e.g. insufficient scopes) rides along for logging; the description stays short.
+            let reason = String(data: data.prefix(500), encoding: .utf8) ?? ""
+            throw URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: "Google API HTTP \(code)", "GoogleResponse": reason])
         }
         return try JSONDecoder().decode(T.self, from: data)
     }

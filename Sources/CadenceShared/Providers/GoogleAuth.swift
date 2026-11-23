@@ -56,12 +56,8 @@ final class GoogleAuth {
         }
     }
 
-    static let writeScope = "https://www.googleapis.com/auth/calendar.events"
-    /// The narrowest pair that works: calendar.events reads (and, on a click, replies to or colours) events on every
-    /// calendar, and calendarlist.readonly lists the calendars so the user can choose which to show.
-    /// calendar.readonly is broader (settings, sharing, free/busy) and Google's verification rejects it here.
-    static let listScope = "https://www.googleapis.com/auth/calendar.calendarlist.readonly"
-    static let scope = "openid email profile \(listScope) \(writeScope)"
+    static let writeScope = GoogleScopes.events
+    static let scope = "openid email profile \(GoogleScopes.calendar)"
     /// Asked for only when "Running late" messages are turned on, and only with a client the user brought
     /// themselves: it's a *restricted* scope, so the built-in client (which goes through Google's verification)
     /// never asks for it.
