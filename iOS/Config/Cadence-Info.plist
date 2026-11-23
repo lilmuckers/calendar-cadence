@@ -59,5 +59,14 @@
 	</array>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<!-- A background refresh to take down a missed meeting's Live Activity once its time is up. -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>cadence.liveactivity.missed-check</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 </dict>
 </plist>

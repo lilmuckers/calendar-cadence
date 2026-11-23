@@ -4,6 +4,8 @@ import SwiftUI
 /// extension doesn't link).
 enum ActivityMood: String, Codable, Hashable {
     case calm, nervous, panicking
+    /// The meeting came and went without anyone joining: heavy lids, eyes down, a frown.
+    case disappointed
 }
 
 /// The Mac's menu bar icon, drawn in SwiftUI for the Dynamic Island: a tiny calendar page with
@@ -22,7 +24,7 @@ struct GooglyIcon: View {
         }
         .frame(width: 20, height: 18)
         // Slight tilt once it's anxious, like the big icon running late.
-        .rotationEffect(.radians(mood == .calm ? 0 : 0.08), anchor: UnitPoint(x: 9 / 20, y: 9.5 / 18))
+        .rotationEffect(.radians(mood == .calm ? 0 : mood == .disappointed ? -0.06 : 0.08), anchor: UnitPoint(x: 9 / 20, y: 9.5 / 18))
         .scaleEffect(height / 18, anchor: .topLeading)
         .frame(width: 20 * height / 18, height: height, alignment: .topLeading)
         .accessibilityLabel(label)
@@ -33,6 +35,7 @@ struct GooglyIcon: View {
         case .calm: "Cadence"
         case .nervous: "Cadence, meeting soon"
         case .panicking: "Cadence, meeting in a few minutes"
+        case .disappointed: "Cadence, disappointed: meeting missed"
         }
     }
 }
@@ -50,9 +53,19 @@ enum GooglyPage {
         func path(in rect: CGRect) -> Path {
             var p = Path()
             for eye in GooglyPage.eyes { p.addEllipse(in: eye.ring) }
-            if mood == .calm {
+            switch mood {
+            case .calm:
                 p.move(to: CGPoint(x: 7.4, y: 14.4))
                 p.addCurve(to: CGPoint(x: 10.6, y: 14.4), control1: CGPoint(x: 8.2, y: 15.6), control2: CGPoint(x: 9.8, y: 15.6))
+            case .disappointed:
+                // A frown, and droopy lids sloping down to the outside.
+                p.move(to: CGPoint(x: 7.3, y: 15.4))
+                p.addCurve(to: CGPoint(x: 10.7, y: 15.4), control1: CGPoint(x: 8.1, y: 14.1), control2: CGPoint(x: 9.9, y: 14.1))
+                for (eye, outward) in zip(GooglyPage.eyes, [-1.0, 1.0]) {
+                    p.move(to: CGPoint(x: eye.center.x - eye.r * outward, y: eye.center.y - eye.r * 0.05))
+                    p.addLine(to: CGPoint(x: eye.center.x + eye.r * outward, y: eye.center.y - eye.r * 0.55))
+                }
+            default: break
             }
             return p
         }
@@ -69,9 +82,14 @@ enum GooglyPage {
             for x in [5.0, 12.5] {
                 p.addRoundedRect(in: CGRect(x: x - 0.9, y: 1.3, width: 1.8, height: 3.4), cornerSize: CGSize(width: 0.9, height: 0.9))
             }
-            for eye in GooglyPage.eyes { p.addEllipse(in: eye.pupil) }
+            for eye in GooglyPage.eyes {
+                // Disappointed: both looking down at the floor.
+                var e = eye
+                if mood == .disappointed { e.look = CGVector(dx: 0, dy: 0.95) }
+                p.addEllipse(in: e.pupil)
+            }
             switch mood {
-            case .calm: break
+            case .calm, .disappointed: break
             case .nervous: p.addEllipse(in: CGRect(x: 8.1, y: 14.0, width: 1.9, height: 1.7))
             case .panicking: p.addEllipse(in: CGRect(x: 7.6, y: 13.5, width: 2.9, height: 2.6))
             }

@@ -1,3 +1,4 @@
+import BackgroundTasks
 import CadenceCore
 import Foundation
 import Observation
@@ -775,6 +776,7 @@ final class PhoneState {
     /// web link when the user prefers that), otherwise on this phone. Other Macs that have it close
     /// their alert.
     func join(_ meeting: Meeting) {
+        markJoined(meeting)
         let copies = link.isConnected ? agenda.copies(of: meeting) : []
         if let target = joinMac(for: meeting) {
             let targetID = target.mac.id
@@ -789,6 +791,34 @@ final class PhoneState {
             for copy in copies { link.send(.dismiss(meetingID: copy.meeting.id), to: copy.macID) }
         }
         if alerting?.id == meeting.id { alerting = nil }
+        updateLiveActivity()
+    }
+
+    // MARK: - Joined meetings
+
+    /// Meetings joined from this phone, by id, with when they end (so old ones can be dropped).
+    @ObservationIgnored private var joinedHere: [String: Date] = PhoneState.loadJoined()
+    private static let joinedKey = "Cadence.phone.joinedMeetings.v1"
+
+    private static func loadJoined() -> [String: Date] {
+        guard let data = UserDefaults.standard.data(forKey: joinedKey),
+              let all = try? JSONDecoder().decode([String: Date].self, from: data) else { return [:] }
+        return all.filter { $0.value > Date() }
+    }
+
+    private func markJoined(_ meeting: Meeting) {
+        let now = Date()
+        joinedHere = joinedHere.filter { $0.value > now }
+        for id in Set([meeting.id] + agenda.copies(of: meeting).map(\.meeting.id)) { joinedHere[id] = meeting.end }
+        if let data = try? JSONEncoder().encode(joinedHere) { UserDefaults.standard.set(data, forKey: Self.joinedKey) }
+    }
+
+    /// Joined here, or on any Mac that has it (from the Mac's last snapshot).
+    func hasJoined(_ meeting: Meeting) -> Bool {
+        if joinedHere[meeting.id] != nil { return true }
+        return agenda.copies(of: meeting).contains { copy in
+            joinedHere[copy.meeting.id] != nil || snapshots[copy.macID]?.joinedIDs?.contains(copy.meeting.id) == true
+        }
     }
 
     /// Join by id (from a notification or the Live Activity). Waits briefly for the Mac link to come
@@ -998,31 +1028,60 @@ final class PhoneState {
     /// (`leaving`) one for a later meeting today starts early, showing the start time, and turns into
     /// the countdown by itself at the lead time.
     private func updateLiveActivity(leaving: Bool = false) {
-        guard prefs.liveActivityEnabled else { liveActivity.end(); return }
+        guard prefs.liveActivityEnabled else { liveActivity.end(keepMissed: false); return }
         let now = Date()
         let lead = Double(prefs.liveActivityLeadMinutes) * 60
         // Focus time or a break with no meeting close: count that down instead.
         let segment = schedule.enabled
             ? daySegments(from: Calendar.current.startOfDay(for: now)).first { $0.contains(now) && $0.countsDown } : nil
-        let meetingDue = focus.map { $0.live || $0.meeting.start.timeIntervalSince(now) <= max(lead, WidgetSchedule.momentYield) } ?? false
+        // Unlike the desk, a joined meeting drops out, and a missed one once it's lingered long enough.
+        let hidden = suppressed
+        let plan = ActivityPlanner.focus(meetings: meetings, now: now, isHidden: { hidden.contains($0.id) },
+                                         hasJoined: hasJoined, linger: prefs.liveActivityMissedLinger)
+        let meetingDue = plan.map { $0.live || $0.meeting.start.timeIntervalSince(now) <= max(lead, WidgetSchedule.momentYield) } ?? false
         if let segment, !meetingDue {
-            liveActivity.show(segment: segment, next: focus?.meeting ?? next)
+            liveActivity.show(segment: segment, next: plan?.meeting ?? next)
             return
         }
-        guard let f = focus else { liveActivity.end(); return }
+        guard let f = plan else { liveActivity.end(); return }
         let countdownFrom = f.meeting.start.addingTimeInterval(-lead)
         let early = leaving && Calendar.current.isDate(f.meeting.start, inSameDayAs: now)
             && f.meeting.start.timeIntervalSince(now) < Self.earlyStartLimit
-        if f.live || now >= countdownFrom || early {
-            let after = laterToday.first { $0.start >= f.meeting.start && $0.id != f.meeting.id }
+        let started = f.meeting.start <= now
+        if started || now >= countdownFrom || early {
+            let after = todayMeetings.first { $0.start >= f.meeting.start && $0.end > now && $0.id != f.meeting.id
+                && !hidden.contains($0.id) && !isAgendaOnly($0) }
             // Same as the Mac's menu bar: the mood (and the icon's colour) follow the next meeting to start.
-            let moodMeeting = f.live ? after : f.meeting
+            let moodMeeting = started ? after.flatMap { $0.start > now ? $0 : nil } : f.meeting
             liveActivity.show(f.meeting, live: f.live, next: after, onMac: joinMacName(for: f.meeting),
-                              countdownFrom: f.live ? now : countdownFrom, moodMeeting: moodMeeting)
+                              countdownFrom: started ? now : countdownFrom, moodMeeting: moodMeeting,
+                              missedUntil: f.missedUntil, showsMissed: prefs.liveActivityShowsMissed)
+            scheduleMissedCheck(f.missedUntil)
         } else if isActive {
             // Back in the app with nothing close: drop an early one; it'll come back when it's due.
             liveActivity.end()
         }
+    }
+
+    static let missedCheckTask = "cadence.liveactivity.missed-check"
+
+    /// The app can't touch the activity while it's suspended, so ask iOS to wake it once a missed
+    /// meeting's time is up, to take it down (or switch it to "Missed"). iOS decides when, so it's
+    /// best effort: the activity's stale date redraws it meanwhile.
+    private func scheduleMissedCheck(_ at: Date?) {
+        guard let at, at > Date(), at != scheduledMissedCheck else { return }
+        scheduledMissedCheck = at
+        let request = BGAppRefreshTaskRequest(identifier: Self.missedCheckTask)
+        request.earliestBeginDate = at
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    @ObservationIgnored private var scheduledMissedCheck: Date?
+
+    /// Woken in the background (see `scheduleMissedCheck`).
+    func backgroundRefresh() {
+        refresh()
+        updateLiveActivity()
     }
 
     /// iOS ends Live Activities after 8 hours; don't start one so early it would expire first.

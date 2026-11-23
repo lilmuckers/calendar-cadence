@@ -187,3 +187,45 @@ struct WidgetScheduleTests {
         #expect(WidgetSchedule.load(from: defaults) == schedule)
     }
 }
+
+@Suite("Live Activity: missed meetings")
+@MainActor
+struct MissedActivityTests {
+    private func state(start: Date, missedUntil: Date?, showsMissed: Bool? = nil) -> MeetingActivityAttributes.ContentState {
+        MeetingActivityAttributes.ContentState(
+            meetingID: "a", title: "Design Review", start: start, end: start.addingTimeInterval(1800), live: false,
+            calendarTitle: "Work", hasLink: true, red: 0.3, green: 0.5, blue: 0.9,
+            countdownFrom: start.addingTimeInterval(-1800), mood: .calm,
+            missedUntil: missedUntil, showsMissed: showsMissed)
+    }
+
+    @Test func turnsMissedAtTheStartThenGoes() {
+        let s = state(start: now, missedUntil: now.addingTimeInterval(300), showsMissed: true)
+        #expect(!s.missed(now: now.addingTimeInterval(-1)))
+        #expect(s.missed(now: now.addingTimeInterval(60)))
+        #expect(s.mood(now: now.addingTimeInterval(60)) == .panicking)
+        #expect(s.gone(now: now.addingTimeInterval(300)))
+        #expect(!s.missed(now: now.addingTimeInterval(300)))
+        #expect(s.mood(now: now.addingTimeInterval(300)) == .disappointed)
+        #expect(state(start: now, missedUntil: now).mood(now: now.addingTimeInterval(1)) == .calm)
+    }
+
+    @Test func withoutALinkNothingIsMissed() {
+        let s = state(start: now, missedUntil: nil)
+        #expect(!s.missed(now: now.addingTimeInterval(60)))
+        #expect(!s.gone(now: now.addingTimeInterval(3600)))
+    }
+
+    @Test func staleAtTheStartThenWhenTheMissedTimeIsUp() {
+        let s = state(start: now, missedUntil: now.addingTimeInterval(300))
+        #expect(LiveActivityController.staleDate(for: s, now: now.addingTimeInterval(-600)) == now)
+        #expect(LiveActivityController.staleDate(for: s, now: now.addingTimeInterval(60)) == now.addingTimeInterval(300))
+    }
+
+    @Test func missedSettingsDefaultAndDecode() throws {
+        let decoded = try JSONDecoder().decode(PhonePrefs.self, from: Data(#"{"liveActivityMissedLinger": 2}"#.utf8))
+        #expect(decoded.liveActivityMissedLinger == .twoMinutes)
+        #expect(decoded.liveActivityShowsMissed == false)
+        #expect(PhonePrefs().liveActivityMissedLinger == .fiveMinutes)
+    }
+}

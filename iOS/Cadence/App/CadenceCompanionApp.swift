@@ -26,5 +26,9 @@ struct CadenceCompanionApp: App {
                     state.desk.autoWhenCharging = on
                 }
         }
+        // A missed meeting's time is up: take its Live Activity down.
+        .backgroundTask(.appRefresh(PhoneState.missedCheckTask)) {
+            await MainActor.run { PhoneState.shared.backgroundRefresh() }
+        }
     }
 }

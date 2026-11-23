@@ -100,10 +100,13 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
     public var enrichments: EnrichmentBook?
     /// Working hours and breaks set on the Mac. Nil from older Macs.
     public var workSchedule: WorkSchedule?
+    /// Meetings joined on this Mac (from anywhere), so the phone's Live Activity can let them go.
+    /// Nil from older Macs.
+    public var joinedIDs: Set<String>?
 
     public init(macName: String, generatedAt: Date, meetings: [Meeting], suppressedIDs: Set<String> = [],
                 agendaOnlyIDs: Set<String>? = nil, takeoverEnabled: Bool = true, takeoverLeadSeconds: Double = 30, takeoverAutoDismissMinutes: Int? = nil,
-                enrichments: EnrichmentBook? = nil, workSchedule: WorkSchedule? = nil) {
+                enrichments: EnrichmentBook? = nil, workSchedule: WorkSchedule? = nil, joinedIDs: Set<String>? = nil) {
         self.macName = macName
         self.generatedAt = generatedAt
         self.meetings = meetings
@@ -114,6 +117,7 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
         self.takeoverAutoDismissMinutes = takeoverAutoDismissMinutes
         self.enrichments = enrichments
         self.workSchedule = workSchedule
+        self.joinedIDs = joinedIDs
     }
 }
 
