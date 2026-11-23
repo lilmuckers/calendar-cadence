@@ -96,11 +96,32 @@
     });
   }
 
-  // Pull the bullet points out of the generated release notes, dropping the
-  // "by @someone in https://…/pull/12" tail.
-  function changes(body) {
-    return body.split(/\r?\n/)
-      .filter(function (line) { return /^\s*[*-]\s+/.test(line); })
+  // Which build a "### 🖥️ Mac app" style section heading belongs to.
+  function sectionTarget(heading) {
+    var h = heading.toLowerCase();
+    if (h.indexOf("mac") >= 0) return "mac";
+    if (h.indexOf("iphone") >= 0 || h.indexOf("ios") >= 0) return "ios";
+    if (h.indexOf("website") >= 0) return "website";
+    if (h.indexOf("build") >= 0 || h.indexOf("ci") >= 0) return "ci";
+    if (h.indexOf("docs") >= 0) return "docs";
+    return "other";
+  }
+
+  // One build's bullet points from the release notes, dropping the
+  // "by @someone in https://…/pull/12" tail. Notes split by build (a ### per
+  // build, #### per kind) only give that build's section; older notes give
+  // every bullet. Keep in step with changes() in scripts/site-downloads.py.
+  function changes(body, target) {
+    var lines = body.split(/\r?\n/);
+    var byBuild = lines.some(function (line) { return /^\s*#### /.test(line); });
+    var section = null;
+    return lines
+      .filter(function (line) {
+        var heading = /^\s*### (.*)$/.exec(line);
+        if (byBuild && heading) { section = sectionTarget(heading[1]); return false; }
+        if (!/^\s*[*-]\s+/.test(line)) return false;
+        return !byBuild || section === target;
+      })
       .map(function (line) {
         return line.replace(/^\s*[*-]\s+/, "")
           .replace(/\s+by @\S+(\s+in\s+\S+)?\s*$/, "")
@@ -139,7 +160,8 @@
   }
 
   function card(release, isLatest) {
-    var items = changes(release.body);
+    // This is the Mac app's download history, so only the Mac app's changes.
+    var items = changes(release.body, "mac");
     var shown = items.slice(0, isLatest ? 8 : 4);
     var more = items.length - shown.length;
     var sums = release.assets.filter(function (a) { return /sha256/i.test(a.name); })[0];
@@ -151,7 +173,7 @@
       (shown.length
         ? '<ul class="rel-changes">' + shown.map(function (c) { return "<li>" + esc(c) + "</li>"; }).join("") +
           (more > 0 ? '<li class="more"><a href="' + esc(release.url) + '">+ ' + more + " more</a></li>" : "") + "</ul>"
-        : '<p class="rel-empty">Maintenance release.</p>') +
+        : '<p class="rel-empty">Behind-the-scenes changes only.</p>') +
       '<div class="rel-files">' +
         fileButton(asset(release, ".dmg"), "Download .dmg", true) +
         fileButton(asset(release, ".zip"), ".zip", false) +
