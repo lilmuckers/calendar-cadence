@@ -43,6 +43,8 @@ final class AppState {
     /// `meetings` without agenda-only ones: what alerts, reminders, clashes, current/next and
     /// assistant timeline events run on.
     private(set) var activeMeetings: [Meeting] = []
+    /// Ids in `meetings` that come only from calendars hidden from assistants (MCP).
+    private(set) var assistantHiddenIDs: Set<String> = []
 
     /// Set by the AppDelegate to show/hide windows when state changes.
     /// Fired when a meeting's alert is due. The optional style forces a presentation (used by Preview).
@@ -292,21 +294,24 @@ final class AppState {
             for change in MeetingChangeDetector.changes(old: previous, new: activeMeetings, now: now) {
                 switch change {
                 case .moved(let from, let to):
-                    onEvent(MCPEvent(type: "meeting.changed", message: "\(to.title) moved to \(Theme.dayTime(to.start))",
-                                     data: ["meeting": dto(to), "previous_start": .string(MeetingDTO.format(from.start)),
-                                            "previous_end": .string(MeetingDTO.format(from.end))],
-                                     uris: Self.agendaURIs))
+                    emit(MCPEvent(type: "meeting.changed", message: "\(to.title) moved to \(Theme.dayTime(to.start))",
+                                  data: ["meeting": dto(to), "previous_start": .string(MeetingDTO.format(from.start)),
+                                         "previous_end": .string(MeetingDTO.format(from.end))],
+                                  uris: Self.agendaURIs), about: [to])
                 case .canceled(let m):
-                    onEvent(MCPEvent(type: "meeting.canceled", message: "\(m.title) was cancelled", data: ["meeting": dto(m)],
-                                     uris: Self.agendaURIs, level: "notice"))
+                    emit(MCPEvent(type: "meeting.canceled", message: "\(m.title) was cancelled", data: ["meeting": dto(m)],
+                                  uris: Self.agendaURIs, level: "notice"), about: [m])
                 }
             }
         }
         let keys = Set(clashes.map(\.key))
         if let announced = announcedClashes, Date().timeIntervalSince(launchedAt) > 60 {
             for clash in clashes where !announced.contains(clash.key) {
-                onEvent(MCPEvent(type: "clash.new", message: "Double-booked: " + clash.meetings.map(\.title).joined(separator: " / "),
-                                 data: ["meetings": .array(clash.meetings.map(dto))], uris: ["cadence://clashes"], level: "warning"))
+                // Only a clash between meetings assistants can see is worth telling them about.
+                let visible = clash.meetings.filter { !isHiddenFromAssistants($0) }
+                guard visible.count > 1 else { continue }
+                emit(MCPEvent(type: "clash.new", message: "Double-booked: " + visible.map(\.title).joined(separator: " / "),
+                              data: ["meetings": .array(visible.map(dto))], uris: ["cadence://clashes"], level: "warning"))
             }
         }
         announcedClashes = (announcedClashes ?? []).union(keys)
@@ -333,8 +338,8 @@ final class AppState {
                                       leadMinutes: max(1, prefs.headsUpMinutes), wrapMinutes: prefs.wrapUpMinutes)
         for d in due {
             sentEvents.insert(d.key)
-            onEvent(MCPEvent(type: d.type, message: MCPEventPlanner.message(d, now: now), data: ["meeting": dto(d.meeting)],
-                             uris: ["cadence://next", "cadence://agenda/today", "cadence://status"]))
+            emit(MCPEvent(type: d.type, message: MCPEventPlanner.message(d, now: now), data: ["meeting": dto(d.meeting)],
+                          uris: ["cadence://next", "cadence://agenda/today", "cadence://status"]), about: [d.meeting])
         }
     }
 
@@ -353,6 +358,29 @@ final class AppState {
         meetings = MeetingDeduplicator.dedupe(shown)
         agendaOnlyIDs = prefs.filters.agendaOnlyIDs(in: meetings, sources: shown)
         activeMeetings = agendaOnlyIDs.isEmpty ? meetings : meetings.filter { !agendaOnlyIDs.contains($0.id) }
+        assistantHiddenIDs = prefs.filters.assistantHiddenIDs(in: meetings, sources: shown)
+    }
+
+    /// Whether connected assistants (MCP) are kept from seeing this meeting. Merged meetings follow
+    /// `assistantHiddenIDs`; anything else (invites, raw events) goes by its own calendar.
+    func isHiddenFromAssistants(_ m: Meeting) -> Bool {
+        let hidden = prefs.filters.assistantHiddenCalendarIDs
+        guard !hidden.isEmpty else { return false }
+        if assistantHiddenIDs.contains(m.id) { return true }
+        return hidden.contains(m.calendar.id) && !meetings.contains { $0.id == m.id }
+    }
+
+    func isCalendarHiddenFromAssistants(_ id: String) -> Bool { prefs.filters.assistantHiddenCalendarIDs.contains(id) }
+
+    func setCalendar(_ id: String, hiddenFromAssistants hidden: Bool) {
+        if hidden { prefs.filters.assistantHiddenCalendarIDs.insert(id) } else { prefs.filters.assistantHiddenCalendarIDs.remove(id) }
+    }
+
+    /// Hands an event to assistants unless it's about a meeting they aren't allowed to see.
+    func emit(_ event: MCPEvent, about meetings: [Meeting] = []) {
+        guard let onEvent else { return }
+        if !meetings.isEmpty, meetings.allSatisfy(isHiddenFromAssistants) { return }
+        onEvent(event)
     }
 
     func isAgendaOnly(_ m: Meeting) -> Bool { agendaOnlyIDs.contains(m.id) }
@@ -392,8 +420,8 @@ final class AppState {
         let fresh = InvitePlanner.newInvites(invites, known: knownInvites)
         if let onEvent {
             for m in fresh {
-                onEvent(MCPEvent(type: "invite.new", message: "New invite: \(m.title), \(Theme.dayTime(m.start))",
-                                 data: ["meeting": dto(m)], uris: ["cadence://invites"]))
+                emit(MCPEvent(type: "invite.new", message: "New invite: \(m.title), \(Theme.dayTime(m.start))",
+                              data: ["meeting": dto(m)], uris: ["cadence://invites"]), about: [m])
             }
             onEvent(MCPEvent(type: "invites.updated", message: "Invites updated", uris: ["cadence://invites"], log: false))
         }
