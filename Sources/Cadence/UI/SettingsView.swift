@@ -87,6 +87,7 @@ private struct CalendarsTab: View {
             Section {
                 legendRow("paintpalette", "Ask for a colour when you reply to an invite on this calendar")
                 legendRow("bell.slash", "Agenda only: events still show, but never alert, remind, clash or count as your current or next meeting")
+                legendRow("sparkles", "Hide from assistants: AI assistants connected over MCP can't see this calendar or its events")
                 if state.browsers.supportsProfiles {
                     legendRow("globe", "Open this calendar's meeting links in a different \(state.browsers.defaultBrowserName) profile")
                 }
@@ -127,6 +128,16 @@ private struct CalendarsTab: View {
                                 .buttonStyle(.plain)
                                 .help(quiet ? "Agenda only: shown in the agenda, but no alerts, reminders, clashes or assistant events. Click to turn alerts back on."
                                             : "Make agenda only: keep it in the agenda, but leave it out of alerts, reminders, clashes and automations")
+                                let unshared = state.isCalendarHiddenFromAssistants(cal.id)
+                                Button {
+                                    state.setCalendar(cal.id, hiddenFromAssistants: !unshared)
+                                } label: {
+                                    Image(systemName: unshared ? "lock.fill" : "sparkles")
+                                        .foregroundStyle(unshared ? Color.purple : Color.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help(unshared ? "Hidden from assistants: connected AI assistants can't see this calendar or its events. Click to share it again."
+                                               : "Hide from assistants: keep this calendar and its events away from AI assistants connected over MCP")
                                 if state.browsers.supportsProfiles {
                                     calendarProfileMenu(cal.id)
                                 }

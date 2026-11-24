@@ -17,24 +17,35 @@ final class CadenceBackend: MCPBackend {
 
     func record(_ entry: MCPActivityEntry) async { activity.add(entry) }
 
+    // MARK: What assistants may see
+
+    /// Leaves out meetings from calendars the user hid from assistants.
+    private func visible(_ list: [Meeting]) -> [Meeting] { list.filter { !state.isHiddenFromAssistants($0) } }
+
+    private var current: [Meeting] { visible(state.current) }
+
+    private var next: Meeting? {
+        visible(state.activeMeetings).first { !$0.isAllDay && $0.start > state.now }
+    }
+
     // MARK: Tools
 
     func callTool(_ name: String, arguments a: [String: JSONValue], client: String) async throws -> JSONValue {
         switch name {
         case "get_agenda": return try agenda(a)
         case "get_next_meeting":
-            guard let next = state.next else { return ["meeting": .null, "note": "No upcoming meetings in the next two days."] }
+            guard let next else { return ["meeting": .null, "note": "No upcoming meetings in the next two days."] }
             return ["meeting": detailed(next)]
         case "get_current_meeting":
-            return ["meetings": .array(state.current.map(detailed))]
+            return ["meetings": .array(current.map(detailed))]
         case "list_invites":
             let horizon = a["horizon"]?.stringValue.flatMap(InviteHorizon.init(rawValue:)) ?? state.prefs.inviteHorizon
-            let list = InvitePlanner.pending(state.invites, now: Date(), horizon: horizon)
+            let list = InvitePlanner.pending(visible(state.invites), now: Date(), horizon: horizon)
             return ["invites": .array(list.map(state.dto)), "horizon": .string(state.prefs.inviteHorizon.rawValue)]
         case "list_clashes": return clashes()
         case "find_free_time": return try freeTime(a)
         case "list_calendars":
-            return ["calendars": .array(state.calendars.map { c in
+            return ["calendars": .array(state.calendars.filter { !state.isCalendarHiddenFromAssistants($0.id) }.map { c in
                 ["id": .string(c.id), "title": .string(c.title), "source": .string(c.sourceTitle),
                  "type": .string(c.kind.rawValue), "enabled": .bool(state.isCalendarEnabled(c.id))]
             })]
@@ -93,7 +104,7 @@ final class CadenceBackend: MCPBackend {
             to = try date(a["to"]) ?? cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: from))!
         }
         let includeDeclined = a["include_declined"]?.boolValue ?? false
-        let list = state.meetings.filter { $0.end > from && $0.start < to && (includeDeclined || $0.participation != .declined) }
+        let list = visible(state.meetings).filter { $0.end > from && $0.start < to && (includeDeclined || $0.participation != .declined) }
         var out: [String: JSONValue] = [
             "from": .string(MeetingDTO.format(from)), "to": .string(MeetingDTO.format(to)),
             "meetings": .array(list.map(state.dto)),
@@ -105,9 +116,12 @@ final class CadenceBackend: MCPBackend {
     }
 
     private func clashes() -> JSONValue {
-        ["clashes": .array(state.clashes.map { clash in
-            let choice = state.clashChoices[clash.key]
-            return ["meetings": .array(clash.meetings.map(state.dto)),
+        ["clashes": .array(state.clashes.compactMap { clash in
+            // A clash with a meeting assistants can't see is left out rather than half-shown.
+            let shown = visible(clash.meetings)
+            guard shown.count > 1 else { return nil }
+            let choice = state.clashChoices[clash.key].flatMap { c in c == "all" || shown.contains { $0.id == c } ? c : nil }
+            return ["meetings": .array(shown.map(state.dto)),
                     "alerting_for": choice.map { $0 == "all" ? "all" : JSONValue.string($0) } ?? "undecided"]
         })]
     }
@@ -152,13 +166,13 @@ final class CadenceBackend: MCPBackend {
             "call_app": ctx.microphoneApp.map { .string($0) } ?? .null,
             "now": .string(MeetingDTO.format(Date())),
         ]
-        if let next = state.next {
+        if let next {
             out["next_meeting"] = state.dto(next)
             if state.prefs.takeoverEnabled {
                 out["next_alert"] = .string(MeetingDTO.format(next.start.addingTimeInterval(-state.prefs.takeoverLeadSeconds)))
             }
         }
-        if !state.current.isEmpty { out["in_meeting"] = .array(state.current.map(state.dto)) }
+        if !current.isEmpty { out["in_meeting"] = .array(current.map(state.dto)) }
         return .object(out)
     }
 
@@ -167,7 +181,7 @@ final class CadenceBackend: MCPBackend {
     private func meeting(_ a: [String: JSONValue]) throws -> Meeting {
         guard let id = a["meeting_id"]?.stringValue else { throw MCPToolError("meeting_id is required.") }
         let all = state.meetings + state.invites + state.allMeetings
-        guard let m = all.first(where: { $0.id == id }) else {
+        guard let m = all.first(where: { $0.id == id }), !state.isHiddenFromAssistants(m) else {
             throw MCPToolError("No meeting with id \(id). Get ids from get_agenda, get_next_meeting or list_invites.")
         }
         return m
@@ -238,10 +252,10 @@ final class CadenceBackend: MCPBackend {
         case "cadence://agenda/tomorrow":
             return try agenda(["date": .string(MeetingDTO.format(cal.date(byAdding: .day, value: 1, to: today)!))])
         case "cadence://next":
-            if let live = state.current.last { return ["in_progress": detailed(live), "next": state.next.map(detailed) ?? .null] }
-            return ["next": state.next.map(detailed) ?? .null]
+            if let live = current.last { return ["in_progress": detailed(live), "next": next.map(detailed) ?? .null] }
+            return ["next": next.map(detailed) ?? .null]
         case "cadence://invites":
-            return ["invites": .array(state.invites.map(state.dto))]
+            return ["invites": .array(visible(state.invites).map(state.dto))]
         case "cadence://clashes": return clashes()
         case "cadence://status": return status()
         default: throw MCPToolError("Unknown resource \(uri)")

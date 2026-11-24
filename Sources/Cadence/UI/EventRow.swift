@@ -264,6 +264,10 @@ struct PanelVisibilityMenu: View {
         Button(quiet ? "Alert for “\(meeting.calendar.title)” Again" : "Make “\(meeting.calendar.title)” Agenda Only") {
             state.setCalendar(meeting.calendar.id, agendaOnly: !quiet)
         }
+        let hidden = state.isCalendarHiddenFromAssistants(meeting.calendar.id)
+        Button(hidden ? "Share “\(meeting.calendar.title)” with Assistants" : "Hide “\(meeting.calendar.title)” from Assistants") {
+            state.setCalendar(meeting.calendar.id, hiddenFromAssistants: !hidden)
+        }
     }
 }
 

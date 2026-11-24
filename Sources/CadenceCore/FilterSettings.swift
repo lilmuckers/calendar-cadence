@@ -8,6 +8,10 @@ public struct FilterSettings: Codable, Hashable, Sendable {
     /// count as the current/next meeting, or reach assistants as timeline events. For things like
     /// all-day room bookings you need to see but that shouldn't drive anything.
     public var agendaOnlyCalendarIDs: Set<String> = []
+    /// Calendars connected AI assistants (MCP) can't see: their events, invites and enrichments are
+    /// left out of every tool, resource and event, and the calendar itself isn't listed. They still
+    /// count as busy for `find_free_time`, without any detail.
+    public var assistantHiddenCalendarIDs: Set<String> = []
     public var hideAllDay = true
     public var hideDeclined = true
     public var hideTentative = false
@@ -43,11 +47,21 @@ public struct FilterSettings: Codable, Hashable, Sendable {
     /// Ids of `meetings` (already merged) that come only from agenda-only calendars. A meeting that
     /// also arrived from a normal calendar stays active, whichever copy the merge kept.
     public func agendaOnlyIDs(in meetings: [Meeting], sources: [Meeting]) -> Set<String> {
-        guard !agendaOnlyCalendarIDs.isEmpty else { return [] }
-        let loud = sources.filter { !agendaOnlyCalendarIDs.contains($0.calendar.id) }
+        Self.onlyFrom(agendaOnlyCalendarIDs, in: meetings, sources: sources)
+    }
+
+    /// Ids of `meetings` (already merged) that come only from calendars hidden from assistants. A
+    /// meeting that also arrived from a calendar assistants may see stays visible to them.
+    public func assistantHiddenIDs(in meetings: [Meeting], sources: [Meeting]) -> Set<String> {
+        Self.onlyFrom(assistantHiddenCalendarIDs, in: meetings, sources: sources)
+    }
+
+    private static func onlyFrom(_ calendars: Set<String>, in meetings: [Meeting], sources: [Meeting]) -> Set<String> {
+        guard !calendars.isEmpty else { return [] }
+        let others = sources.filter { !calendars.contains($0.calendar.id) }
         var out: Set<String> = []
-        for m in meetings where agendaOnlyCalendarIDs.contains(m.calendar.id) {
-            if !loud.contains(where: { MeetingDeduplicator.isSameMeeting($0, m) }) { out.insert(m.id) }
+        for m in meetings where calendars.contains(m.calendar.id) {
+            if !others.contains(where: { MeetingDeduplicator.isSameMeeting($0, m) }) { out.insert(m.id) }
         }
         return out
     }
@@ -58,6 +72,7 @@ public struct FilterSettings: Codable, Hashable, Sendable {
         let d = FilterSettings()
         disabledCalendarIDs = try c.decodeIfPresent(Set<String>.self, forKey: .disabledCalendarIDs) ?? d.disabledCalendarIDs
         agendaOnlyCalendarIDs = try c.decodeIfPresent(Set<String>.self, forKey: .agendaOnlyCalendarIDs) ?? d.agendaOnlyCalendarIDs
+        assistantHiddenCalendarIDs = try c.decodeIfPresent(Set<String>.self, forKey: .assistantHiddenCalendarIDs) ?? d.assistantHiddenCalendarIDs
         hideAllDay = try c.decodeIfPresent(Bool.self, forKey: .hideAllDay) ?? d.hideAllDay
         hideDeclined = try c.decodeIfPresent(Bool.self, forKey: .hideDeclined) ?? d.hideDeclined
         hideTentative = try c.decodeIfPresent(Bool.self, forKey: .hideTentative) ?? d.hideTentative

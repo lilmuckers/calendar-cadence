@@ -69,6 +69,34 @@ struct FilterTests {
         #expect(ClashDetector.clashes(in: all.filter { !quiet.contains($0.id) }, after: t0).isEmpty)
     }
 
+    @Test func assistantHiddenCalendarStillShownButHidden() {
+        var f = FilterSettings()
+        f.assistantHiddenCalendarIDs = ["work"]
+        let m = meeting()
+        #expect(f.allows(m))
+        #expect(f.assistantHiddenIDs(in: [m], sources: [m]) == ["m"])
+        #expect(f.agendaOnlyIDs(in: [m], sources: [m]).isEmpty)
+    }
+
+    @Test func assistantHiddenLosesToACopyOnASharedCalendar() {
+        var f = FilterSettings()
+        f.assistantHiddenCalendarIDs = ["work"]
+        var other = meeting("copy")
+        other.calendar = CalendarInfo(id: "personal", title: "Personal", sourceTitle: "iCloud", color: .gray)
+        let solo = meeting("solo", title: "1:1", startOffset: 7200)
+        let merged = MeetingDeduplicator.dedupe([meeting(), other, solo])
+        #expect(f.assistantHiddenIDs(in: merged, sources: [meeting(), other, solo]) == ["solo"])
+    }
+
+    @Test func assistantHiddenSurvivesDecoding() throws {
+        var f = FilterSettings()
+        f.assistantHiddenCalendarIDs = ["private"]
+        let back = try JSONDecoder().decode(FilterSettings.self, from: JSONEncoder().encode(f))
+        #expect(back.assistantHiddenCalendarIDs == ["private"])
+        let old = try JSONDecoder().decode(FilterSettings.self, from: Data(#"{"hideAllDay":false}"#.utf8))
+        #expect(old.assistantHiddenCalendarIDs.isEmpty)
+    }
+
     @Test func agendaOnlySurvivesDecoding() throws {
         var f = FilterSettings()
         f.agendaOnlyCalendarIDs = ["rooms"]

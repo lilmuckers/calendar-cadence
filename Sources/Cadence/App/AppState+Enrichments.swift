@@ -20,9 +20,15 @@ extension AppState {
         if name != "get_enrichments", !prefs.mcpEnrichments {
             throw MCPToolError("The user turned off assistant attachments in Cadence (Settings → Assistants).", kind: .denied)
         }
+        // Enrichments on meetings from calendars hidden from assistants are out of reach by id too.
+        if let id = arguments["enrichment_id"]?.stringValue, let e = enrichments.book.enrichment(id: id),
+           let m = (meetings + allMeetings + invites).first(where: { $0.id == e.meetingID }), isHiddenFromAssistants(m) {
+            throw MCPToolError("No enrichment with id \(id). Get ids from get_enrichments.")
+        }
         let outcome = try enrichments.mutate { book in
             try EnrichmentTools.call(name, arguments, book: &book, meeting: { id in
-                guard let m = (self.meetings + self.allMeetings + self.invites).first(where: { $0.id == id }) else {
+                guard let m = (self.meetings + self.allMeetings + self.invites).first(where: { $0.id == id }),
+                      !self.isHiddenFromAssistants(m) else {
                     throw MCPToolError("No meeting with id \(id). Get ids from get_agenda or get_next_meeting.")
                 }
                 return m
@@ -38,7 +44,7 @@ extension AppState {
         let before = enrichments.state(e, m)
         guard let after = enrichments.mutate({ $0.apply(action, meetingID: m.id) }) else { return }
         enrichmentsChanged()
-        onEvent?(EnrichmentTools.event(for: action, enrichment: e, before: before, after: after, meeting: m))
+        emit(EnrichmentTools.event(for: action, enrichment: e, before: before, after: after, meeting: m), about: [m])
     }
 
     private func enrichmentsChanged() {
