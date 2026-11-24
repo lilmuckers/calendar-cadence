@@ -133,7 +133,7 @@ public enum MCPCatalog {
             return "Call list_invites and get_agenda. For each invite, check for clashes with what I've already accepted and suggest Accept, Maybe or Decline with a one-line reason. Don't reply to anything until I confirm; then use respond_to_invite."
         case "enrich_meeting":
             let which = arguments["meeting_id"].map { "the meeting with id \($0)" } ?? "my next meeting (get_next_meeting)"
-            return "Get ready for \(which) and attach what will help me during it with add_enrichment: a markdown summary of what it's about and what I should know (from its notes and any linked documents you can read), a links list of the documents, a short timed agenda if one is implied, briefs for attendees I may not know, and a fun buzzword bingo card fitting the meeting. Check get_enrichments first and update rather than duplicate."
+            return "Get ready for \(which) and attach what will help me during it with add_enrichment: a markdown summary of what it's about and what I should know (from its notes and any linked documents you can read), a links list of the documents, a short timed agenda if one is implied, briefs for attendees I may not know, and a fun buzzword bingo card fitting the meeting. Cite where each one's content came from in its sources. Check get_enrichments first and update rather than duplicate."
         default:
             return nil
         }

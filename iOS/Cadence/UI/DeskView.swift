@@ -413,7 +413,7 @@ private struct DeskNotes: View {
             }
             EnrichmentPanel(meeting: meeting, enrichments: state.enrichments(for: meeting),
                             state: { state.enrichmentState($0, meeting) }, now: state.now,
-                            interactive: state.canEditEnrichments) { action in
+                            interactive: state.canEditEnrichments, sourcesStyle: .indicator) { action in
                 state.applyEnrichment(action, meetingID: meeting.id)
             }
         }

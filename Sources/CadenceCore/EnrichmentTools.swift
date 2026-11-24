@@ -20,6 +20,7 @@ public enum EnrichmentTools {
             let title = a["title"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
                 ?? EnrichmentKind(rawValue: kind)?.label ?? kind
             let content = try EnrichmentParser.parse(kind: kind, a["content"] ?? .null, seed: m.id)
+            let sources = try EnrichmentParser.sources(a["sources"])
             let series = (a["all_occurrences"]?.boolValue ?? false) && m.recurs
             let id = a["id"]?.stringValue?.trimmingCharacters(in: .whitespaces).nilIfEmpty.map { String($0.prefix(64)) }
                 ?? "enr_" + UUID().uuidString.prefix(8).lowercased()
@@ -30,7 +31,8 @@ public enum EnrichmentTools {
             let order = existing?.order ?? ((book.enrichments(for: m).map(\.order).max() ?? -1) + 1)
             let stored = book.upsert(Enrichment(id: id, meetingID: m.id, seriesID: series ? m.seriesID : nil,
                                                 title: String(title.prefix(80)), content: content,
-                                                source: client, order: order, meetingEnd: series ? nil : m.end), now: now)
+                                                source: client, order: order, meetingEnd: series ? nil : m.end,
+                                                sources: sources), now: now)
             return Outcome(result: ["done": true, "replaced": .bool(existing != nil),
                                     "enrichment": dto(stored, state: book.state(stored.id, meetingID: m.id), meeting: m, now: now)],
                            changed: true)
@@ -42,6 +44,7 @@ public enum EnrichmentTools {
             if let c = a["content"] {
                 e.content = try EnrichmentParser.parse(kind: a["kind"]?.stringValue?.lowercased() ?? e.kind, c, seed: e.meetingID)
             }
+            if let src = a["sources"] { e.sources = try EnrichmentParser.sources(src) }
             e.source = client
             let stored = book.upsert(e, now: now)
             return Outcome(result: ["done": true, "enrichment": dto(stored, state: book.state(id, meetingID: e.meetingID), meeting: nil, now: now)],
@@ -76,6 +79,7 @@ public enum EnrichmentTools {
             "all_occurrences": .bool(e.seriesID != nil), "source": .string(e.source),
             "updated": .string(MeetingDTO.format(e.updated)), "content": e.content.json,
         ]
+        if !e.sources.isEmpty { out["sources"] = .array(e.sources.map(\.json)) }
         var state: [String: JSONValue] = [:]
         let checked = s.checked.sorted()
         switch e.content {
@@ -137,6 +141,20 @@ public enum EnrichmentTools {
 
     static let enrichmentID: JSONValue = ["type": "string", "description": "An enrichment id from add_enrichment or get_enrichments."]
 
+    static let sources: JSONValue = [
+        "type": "array",
+        "description": "Where you got this from, shown to the user as citations. Add one for each document, page, email thread, ticket, calendar note or other place you drew on, with what you took from it. Please include these whenever the content isn't purely your own.",
+        "items": [
+            "type": "object",
+            "properties": [
+                "name": ["type": "string", "description": "What it is, e.g. \"Q3 planning doc\" or \"Email from Sam, 12 Nov\"."],
+                "url": ["type": "string", "description": "Link to it (http/https/mailto), if it has one."],
+                "description": ["type": "string", "description": "What you got from it, e.g. \"Launch dates and owners\"."],
+            ],
+            "required": ["name"],
+        ],
+    ]
+
     static let contentDescription = """
     Shape depends on kind. markdown: {"text": "# Heading\\n- bullets, **bold**, [links](https://…), - [ ] tasks"}. \
     links: {"items": [{"title", "url" (http/https/mailto), "note"?}]}. \
@@ -153,21 +171,23 @@ public enum EnrichmentTools {
     static var tools: [MCPTool] {
         [
             MCPTool(name: "add_enrichment", title: "Attach to a meeting",
-                    description: "Attach notes, links, a checklist, a bingo card, a timed agenda, attendee briefs, a decisions & actions log or key numbers to a meeting. The user sees them in Cadence during the meeting (Mac drawer, iPhone desk mode) and can tick things off; read that back with get_enrichments. Passing an existing id replaces it. No confirmation needed.",
+                    description: "Attach notes, links, a checklist, a bingo card, a timed agenda, attendee briefs, a decisions & actions log or key numbers to a meeting. The user sees them in Cadence during the meeting (Mac drawer, iPhone desk mode) and can tick things off; read that back with get_enrichments. Passing an existing id replaces it. Cite where the content came from in sources. No confirmation needed.",
                     inputSchema: MCPCatalog.schema([
                         "meeting_id": MCPCatalog.meetingID,
                         "kind": ["type": "string", "enum": .array(EnrichmentKind.allCases.map { .string($0.rawValue) })],
                         "title": ["type": "string", "description": "Short tab title, e.g. \"Prep notes\". Defaults to the kind's name."],
                         "content": ["type": "object", "description": .string(contentDescription)],
+                        "sources": sources,
                         "all_occurrences": ["type": "boolean", "description": "For recurring meetings: show it in every occurrence (ticks are kept per occurrence). Default false."],
                         "id": ["type": "string", "description": "Optional id to create or replace."],
                     ], required: ["meeting_id", "kind", "content"]), isAction: false, writes: true),
             MCPTool(name: "update_enrichment", title: "Update an attachment",
-                    description: "Change an enrichment's title or content (same shape as add_enrichment). The user's ticks on items that still exist are kept.",
+                    description: "Change an enrichment's title, content (same shape as add_enrichment) or sources. The user's ticks on items that still exist are kept. Passing sources replaces them; leaving it out keeps them.",
                     inputSchema: MCPCatalog.schema([
                         "enrichment_id": enrichmentID,
                         "title": ["type": "string"],
                         "content": ["type": "object", "description": "Same shape as add_enrichment for its kind."],
+                        "sources": sources,
                     ], required: ["enrichment_id"]), isAction: false, writes: true),
             MCPTool(name: "remove_enrichment", title: "Remove an attachment",
                     description: "Remove one enrichment (and what the user ticked on it).",

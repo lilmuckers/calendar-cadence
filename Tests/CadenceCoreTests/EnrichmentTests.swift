@@ -197,6 +197,47 @@ struct EnrichmentTests {
         #expect(AgendaTimeline.totalMinutes(items) == 30)
     }
 
+    @Test func sourcesAreParsedKeptAndReturned() throws {
+        var book = EnrichmentBook()
+        let m = meeting()
+        let r = try add(&book, m, kind: "markdown", content: ["text": "Hi"], extra: ["sources": [
+            ["name": "Q3 plan", "url": "https://docs.example.com/q3", "description": "Launch dates"],
+            "https://wiki.example.com/page",
+            ["title": "Sam's email", "url": "javascript:alert(1)", "note": "Budget"],
+            "Own knowledge",
+            ["description": "no name or url"],
+        ]])
+        let id = try #require(r["enrichment"]?["id"]?.stringValue)
+        let sources = try #require(book.enrichment(id: id)?.sources)
+        #expect(sources.map(\.name) == ["Q3 plan", "wiki.example.com", "Sam's email", "Own knowledge"])
+        #expect(sources.map(\.id) == ["1", "2", "3", "4"])
+        #expect(sources[0].detail == "Launch dates" && sources[2].url == nil && sources[2].detail == "Budget")
+        #expect(r["enrichment"]?["sources"]?.arrayValue?.count == 4)
+
+        // Updating content without sources keeps them; passing sources replaces them.
+        let call = { (args: [String: JSONValue]) in
+            try EnrichmentTools.call("update_enrichment", args, book: &book, meeting: { _ in m }, client: "Claude", now: t0)
+        }
+        _ = try call(["enrichment_id": .string(id), "content": ["text": "Hello"]])
+        #expect(book.enrichment(id: id)?.sources.count == 4)
+        _ = try call(["enrichment_id": .string(id), "sources": [["name": "Only one"]]])
+        #expect(book.enrichment(id: id)?.sources.map(\.name) == ["Only one"])
+        _ = try call(["enrichment_id": .string(id), "sources": []])
+        #expect(book.enrichment(id: id)?.sources.isEmpty == true)
+        #expect(throws: MCPToolError.self) { try call(["enrichment_id": .string(id), "sources": "nope"]) }
+
+        // Round-trips, and a saved enrichment from before sources decodes with none.
+        _ = try call(["enrichment_id": .string(id), "sources": [["name": "Doc", "url": "https://x.example.com"]]])
+        let data = try JSONEncoder().encode(book)
+        #expect(try JSONDecoder().decode(EnrichmentBook.self, from: data) == book)
+        var old = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var items = try #require(old["items"] as? [[String: Any]])
+        items[0].removeValue(forKey: "sources")
+        old["items"] = items
+        let decoded = try JSONDecoder().decode(EnrichmentBook.self, from: JSONSerialization.data(withJSONObject: old))
+        #expect(decoded.items.first?.sources == [])
+    }
+
     @Test func toolsAreWritesWithoutApproval() {
         let add = MCPCatalog.tool("add_enrichment")
         #expect(add?.isAction == false && add?.writes == true)
