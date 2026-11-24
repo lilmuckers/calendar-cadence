@@ -154,6 +154,9 @@ identity to this session.
   Nothing in `/Library/Managed Preferences` does so today.
 
 ## Open questions
+- **Who can work out the tag:** anyone who knows the Mac's id. That's its paired phones, but also
+  anyone on the same network, because the id is in the Bonjour TXT record. People who have only
+  ever been near the Mac over Bluetooth can't link one hour's tag to the next.
 - **Hour-based tag and clock skew:** ±1 hour covers it. Is a stable tag stored at pairing acceptable
   instead? It's simpler, but people nearby could track the Mac by it.
 - **Several Macs in range on Bluetooth at once:** each `MacLink` matches its own tag, so this works.
