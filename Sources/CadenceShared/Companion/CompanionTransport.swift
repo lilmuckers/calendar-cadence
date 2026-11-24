@@ -2,12 +2,6 @@ import CadenceCore
 import Foundation
 import Network
 
-/// How a channel's bytes travel between the Mac and a phone.
-enum CompanionTransportKind: String, Sendable {
-    /// TCP + TLS-PSK over Wi-Fi, Ethernet or peer-to-peer Wi-Fi (`CompanionNetwork`).
-    case network
-}
-
 /// An encrypted byte stream between the Mac and a phone, underneath a `CompanionChannel`. The
 /// channel does the framing, pings and timeout; the transport only moves bytes and says when it's
 /// ready or gone. Everything runs on the main queue.
