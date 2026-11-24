@@ -53,6 +53,8 @@
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 	</dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Cadence uses Bluetooth to reach Cadence on your Mac when Wi-Fi can't connect the two.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_cadence._tcp</string>

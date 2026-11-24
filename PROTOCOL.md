@@ -84,8 +84,20 @@ The phone tries, in this order:
    - It gives up on each dial after **5 s** if no `welcome` arrives.
 3. If nothing has worked after about **20 s + 5 s for each saved address**, the phone suggests
    scanning a new pairing code.
+4. **Bluetooth, the last resort** (`TransportPlanner`, if the setting is on and Bluetooth is
+   allowed on both devices). The phone falls back when one of these is true:
+   - the whole round in steps 1–3 failed;
+   - there's been no Wi-Fi or wired network for **3 s**;
+   - Local Network access has been off for **3 s**.
 
-Retries back off as 1, 2, 4, 8, 16, then 30 s.
+   Then it scans for the Cadence service and connects to each Mac it finds. It reads the Mac tag
+   to see which paired Mac it is, then opens the L2CAP channel. Meanwhile the network keeps being
+   tried. As soon as a network channel is welcomed, the phone sends `bye("upgraded")` on the
+   Bluetooth channel and drops it. Joining a network, or turning Local Network access back on,
+   gives the network a fresh round before Bluetooth again.
+
+Network retries back off as 1, 2, 4, 8, 16, then 30 s. After a Bluetooth channel drops, the phone
+waits 5 s before scanning again.
 
 ## 3. Transport and encryption
 
@@ -100,9 +112,33 @@ The network transport (`CompanionNetwork.parameters`) is:
     uses it. TLS picks the key that matches the identity the phone offers.
   - The wrong key fails the TLS handshake.
 
-The channel (`CompanionChannel`) runs on top of a `CompanionTransport`. Today the only transport is
-the network one. `docs/plans/bluetooth-fallback.md` plans a Bluetooth LE transport as a last
-resort. It would carry the same frames and messages, with its own pre-shared-key encryption.
+The **Bluetooth transport** (`BluetoothTransport`, `BluetoothLink.swift`) carries the same frames
+and messages over an L2CAP channel. TLS can't run there, so it has its own pre-shared-key
+handshake.
+
+- **Discovery:** the Mac advertises only the service UUID `7C3A1E52-4B8D-4F0A-9E61-2D5C8B0F7A13`,
+  with no name. The service has two readable characteristics:
+  - `…7A14`: the L2CAP PSM, as 2 bytes big-endian.
+  - `…7A15`: the **Mac tag**, the first 8 bytes of `HMAC-SHA256(key: SHA256(macID), "cadence-ble-tag" ‖ hour)`.
+    `hour` is the Unix time divided by 3600, as an Int64 big-endian. The phone accepts an hour
+    either way.
+- **The channel** is opened without Bluetooth's own link encryption, so there's no system pairing
+  dialog.
+- **Records:** each is a 4-byte big-endian length, then that many bytes.
+- **Handshake:**
+  1. Phone → Mac: `[0x01][identity length: 1 byte][identity][phone nonce: 32 bytes]`. The identity
+     is the same as the TLS PSK identity.
+  2. Mac → phone: `[0x01][Mac nonce: 32 bytes]`. The Mac sends this only if it holds that
+     identity's key. Otherwise it closes the channel.
+  3. Both derive 96 bytes: `HKDF-SHA256(link key, salt: phone nonce ‖ Mac nonce, info: "cadence-ble-v1")`.
+     - The first 32 bytes are the phone→Mac key, the next 32 the Mac→phone key.
+     - The last 32 are the **session binding**, which the hello `proof` signs in place of the TLS
+       exporter secret.
+- **After the handshake:** each record is `ChaChaPoly(ciphertext ‖ 16-byte tag)`. Its nonce is 4
+  zero bytes, then a counter for that direction (UInt64 big-endian, starting at 0). A record that
+  doesn't open closes the channel. Inside the records is the normal framing (§4).
+
+The channel (`CompanionChannel`) runs the same way over either transport.
 
 ## 4. Framing
 
@@ -207,7 +243,7 @@ name and keeps its place in the media-key queue.
 |---|---|---|
 | `welcome` | `macID`, `macName` | The hello was accepted. See §5. |
 | `features` | `_0: [String]` | Optional abilities, as `CompanionFeature` raw values. Today: `joinMeeting`. |
-| `address` | `hosts: [String]`, `port: UInt16` | Where to dial the Mac directly on this network. The phone adds it to its address book and marks it as working. |
+| `address` | `hosts: [String]`, `port: UInt16` | Where to dial the Mac directly on this network. The phone adds it to its address book. It marks it as working only when the message came over the network, not over Bluetooth. |
 | `rekey` | `keyID`, `key: Data` (32 bytes) | This phone's own key, used from its next connection. |
 | `snapshot` | `_0: CompanionSnapshot` | The full state to mirror. Sent after the welcome, every 60 s while a phone is connected, and whenever something changes. |
 | `alert` | `_0: Meeting` | The full-screen alert for this meeting is due now. |

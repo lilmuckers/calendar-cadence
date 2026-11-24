@@ -1,4 +1,5 @@
 import CadenceCore
+import CoreBluetooth
 import Foundation
 import Network
 import Observation
@@ -103,6 +104,16 @@ final class CompanionClient {
     @ObservationIgnored var onLinksChanged: (() -> Void)?
 
     @ObservationIgnored private let deviceID = CompanionIdentity.deviceID("Cadence.companion.deviceID")
+    /// Bluetooth LE, shared by every Mac's link: the last resort when the network can't reach a Mac.
+    @ObservationIgnored let bluetooth = BluetoothScanner()
+    /// Whether the phone has Wi-Fi or a wired network, for the links' Bluetooth fallback.
+    @ObservationIgnored private var pathMonitor: NWPathMonitor?
+    /// The user's "Use Bluetooth when Wi-Fi can't connect" setting.
+    var bluetoothEnabled = true {
+        didSet { if bluetoothEnabled != oldValue { refreshBluetooth() } }
+    }
+    /// Whether Bluetooth can be used now, for the settings: nil = fine (or not asked yet).
+    private(set) var bluetoothProblem: String?
     @ObservationIgnored private var helloResend: Timer?
     @ObservationIgnored private var running = false
 
@@ -138,10 +149,35 @@ final class CompanionClient {
             return makeLink(mac)
         }
         save()
+        bluetooth.onStateChanged = { [weak self] in self?.refreshBluetooth() }
+        refreshBluetooth()
+    }
+
+    /// Re-checks the setting and the permission for every link. Once iOS has granted access the
+    /// scanner is created straight away; before that, only pairing creates it (and so asks).
+    private func refreshBluetooth() {
+        let authorization = BluetoothScanner.authorization
+        if bluetoothEnabled, authorization == .allowedAlways { bluetooth.activate() }
+        let allowed = bluetoothEnabled && authorization == .allowedAlways
+        bluetoothProblem = if !bluetoothEnabled || authorization == .notDetermined {
+            nil
+        } else if authorization != .allowedAlways {
+            "Cadence isn't allowed to use Bluetooth: turn it on in Settings → Apps → Cadence."
+        } else if bluetooth.isActivated, !bluetooth.isUsable {
+            "Bluetooth is off on this iPhone."
+        } else {
+            nil
+        }
+        for link in links {
+            link.bluetoothAllowed = allowed
+            link.bluetoothStateChanged()
+        }
     }
 
     private func makeLink(_ mac: PairedMac) -> MacLink {
         let link = MacLink(mac: mac)
+        link.scanner = bluetooth
+        link.bluetoothAllowed = bluetoothEnabled && BluetoothScanner.authorization == .allowedAlways
         link.traffic = traffic
         link.hello = { [weak self] in self?.hello ?? CompanionHello(deviceID: "", deviceName: "", displaying: false) }
         link.displaying = displaying
@@ -179,6 +215,11 @@ final class CompanionClient {
         // Pairing happens in the app, so it's in the foreground: connect now.
         running = true
         link(invite.macID)?.start()
+        // The end of pairing is when iOS asks about Bluetooth, not at launch.
+        if bluetoothEnabled {
+            bluetooth.activate()
+            refreshBluetooth()
+        }
     }
 
     /// Give a paired Mac a name of the user's own; blank goes back to the Mac's computer name.
@@ -252,12 +293,33 @@ final class CompanionClient {
     func start() {
         running = true
         for link in links { link.start() }
+        startPathMonitor()
+    }
+
+    /// Wi-Fi or wired comes and goes: without either, Bonjour can't work and the links may go to
+    /// Bluetooth sooner.
+    private func startPathMonitor() {
+        guard pathMonitor == nil else { return }
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { [weak self] path in
+            let local = path.availableInterfaces.contains { $0.type == .wifi || $0.type == .wiredEthernet }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self, self.running else { return }
+                    for link in self.links { link.pathChanged(hasLocalNetwork: local) }
+                }
+            }
+        }
+        monitor.start(queue: .main)
+        pathMonitor = monitor
     }
 
     /// Say goodbye and drop every link. Called when the app leaves the foreground.
     func stop() {
         running = false
         for link in links { link.stop() }
+        pathMonitor?.cancel()
+        pathMonitor = nil
     }
 
     func send(_ message: CompanionMessage, to macID: String) { link(macID)?.send(message) }
@@ -279,14 +341,25 @@ final class MacLink: Identifiable {
     private nonisolated let macID: String
 
     private(set) var mac: PairedMac
-    private(set) var status: Status = .off {
-        didSet {
-            guard (oldValue == .connected) != (status == .connected) else { return }
-            if status != .connected { features = [] }
-            onConnectionChanged?(status == .connected)
-        }
-    }
+    /// The network side's own state (Bonjour and direct dials).
+    private var networkStatus: Status = .off { didSet { connectionChanged() } }
+    /// A Bluetooth channel has been welcomed by the Mac (the last resort, `TransportPlanner`).
+    private var bluetoothConnected = false { didSet { connectionChanged() } }
+    /// Connected if either transport is; otherwise what the network side is doing.
+    var status: Status { bluetoothConnected && networkStatus != .connected ? .connected : networkStatus }
     var isConnected: Bool { status == .connected }
+    /// How the link is connected right now: the network wins when both are up.
+    var transport: CompanionTransportKind? {
+        networkStatus == .connected ? .network : bluetoothConnected ? .bluetooth : nil
+    }
+    @ObservationIgnored private var reportedConnected = false
+
+    private func connectionChanged() {
+        guard isConnected != reportedConnected else { return }
+        reportedConnected = isConnected
+        if !isConnected { features = [] }
+        onConnectionChanged?(isConnected)
+    }
 
     /// What this Mac said it understands beyond protocol 1 (`CompanionFeature`), while connected.
     private(set) var features: Set<String> = []
@@ -297,7 +370,7 @@ final class MacLink: Identifiable {
     private(set) var needsRescan = false
 
     var displaying = false {
-        didSet { if displaying != oldValue { channel?.send(.displayState(displaying: displaying)) } }
+        didSet { if displaying != oldValue { activeChannel?.send(.displayState(displaying: displaying)) } }
     }
 
     @ObservationIgnored var hello: (() -> CompanionHello)?
@@ -323,6 +396,34 @@ final class MacLink: Identifiable {
     @ObservationIgnored private var dialling: (host: String, port: UInt16)?
     @ObservationIgnored private var running = false
     @ObservationIgnored private var failures = 0
+
+    /// When to fall back to Bluetooth, and when to drop it for the network.
+    @ObservationIgnored private var planner = TransportPlanner(bluetoothAllowed: false)
+    /// Shared by every Mac's link (`CompanionClient`).
+    @ObservationIgnored weak var scanner: BluetoothScanner?
+    @ObservationIgnored private var bluetoothChannel: CompanionChannel?
+    /// For the planner's grace periods, and the pause after a Bluetooth channel drops.
+    @ObservationIgnored private var plannerTimer: Timer?
+    @ObservationIgnored private var bluetoothRetryAt: Date?
+    private static let bluetoothRetryAfter: TimeInterval = 5
+
+    /// The user's setting and the Bluetooth permission, from `CompanionClient`.
+    var bluetoothAllowed: Bool {
+        get { planner.bluetoothAllowed }
+        set {
+            guard newValue != planner.bluetoothAllowed else { return }
+            planner.bluetoothAllowed = newValue
+            updateBluetooth()
+        }
+    }
+
+    /// The channel messages go over: the network once it's welcomed, else Bluetooth if that is,
+    /// else the network attempt in progress.
+    private var activeChannel: CompanionChannel? {
+        if networkStatus == .connected { return channel }
+        if bluetoothConnected { return bluetoothChannel }
+        return channel
+    }
 
     init(mac: PairedMac) {
         self.mac = mac
@@ -350,8 +451,14 @@ final class MacLink: Identifiable {
     // MARK: Lifecycle
 
     func start() {
-        guard let key else { status = .unpaired; return }
+        guard let key else { networkStatus = .unpaired; return }
         running = true
+        // A fresh start gives the network a fresh round before Bluetooth (retries call start() too).
+        if !planner.running {
+            planner.start()
+            bluetoothRetryAt = nil
+            updateBluetooth()
+        }
         guard browser == nil else { return }
         let browser = NWBrowser(for: .bonjour(type: CompanionService.type, domain: nil),
                                 using: CompanionNetwork.parameters(key: key, keyID: mac.keyID))
@@ -361,17 +468,28 @@ final class MacLink: Identifiable {
         browser.stateUpdateHandler = { [weak self] state in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if case .failed(let error) = state { self.status = .failed(error.localizedDescription); self.restartBrowser() }
+                if case .failed(let error) = state { self.networkStatus = .failed(error.localizedDescription); self.restartBrowser() }
                 // Access turned on (or the first-run prompt answered): back to looking.
-                if case .ready = state, self.status == .noLocalNetwork { self.status = .searching }
-                if case .waiting(let error) = state, self.channel == nil {
-                    self.status = Self.isLocalNetworkDenied(error) ? .noLocalNetwork : .failed(error.localizedDescription)
+                if case .ready = state {
+                    if self.networkStatus == .noLocalNetwork { self.networkStatus = .searching }
+                    self.planner.localNetworkAccess(denied: false, now: Date())
+                    self.updateBluetooth()
+                }
+                if case .waiting(let error) = state {
+                    let denied = Self.isLocalNetworkDenied(error)
+                    if self.channel == nil {
+                        self.networkStatus = denied ? .noLocalNetwork : .failed(error.localizedDescription)
+                    }
+                    if denied {
+                        self.planner.localNetworkAccess(denied: true, now: Date())
+                        self.updateBluetooth()
+                    }
                 }
             }
         }
         browser.start(queue: .main)
         self.browser = browser
-        if channel == nil { status = .searching }
+        if channel == nil { networkStatus = .searching }
         scheduleDirect()
         armStuckTimer()
     }
@@ -390,7 +508,11 @@ final class MacLink: Identifiable {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.stuck = nil
-                if self.running, self.status != .connected { self.needsRescan = true }
+                guard self.running, self.networkStatus != .connected else { return }
+                // A whole round of Bonjour and every saved address without the Mac: Bluetooth may go next.
+                self.planner.networkRoundFailedToConnect()
+                self.updateBluetooth()
+                if self.status != .connected { self.needsRescan = true }
             }
         }
     }
@@ -435,10 +557,25 @@ final class MacLink: Identifiable {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { channel.close() }
         }
         channel = nil
+        if let bluetoothChannel {
+            bluetoothChannel.send(.displayState(displaying: false))
+            bluetoothChannel.send(.bye(reason: "background"))
+            let id = macID
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                bluetoothChannel.close()
+                self?.scanner?.release(id)
+            }
+        }
+        bluetoothChannel = nil
+        bluetoothConnected = false
+        planner.stop()
+        plannerTimer?.invalidate()
+        plannerTimer = nil
+        scanner?.unwant(macID)
         browser?.cancel()
         browser = nil
         endpoint = nil
-        status = key == nil ? .unpaired : .off
+        networkStatus = key == nil ? .unpaired : .off
     }
 
     private func restartBrowser() {
@@ -477,7 +614,7 @@ final class MacLink: Identifiable {
         let candidates = ours.map { [$0.endpoint] } ?? unnamed.map(\.endpoint).filter { !rejected.contains($0) }
         endpoint = candidates.first
         if let endpoint, channel == nil { connect(endpoint) }
-        if candidates.isEmpty, channel == nil { status = .searching }
+        if candidates.isEmpty, channel == nil { networkStatus = .searching }
     }
 
     /// Macs that turned out not to be ours this session.
@@ -485,7 +622,7 @@ final class MacLink: Identifiable {
 
     private func connect(_ endpoint: NWEndpoint, direct: (host: String, port: UInt16)? = nil) {
         guard let key, running else { return }
-        status = .connecting
+        networkStatus = .connecting
         let connection = NWConnection(to: endpoint, using: CompanionNetwork.parameters(key: key, keyID: mac.keyID))
         let channel = CompanionChannel(transport: NetworkTransport(connection: connection))
         self.channel = channel
@@ -494,7 +631,7 @@ final class MacLink: Identifiable {
         if direct != nil {
             dialTimeout = Timer.scheduledTimer(withTimeInterval: Self.dialTimeoutAfter, repeats: false) { [weak self, weak channel] _ in
                 MainActor.assumeIsolated {
-                    guard let self, let channel, self.channel === channel, self.status != .connected else { return }
+                    guard let self, let channel, self.channel === channel, self.networkStatus != .connected else { return }
                     channel.close(URLError(.timedOut))
                 }
             }
@@ -503,7 +640,7 @@ final class MacLink: Identifiable {
             guard let self, let channel else { return }
             self.sendHello(on: channel)
         }
-        channel.onMessage = { [weak self] message in self?.handle(message) }
+        channel.onMessage = { [weak self] message in self?.handle(message, over: .network) }
         channel.onTraffic = { [weak self] message, direction, bytes in
             guard let self else { return }
             self.traffic?.record(kind: message.kind, direction, bytes: bytes, peer: self.macID)
@@ -511,33 +648,46 @@ final class MacLink: Identifiable {
         channel.onClose = { [weak self, weak channel] error in
             guard let self, self.channel === channel else { return }
             self.channel = nil
+            self.planner.disconnected(.network)
             self.dialTimeout?.invalidate()
             let wasDirect = self.dialling != nil
             self.dialling = nil
             // With several Macs paired, an unnamed Bonjour result that refuses our key is another Mac.
-            if let error = error as? NWError, case .tls = error, direct == nil, self.status != .connected {
+            if let error = error as? NWError, case .tls = error, direct == nil, self.networkStatus != .connected {
                 self.rejected.insert(endpoint)
             }
             if self.running, wasDirect, self.endpoint == nil, self.moreAddressesThisRound {
                 // Another network's address didn't answer: try the next one straight away.
-                self.status = .connecting
+                self.networkStatus = .connecting
                 self.scheduleDirect(after: 0.2)
                 return
             }
             self.failures += 1
             if self.running {
-                self.status = error.map { .failed(Self.describe($0)) } ?? .searching
+                self.networkStatus = error.map { .failed(Self.describe($0)) } ?? .searching
                 self.scheduleRetry()
+                // A link that was up gets a new round of the network before Bluetooth.
+                self.armStuckTimer()
+                self.updateBluetooth()
             } else {
-                self.status = .off
+                self.networkStatus = .off
             }
         }
         channel.start()
     }
 
-    private func handle(_ message: CompanionMessage) {
+    private func handle(_ message: CompanionMessage, over kind: CompanionTransportKind) {
+        // While both are up (moving onto the network), the Bluetooth channel only finishes its
+        // handshake: the network one carries everything.
+        if kind == .bluetooth, networkStatus == .connected {
+            guard case .welcome = message else { return }
+        }
         switch message {
         case .welcome(let welcomeID, let macName):
+            if kind == .bluetooth {
+                guard welcomeID == mac.id else { bluetoothChannel?.close(); return }
+                return bluetoothWelcomed(macName: macName)
+            }
             guard welcomeID == mac.id else {
                 if let endpoint { rejected.insert(endpoint) }
                 channel?.close()
@@ -559,7 +709,9 @@ final class MacLink: Identifiable {
             }
             // Next time, start from the address that worked.
             if dialled != nil { directIndex = 0 }
-            status = .connected
+            networkStatus = .connected
+            planner.connected(.network)
+            updateBluetooth()
         case .features(let list):
             features = Set(list)
         case .rekey(let keyID, let key):
@@ -573,23 +725,110 @@ final class MacLink: Identifiable {
             // and count it as working now.
             update { mac in
                 var book = mac.book()
-                book.learn(hosts: hosts, port: port, now: Date(), worked: true)
+                // Over Bluetooth the phone isn't on that network: keep the address for later, untried.
+                book.learn(hosts: hosts, port: port, now: Date(), worked: kind == .network)
                 mac.addresses = book
             }
         case .bye(let reason):
+            if kind == .bluetooth { bluetoothChannel?.close(); break }
             channel?.close()
-            if reason != "stopped" { status = .failed(reason) }
+            if reason != "stopped" { networkStatus = .failed(reason) }
         default:
             break
         }
         onMessage?(message)
     }
 
-    func send(_ message: CompanionMessage) { channel?.send(message) }
+    func send(_ message: CompanionMessage) { activeChannel?.send(message) }
 
     /// Says hello again (the phone was renamed).
     func sendHello() {
-        if let channel { sendHello(on: channel) }
+        for channel in [channel, bluetoothChannel].compactMap({ $0 }) { sendHello(on: channel) }
+    }
+
+    // MARK: Bluetooth (last resort)
+
+    /// The phone's network path changed: Wi-Fi or wired (so Bonjour can work), or neither.
+    func pathChanged(hasLocalNetwork: Bool) {
+        planner.pathChanged(hasLocalNetwork: hasLocalNetwork, now: Date())
+        updateBluetooth()
+    }
+
+    /// Bluetooth became usable or not (switched on/off, permission answered): look again.
+    func bluetoothStateChanged() { updateBluetooth() }
+
+    /// Follows the planner: asks the scanner for a channel when Bluetooth is the way to go, and
+    /// drops a Bluetooth channel once the network is up (or Bluetooth isn't allowed any more).
+    private func updateBluetooth() {
+        plannerTimer?.invalidate()
+        plannerTimer = nil
+        if let old = bluetoothChannel, planner.shouldDropBluetooth || !planner.bluetoothAllowed {
+            bluetoothChannel = nil
+            bluetoothConnected = false
+            planner.disconnected(.bluetooth)
+            old.send(.bye(reason: planner.bluetoothAllowed ? "upgraded" : "bluetooth off"))
+            let id = macID
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                old.close()
+                self?.scanner?.release(id)
+            }
+        }
+        let now = Date()
+        var wait = planner.nextDeadline(after: now)
+        if planner.wantsBluetooth(now: now), bluetoothChannel == nil, let scanner, scanner.isUsable {
+            if let retry = bluetoothRetryAt, retry > now {
+                scanner.unwant(macID)
+                wait = min(wait ?? retry, retry)
+            } else {
+                scanner.want(macID) { [weak self] channel in self?.bluetoothOpened(channel) }
+            }
+        } else {
+            scanner?.unwant(macID)
+        }
+        if let wait {
+            plannerTimer = Timer.scheduledTimer(withTimeInterval: max(0.1, wait.timeIntervalSince(now)), repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated { self?.updateBluetooth() }
+            }
+        }
+    }
+
+    /// The scanner opened an L2CAP channel to this Mac: run the link over it.
+    private func bluetoothOpened(_ l2cap: CBL2CAPChannel) {
+        guard running, bluetoothChannel == nil, let key else { scanner?.release(macID); return }
+        let transport = BluetoothTransport(channel: l2cap, role: .phone(key: key, identity: CompanionKeys.identity(for: mac.keyID)))
+        let channel = CompanionChannel(transport: transport)
+        bluetoothChannel = channel
+        channel.onReady = { [weak self, weak channel] in
+            guard let self, let channel else { return }
+            self.sendHello(on: channel)
+        }
+        channel.onMessage = { [weak self] message in self?.handle(message, over: .bluetooth) }
+        channel.onTraffic = { [weak self] message, direction, bytes in
+            guard let self else { return }
+            self.traffic?.record(kind: message.kind, direction, bytes: bytes, peer: self.macID)
+        }
+        channel.onClose = { [weak self, weak channel] _ in
+            guard let self, self.bluetoothChannel === channel else { return }
+            self.bluetoothChannel = nil
+            self.bluetoothConnected = false
+            self.planner.disconnected(.bluetooth)
+            self.scanner?.release(self.macID)
+            // Out of range, or the Mac went away: pause before looking again.
+            self.bluetoothRetryAt = Date().addingTimeInterval(Self.bluetoothRetryAfter)
+            self.updateBluetooth()
+        }
+        channel.start()
+    }
+
+    /// The Mac welcomed us over Bluetooth.
+    private func bluetoothWelcomed(macName: String) {
+        needsRescan = false
+        bluetoothRetryAt = nil
+        update { $0.name = macName }
+        bluetoothConnected = true
+        planner.connected(.bluetooth)
+        // The network may have come up while this was connecting: then this goes straight away.
+        updateBluetooth()
     }
 
     /// Hello, with which of the Mac's keys this is and proof that this TLS session was made with it.

@@ -96,7 +96,8 @@ struct ConnectionPill: View {
         let others = state.link.connected.count - 1
         switch state.link.status {
         case .connected:
-            let macs = others > 0 ? "\(mac) +\(others)" : mac
+            var macs = others > 0 ? "\(mac) +\(others)" : mac
+            if state.link.connected.first?.transport == .bluetooth { macs += " · Bluetooth" }
             return state.displaying ? "\(macs) · quiet" : macs
         case .connecting: return "Connecting to \(mac)…"
         case .searching: return "Looking for \(mac)…"

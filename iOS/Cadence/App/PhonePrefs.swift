@@ -60,6 +60,8 @@ struct PhonePrefs: Codable, Equatable {
     /// Paired with several Macs: a meeting only one Mac has, with a link any browser opens, joins on
     /// the first Mac in the list rather than the one it came from.
     var joinOnPriorityMac = false
+    /// Reach the Mac over Bluetooth when the network can't (a last resort; Wi-Fi is always tried first).
+    var useBluetooth = true
 
     /// "Try with sample meetings": when it was turned on, nil while it's off.
     var sampleCalendarSince: Date?
@@ -112,6 +114,7 @@ extension PhonePrefs {
         widgetTomorrowHour = v(.widgetTomorrowHour, d.widgetTomorrowHour)
         workSchedule = v(.workSchedule, d.workSchedule)
         joinOnPriorityMac = v(.joinOnPriorityMac, d.joinOnPriorityMac)
+        useBluetooth = v(.useBluetooth, d.useBluetooth)
         sampleCalendarSince = v(.sampleCalendarSince, d.sampleCalendarSince)
         welcomeSeen = v(.welcomeSeen, d.welcomeSeen)
     }
