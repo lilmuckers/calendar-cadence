@@ -486,7 +486,8 @@ final class MacLink: Identifiable {
     private func connect(_ endpoint: NWEndpoint, direct: (host: String, port: UInt16)? = nil) {
         guard let key, running else { return }
         status = .connecting
-        let channel = CompanionChannel(connection: NWConnection(to: endpoint, using: CompanionNetwork.parameters(key: key, keyID: mac.keyID)))
+        let connection = NWConnection(to: endpoint, using: CompanionNetwork.parameters(key: key, keyID: mac.keyID))
+        let channel = CompanionChannel(transport: NetworkTransport(connection: connection))
         self.channel = channel
         dialTimeout?.invalidate()
         dialling = direct
