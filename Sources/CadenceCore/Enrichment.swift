@@ -20,9 +20,12 @@ public struct Enrichment: Codable, Equatable, Identifiable, Sendable {
     public var updated: Date
     /// When the occurrence ends, for pruning.
     public var meetingEnd: Date?
+    /// Where the assistant got the content from (documents, pages, emails…), shown as citations.
+    public var sources: [EnrichmentSource]
 
     public init(id: String, meetingID: String, seriesID: String? = nil, title: String, content: EnrichmentContent,
-                source: String = "", order: Int = 0, created: Date = Date(), updated: Date = Date(), meetingEnd: Date? = nil) {
+                source: String = "", order: Int = 0, created: Date = Date(), updated: Date = Date(), meetingEnd: Date? = nil,
+                sources: [EnrichmentSource] = []) {
         self.id = id
         self.meetingID = meetingID
         self.seriesID = seriesID
@@ -33,6 +36,23 @@ public struct Enrichment: Codable, Equatable, Identifiable, Sendable {
         self.created = created
         self.updated = updated
         self.meetingEnd = meetingEnd
+        self.sources = sources
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        meetingID = try c.decode(String.self, forKey: .meetingID)
+        seriesID = try c.decodeIfPresent(String.self, forKey: .seriesID)
+        title = try c.decode(String.self, forKey: .title)
+        content = try c.decode(EnrichmentContent.self, forKey: .content)
+        source = try c.decode(String.self, forKey: .source)
+        order = try c.decode(Int.self, forKey: .order)
+        created = try c.decode(Date.self, forKey: .created)
+        updated = try c.decode(Date.self, forKey: .updated)
+        meetingEnd = try c.decodeIfPresent(Date.self, forKey: .meetingEnd)
+        // Older Macs and saved books don't have it.
+        sources = (try? c.decodeIfPresent([EnrichmentSource].self, forKey: .sources)) ?? []
     }
 
     public var kind: String { content.kind }
@@ -82,6 +102,22 @@ public struct EnrichmentLink: Codable, Equatable, Identifiable, Sendable {
         self.id = id; self.title = title; self.url = url; self.note = note
     }
     public var host: String { url.scheme == "mailto" ? "Email" : (url.host ?? url.absoluteString).replacingOccurrences(of: "www.", with: "") }
+}
+
+/// Where an assistant got (part of) an enrichment from: a document, page, email thread, its own knowledge…
+public struct EnrichmentSource: Codable, Equatable, Identifiable, Sendable {
+    public var id: String
+    public var name: String
+    public var url: URL?
+    /// What it took from there.
+    public var detail: String?
+    public init(id: String, name: String, url: URL? = nil, detail: String? = nil) {
+        self.id = id; self.name = name; self.url = url; self.detail = detail
+    }
+
+    public var json: JSONValue {
+        ["name": .string(name), "url": url.map { .string($0.absoluteString) } ?? .null, "description": detail.map(JSONValue.string) ?? .null]
+    }
 }
 
 public struct ChecklistItem: Codable, Equatable, Identifiable, Sendable {
@@ -531,6 +567,27 @@ public enum EnrichmentParser {
                                 upIsGood: v["up_is_good"]?.boolValue ?? true)
             })
         }
+    }
+
+    public static let maxSources = 20
+
+    /// Sources, leniently: a bare string is a name (or a url), and a bad url is dropped rather than failing.
+    public static func sources(_ value: JSONValue?) throws -> [EnrichmentSource] {
+        guard let value, value != .null else { return [] }
+        guard let list = value.arrayValue ?? value["items"]?.arrayValue else {
+            throw MCPToolError("sources needs an array: [{\"name\", \"url\"?, \"description\"?}].")
+        }
+        guard list.count <= maxSources else { throw MCPToolError("sources is limited to \(maxSources).") }
+        return list.compactMap { v -> EnrichmentSource? in
+            let rawURL = text(v["url"]) ?? text(v["link"]) ?? text(v).flatMap { $0.contains("://") || $0.hasPrefix("mailto:") ? $0 : nil }
+            let url = rawURL.flatMap(URL.init(string:)).flatMap { u in u.scheme.map { allowedSchemes.contains($0.lowercased()) } == true ? u : nil }
+            let name = text(v["name"]) ?? text(v["title"]) ?? (rawURL == nil ? text(v) : nil)
+                ?? url.map { $0.scheme == "mailto" ? $0.absoluteString.replacingOccurrences(of: "mailto:", with: "") : ($0.host ?? $0.absoluteString) }
+            guard let name else { return nil }
+            let detail = text(v["description"]) ?? text(v["detail"]) ?? text(v["note"]) ?? text(v["used_for"])
+            return EnrichmentSource(id: "", name: String(name.prefix(120)), url: url, detail: detail.map { String($0.prefix(500)) })
+        }
+        .enumerated().map { i, s in var s = s; s.id = String(i + 1); return s }
     }
 
     static func logJSON(_ e: LogEntry) -> JSONValue {
