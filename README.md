@@ -185,7 +185,7 @@ claude mcp add --scope user cadence -- "/Applications/Cadence.app/Contents/MacOS
 | `checklist` | Things to cover or bring, ticked off as you go |
 | `bingo` | A 3×3 to 5×5 buzzword bingo card (free centre, sampled per meeting) that celebrates a line |
 | `agenda` | A timed agenda that follows the clock from the start and goes red when an item runs over |
-| `people` | Short briefs on who's in the room |
+| `people` | Short briefs on who's in the room, with a profile picture when the assistant has one |
 | `log` | Decisions, action items and notes you capture in the meeting |
 | `stats` | Key numbers as tiles with trend arrows |
 

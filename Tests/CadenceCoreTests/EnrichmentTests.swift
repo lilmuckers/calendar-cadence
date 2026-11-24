@@ -46,6 +46,22 @@ struct EnrichmentTests {
         }
     }
 
+    @Test func peopleTakeHTTPSPhotosOnly() throws {
+        let content = try EnrichmentParser.parse(kind: "people", ["items": [
+            ["name": "Ada Lovelace", "photo_url": "https://example.com/ada.jpg"],
+            ["name": "Alan Turing", "avatar": "https://example.com/alan.png"],
+            ["name": "Grace Hopper", "photo_url": "http://example.com/grace.jpg"],
+            ["name": "Linus", "photo": "file:///etc/passwd"],
+            "Margaret Hamilton",
+        ]], seed: "")
+        guard case .people(let people) = content else { Issue.record("not people"); return }
+        #expect(people.map(\.photo?.absoluteString) == ["https://example.com/ada.jpg", "https://example.com/alan.png", nil, nil, nil])
+        // Round-trips through storage / the phone link.
+        let data = try JSONEncoder().encode(content)
+        #expect(try JSONDecoder().decode(EnrichmentContent.self, from: data) == content)
+        #expect(content.json["items"]?.arrayValue?.first?["photo_url"]?.stringValue == "https://example.com/ada.jpg")
+    }
+
     @Test func bingoFitsCardAndSamplesStably() throws {
         // 30 squares for a 5×5 with free centre: 24 picked, the same each time for the same meeting.
         let a = try EnrichmentParser.parse(kind: "bingo", bingoSquares(30), seed: "m1")

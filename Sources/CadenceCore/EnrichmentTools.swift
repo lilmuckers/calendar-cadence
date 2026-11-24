@@ -144,7 +144,7 @@ public enum EnrichmentTools {
     bingo: {"squares": ["synergy", "circle back", …], "size"?: 3-5 (default 5), "free_centre"?: true} — \
     needs at least size²−1 squares; extras are sampled per meeting. \
     agenda: {"items": [{"title", "minutes", "owner"?}]} (timed from the meeting start; the user ticks items done). \
-    people: {"items": [{"name", "email"?, "role"?, "notes"? (markdown)}]}. \
+    people: {"items": [{"name", "email"?, "role"?, "notes"? (markdown), "photo_url"? (https profile picture, if you have one)}]}. \
     log: {"items": [{"type": "decision"|"action"|"note", "text", "owner"?, "due"?}]} (the user adds entries in the meeting). \
     stats: {"items": [{"label", "value", "delta"?, "trend"?: "up"|"down"|"flat", "up_is_good"?: true}]}. \
     Give items stable "id"s if you'll rewrite them; otherwise ids come from the text, so the user's ticks survive a rewrite.
