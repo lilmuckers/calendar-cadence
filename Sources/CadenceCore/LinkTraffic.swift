@@ -65,6 +65,8 @@ public struct LinkTraffic: Equatable, Sendable {
         public var kind: String
         public var direction: LinkDirection
         public var bytes: Int
+        /// What it travelled over.
+        public var transport: CompanionTransportKind = .network
     }
 
     public struct KindTotal: Equatable, Sendable {
@@ -81,6 +83,9 @@ public struct LinkTraffic: Equatable, Sendable {
     public private(set) var bytesReceived = 0
     public private(set) var messagesSent = 0
     public private(set) var messagesReceived = 0
+    /// The part of the totals that went over Bluetooth (the last resort, when the network can't connect).
+    public private(set) var bluetoothBytes = 0
+    public private(set) var bluetoothMessages = 0
     /// When the first message was recorded.
     public private(set) var since: Date?
     public private(set) var lastActivity: Date?
@@ -92,11 +97,13 @@ public struct LinkTraffic: Equatable, Sendable {
     public var totalMessages: Int { messagesSent + messagesReceived }
     public var isEmpty: Bool { totalMessages == 0 }
 
-    public mutating func record(_ message: CompanionMessage, _ direction: LinkDirection, bytes: Int, at date: Date = Date()) {
-        record(kind: message.kind, direction, bytes: bytes, at: date)
+    public mutating func record(_ message: CompanionMessage, _ direction: LinkDirection, bytes: Int, at date: Date = Date(),
+                                over transport: CompanionTransportKind = .network) {
+        record(kind: message.kind, direction, bytes: bytes, at: date, over: transport)
     }
 
-    public mutating func record(kind: String, _ direction: LinkDirection, bytes: Int, at date: Date = Date()) {
+    public mutating func record(kind: String, _ direction: LinkDirection, bytes: Int, at date: Date = Date(),
+                                over transport: CompanionTransportKind = .network) {
         if since == nil { since = date }
         lastActivity = max(lastActivity ?? date, date)
 
@@ -116,12 +123,16 @@ public struct LinkTraffic: Equatable, Sendable {
         case .sent: bytesSent += bytes; messagesSent += 1
         case .received: bytesReceived += bytes; messagesReceived += 1
         }
+        if transport == .bluetooth {
+            bluetoothBytes += bytes
+            bluetoothMessages += 1
+        }
         var total = kinds[kind] ?? KindTotal()
         if direction == .sent { total.sent += 1 } else { total.received += 1 }
         total.bytes += bytes
         kinds[kind] = total
 
-        recent.append(Entry(id: nextID, at: date, kind: kind, direction: direction, bytes: bytes))
+        recent.append(Entry(id: nextID, at: date, kind: kind, direction: direction, bytes: bytes, transport: transport))
         nextID += 1
         if recent.count > Self.maxRecent { recent.removeFirst(recent.count - Self.maxRecent) }
     }

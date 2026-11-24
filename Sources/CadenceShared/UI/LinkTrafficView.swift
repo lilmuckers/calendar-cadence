@@ -50,7 +50,10 @@ struct LinkTrafficSections: View {
             Text("Link traffic")
         } footer: {
             if let since = traffic.since {
-                Text("Since \(since.formatted(date: .omitted, time: .shortened)), kept while Cadence is open. Sizes are what went over the encrypted link, before TLS overhead.")
+                Text("Since \(since.formatted(date: .omitted, time: .shortened)), kept while Cadence is open. Sizes are what went over the encrypted link, before encryption overhead."
+                     + (traffic.bluetoothMessages > 0
+                        ? " \(Self.megabytes(traffic.bluetoothBytes)) of it (\(traffic.bluetoothMessages.formatted()) messages) went over Bluetooth because the network couldn't connect; those are marked in Recent."
+                        : ""))
             } else {
                 Text("Nothing has gone over the link with \(peer) since Cadence opened. Connect the two to see traffic here.")
             }
@@ -184,6 +187,11 @@ struct LinkTrafficSections: View {
                         .foregroundStyle(entry.direction == .sent ? Color.orange : Color.blue)
                         .accessibilityLabel(entry.direction == .sent ? "Sent" : "Received")
                     Text(entry.kind)
+                    if entry.transport == .bluetooth {
+                        Image(systemName: "dot.radiowaves.left.and.right")
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Over Bluetooth")
+                    }
                     Spacer()
                     Text(Self.size(entry.bytes)).foregroundStyle(.secondary)
                     Text(entry.at.formatted(date: .omitted, time: .standard))
