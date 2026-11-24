@@ -119,6 +119,22 @@ struct BluetoothLinkTests {
         #expect(throws: BluetoothLinkError.badRecord) { try copy.open(try phone.seal(Data("x".utf8))) }
     }
 
+    @Test func sealedRecordsArrivingWithTheHandshakeAreKept() throws {
+        // The Mac's reply and its first sealed records can arrive in one chunk; what's left after
+        // the handshake record goes on to the session.
+        let client = BluetoothHandshake.Client(key: key, identity: identity)
+        var (reply, mac, _) = try BluetoothHandshake.respond(to: client.hello) { _ in key }
+        let sealed = try mac.seal(Data("welcome".utf8)) + mac.seal(Data("snapshot".utf8))
+        let wire = BluetoothRecordReader.frame(reply) + sealed
+
+        var reader = BluetoothRecordReader()
+        var records = try reader.append(wire.dropLast(3))
+        var phone = try client.finish(records.removeFirst())
+        let rest = records.reduce(Data()) { $0 + BluetoothRecordReader.frame($1) } + reader.takeRemainder()
+        #expect(try phone.open(rest) + phone.open(wire.suffix(3)) == [Data("welcome".utf8), Data("snapshot".utf8)])
+        #expect(reader.takeRemainder().isEmpty)
+    }
+
     @Test func oversizedRecordIsRefused() throws {
         var reader = BluetoothRecordReader()
         var length = UInt32(BluetoothRecordReader.maxRecord + 1).bigEndian

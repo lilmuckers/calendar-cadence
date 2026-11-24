@@ -1,5 +1,6 @@
 import AppKit
 import CadenceCore
+import CoreBluetooth
 import Network
 import Observation
 
@@ -24,6 +25,7 @@ struct ConnectedPhone: Identifiable, Equatable {
 }
 
 /// The Mac end of the iPhone link: advertises `_cadence._tcp` over Bonjour (Wi-Fi and peer-to-peer),
+/// and the Cadence Bluetooth service as a last resort for phones the network can't reach,
 /// accepts phones that hold the link key, mirrors meetings to them, and takes Join/Snooze/Dismiss back.
 @MainActor
 @Observable
@@ -86,6 +88,19 @@ final class CompanionHub {
     @ObservationIgnored var onDisplayChanged: (() -> Void)?
 
     @ObservationIgnored private var listener: NWListener?
+    /// Bluetooth LE, for phones the network can't reach (`BluetoothAdvertiser`). Created the first
+    /// time it's needed, since that's when macOS asks for Bluetooth access.
+    @ObservationIgnored private var bluetooth: BluetoothAdvertiser?
+    /// The user's "Use Bluetooth when Wi-Fi can't connect" setting.
+    var bluetoothEnabled = true {
+        didSet { if bluetoothEnabled != oldValue { updateBluetooth() } }
+    }
+    /// Whether phones can reach this Mac over Bluetooth right now, for the settings.
+    private(set) var bluetoothStatus: BluetoothStatus = .off
+    enum BluetoothStatus: Equatable {
+        case off, notAllowed, bluetoothOff, advertising
+    }
+    @ObservationIgnored private var started = false
     /// Waiting for the old listener to let go of the port before starting one with the new keys.
     @ObservationIgnored private var restarting = false
     /// The pairing code on show: its key works once, until `CompanionKeys.inviteLifetime`.
@@ -108,6 +123,8 @@ final class CompanionHub {
     func start() {
         let keys = listenerKeys()
         guard listener == nil, !restarting, !keys.isEmpty else { return }
+        started = true
+        updateBluetooth()
         do {
             // A fixed port, so the address in the pairing code keeps working across launches.
             let port = NWEndpoint.Port(rawValue: Self.port) ?? .any
@@ -124,7 +141,7 @@ final class CompanionHub {
                 MainActor.assumeIsolated { self?.listenerChanged(state) }
             }
             listener.newConnectionHandler = { [weak self] connection in
-                MainActor.assumeIsolated { self?.accept(connection) }
+                MainActor.assumeIsolated { self?.accept(NetworkTransport(connection: connection)) }
             }
             listener.start(queue: .main)
             self.listener = listener
@@ -174,6 +191,8 @@ final class CompanionHub {
 
     func stop() {
         restarting = false
+        started = false
+        updateBluetooth()
         for (_, entry) in channels { entry.channel.send(.bye(reason: "stopped")); entry.channel.close() }
         channels = [:]
         phones = []
@@ -214,6 +233,43 @@ final class CompanionHub {
         }
     }
 
+    // MARK: Bluetooth
+
+    /// Advertises over Bluetooth while the hub is listening and the setting is on. Before macOS has
+    /// asked about Bluetooth access, waits for a pairing code to be on show to start (and ask).
+    private func updateBluetooth() {
+        let authorization = BluetoothAdvertiser.authorization
+        let want = started && bluetoothEnabled && authorization != .denied && authorization != .restricted
+            && (authorization == .allowedAlways || pending != nil)
+        if want {
+            if bluetooth == nil {
+                let advertiser = BluetoothAdvertiser(macID: macID) { [weak self] in self?.listenerKeys() ?? [] }
+                advertiser.onChannel = { [weak self] transport in self?.accept(transport) }
+                advertiser.onStateChanged = { [weak self] in self?.refreshBluetoothStatus() }
+                bluetooth = advertiser
+            }
+            bluetooth?.start()
+        } else {
+            bluetooth?.stop()
+        }
+        refreshBluetoothStatus()
+    }
+
+    private func refreshBluetoothStatus() {
+        let authorization = BluetoothAdvertiser.authorization
+        bluetoothStatus = if !started || !bluetoothEnabled {
+            .off
+        } else if authorization == .denied || authorization == .restricted {
+            .notAllowed
+        } else if bluetooth?.isAdvertising == true {
+            .advertising
+        } else if bluetooth?.state == .poweredOff {
+            .bluetoothOff
+        } else {
+            .off
+        }
+    }
+
     // MARK: Pairing
 
     /// A new pairing code to show as a QR code: a fresh key for one phone, which stops working once a
@@ -226,6 +282,8 @@ final class CompanionHub {
             MainActor.assumeIsolated { self?.cancelInvite() }
         }
         if listener == nil { start() } else { restartListener() }
+        // Showing a pairing code is when macOS may ask for Bluetooth access, not at launch.
+        updateBluetooth()
         return PairingInvite(macID: macID, macName: macName, key: key, keyID: keyID, hosts: Self.lanAddresses(), port: Self.port)
     }
 
@@ -304,8 +362,8 @@ final class CompanionHub {
 
     // MARK: Connections
 
-    private func accept(_ connection: NWConnection) {
-        let channel = CompanionChannel(transport: NetworkTransport(connection: connection))
+    private func accept(_ transport: CompanionTransport) {
+        let channel = CompanionChannel(transport: transport)
         let id = ObjectIdentifier(channel)
         channels[id] = (channel, nil)
         channel.onMessage = { [weak self] message in self?.handle(message, from: id) }
