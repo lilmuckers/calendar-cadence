@@ -1,7 +1,8 @@
 import SwiftUI
 import WidgetKit
 
-/// Home Screen, Today view, StandBy and Lock Screen widget: how long until the next meeting today,
+/// Home Screen, Today view, StandBy and Lock Screen widget: how long until the next meeting today
+/// (or, during one, how long it has left, until the next is ten minutes off),
 /// or "No more meetings today!" once there isn't one (in the evening, when tomorrow's first meeting is). Reads the schedule the app saves to the App
 /// Group; the countdown is a system timer, so it ticks without timeline reloads.
 struct NextMeetingWidget: Widget {
@@ -17,6 +18,8 @@ struct NextMeetingWidget: Widget {
 
 struct NextMeetingEntry: TimelineEntry {
     let date: Date
+    /// A meeting in progress, shown instead of the next one until that's close (as in the app).
+    let live: WidgetMeeting?
     let next: WidgetMeeting?
     let following: WidgetMeeting?
     /// Tomorrow's first meeting, set only in the evening once nothing is left today.
@@ -30,6 +33,7 @@ struct NextMeetingEntry: TimelineEntry {
     init(date: Date, schedule: WidgetSchedule?) {
         self.date = date
         unknown = schedule == nil
+        live = schedule?.live(at: date)
         next = schedule?.next(after: date)
         following = next.flatMap { schedule?.following($0) }
         tomorrow = schedule?.tomorrowFirst(after: date)
@@ -49,7 +53,7 @@ struct NextMeetingProvider: TimelineProvider {
     func getSnapshot(in context: Context, completion: @escaping (NextMeetingEntry) -> Void) {
         let schedule = WidgetSchedule.load()
         // The gallery shows a sample when there's nothing real to preview.
-        if context.isPreview, schedule?.next(after: Date()) == nil, schedule?.tomorrowFirst(after: Date()) == nil {
+        if context.isPreview, schedule?.live(at: Date()) == nil, schedule?.next(after: Date()) == nil, schedule?.tomorrowFirst(after: Date()) == nil {
             return completion(.placeholder)
         }
         completion(NextMeetingEntry(date: Date(), schedule: schedule))
@@ -60,8 +64,11 @@ struct NextMeetingProvider: TimelineProvider {
         let schedule = WidgetSchedule.load()
         let dates = schedule?.entryDates(from: now) ?? [now]
         let entries = dates.map { NextMeetingEntry(date: $0, schedule: schedule) }
-        // The last date is midnight: ask again then for the new day (the app also reloads on changes).
-        completion(Timeline(entries: entries, policy: dates.count > 1 ? .atEnd : .after(now.addingTimeInterval(3600))))
+        // The app reloads the widget on every change, but iOS rations reloads asked for from the
+        // background and can drop them, leaving a timeline built from an older schedule. So also come
+        // back on our own every so often to pick up whatever the app saved since.
+        let refresh = min(dates.last.flatMap { $0 > now ? $0 : nil } ?? .distantFuture, now.addingTimeInterval(WidgetSchedule.refreshInterval))
+        completion(Timeline(entries: entries, policy: .after(refresh)))
     }
 }
 
@@ -94,6 +101,14 @@ struct NextMeetingView: View {
     }
 
     @ViewBuilder private var meetingContent: some View {
+        if let live = entry.live {
+            LiveMeetingView(entry: entry, meeting: live, family: family)
+        } else {
+            nextContent
+        }
+    }
+
+    @ViewBuilder private var nextContent: some View {
         switch family {
         case .systemMedium: MediumView(entry: entry)
         case .accessoryRectangular: RectangularView(entry: entry)
@@ -284,6 +299,92 @@ private struct InlineView: View {
             Text("Tomorrow \(first.start.formatted(date: .omitted, time: .shortened)): \(first.title)")
         } else {
             DoneText(unknown: entry.unknown)
+        }
+    }
+}
+
+/// A meeting in progress: counting down to its end, with what's next.
+private struct LiveMeetingView: View {
+    let entry: NextMeetingEntry
+    let meeting: WidgetMeeting
+    let family: WidgetFamily
+
+    private var thenText: String? {
+        entry.next.map { "then \($0.title) \($0.start.formatted(date: .omitted, time: .shortened))" }
+    }
+
+    var body: some View {
+        switch family {
+        case .systemMedium:
+            HStack(alignment: .center, spacing: 14) {
+                RoundedRectangle(cornerRadius: 3).fill(meeting.tint).frame(width: 6)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        GooglyIcon(mood: entry.mood, height: 16).foregroundStyle(iconTint(meeting))
+                        Text("NOW · ENDS IN").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.6))
+                    }
+                    CountdownText(target: meeting.end)
+                        .font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                        .foregroundStyle(.white)
+                    Text(meeting.title).font(.headline).foregroundStyle(.white).lineLimit(1)
+                    Text(thenText ?? "Until \(meeting.end.formatted(date: .omitted, time: .shortened))")
+                        .font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if meeting.hasLink {
+                    Link(destination: meeting.joinURL) {
+                        VStack(spacing: 2) {
+                            Image(systemName: "video.fill").font(.title3)
+                            Text("Join").font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .background(meeting.tint, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                }
+            }
+        case .accessoryRectangular:
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    GooglyIcon(mood: entry.mood, height: 12)
+                    Text("Now · ends in").font(.caption.weight(.semibold))
+                    CountdownText(target: meeting.end).font(.caption.weight(.semibold)).monospacedDigit()
+                }
+                Text(meeting.title).font(.headline).lineLimit(1).widgetAccentable()
+                Text(thenText ?? "Until \(meeting.end.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        case .accessoryCircular:
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: 0) {
+                    Text("NOW").font(.system(size: 8, weight: .bold))
+                    CountdownText(target: meeting.end, showsHours: false)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .multilineTextAlignment(.center).minimumScaleFactor(0.5).lineLimit(1)
+                        .padding(.horizontal, 4)
+                }
+            }
+            .accessibilityLabel("\(meeting.title), in progress")
+        case .accessoryInline:
+            Text("\(meeting.title) · \(Text(timerInterval: entry.date...max(entry.date, meeting.end), countsDown: true)) left")
+        default:
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    GooglyIcon(mood: entry.mood, height: 18).foregroundStyle(iconTint(meeting))
+                    Spacer(minLength: 0)
+                    Text(meeting.start, style: .time).font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.6))
+                }
+                Spacer(minLength: 0)
+                Text("NOW · ENDS IN").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.6))
+                CountdownText(target: meeting.end)
+                    .font(.system(size: 30, weight: .semibold, design: .rounded)).monospacedDigit()
+                    .minimumScaleFactor(0.6).lineLimit(1)
+                    .foregroundStyle(.white)
+                Text(meeting.title).font(.subheadline.weight(.semibold)).foregroundStyle(meeting.tint).lineLimit(2)
+            }
         }
     }
 }

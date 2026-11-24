@@ -133,7 +133,22 @@ struct WidgetScheduleTests {
         let midnight = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: morning))!
         let m = { (minutes: Double) in morning.addingTimeInterval(minutes * 60) }
         // "soon" is already inside its nervous lead, so only its panic point and start count.
-        #expect(dates == [morning, m(5), m(10), m(45), m(55), m(60), midnight])
+        // Ends (40, 90) and the next one's 10-minute takeover (50) redraw for the live view.
+        #expect(dates == [morning, m(5), m(10), m(40), m(45), m(50), m(55), m(60), m(90), midnight])
+    }
+
+    @Test func aMeetingInProgressShowsUntilTheNextIsClose() {
+        // Live 09:00–09:30, next 09:30: the live one shows until 09:20, as in the app.
+        let schedule = WidgetSchedule(meetings: [item("live", inMinutes: -10), item("next", inMinutes: 20)],
+                                      generatedAt: morning)
+        #expect(schedule.live(at: morning, calendar: cal)?.id == "live")
+        #expect(schedule.next(after: morning, calendar: cal)?.id == "next")
+        #expect(schedule.live(at: morning.addingTimeInterval(10 * 60), calendar: cal) == nil)
+        #expect(schedule.entryDates(from: morning, calendar: cal).contains(morning.addingTimeInterval(10 * 60)))
+        // With nothing else today it shows until it ends.
+        let alone = WidgetSchedule(meetings: [item("live", inMinutes: -10)], generatedAt: morning)
+        #expect(alone.live(at: morning, calendar: cal)?.id == "live")
+        #expect(alone.live(at: morning.addingTimeInterval(20 * 60), calendar: cal) == nil)
     }
 
     @Test func tomorrowsFirstShowsFromTheCutoffOnceTodayIsDone() {
