@@ -324,10 +324,7 @@ struct PeopleView: View {
             ForEach(people) { p in
                 EnrichmentCard {
                     HStack(alignment: .top, spacing: 10) {
-                        Text(Self.initials(p.name))
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .frame(width: 34, height: 34)
-                            .background(Circle().fill(tint.gradient))
+                        PersonAvatar(name: p.name, photo: p.photo, tint: tint)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(p.name).font(.system(size: 14, weight: .semibold))
                             if let role = p.role { Text(role).font(.system(size: 12)).foregroundStyle(.white.opacity(0.6)) }
@@ -344,6 +341,37 @@ struct PeopleView: View {
     static func initials(_ name: String) -> String {
         let parts = name.split(separator: " ").prefix(2)
         return parts.compactMap(\.first).map(String.init).joined().uppercased()
+    }
+}
+
+/// The person's picture when the assistant gave one and it loads; their initials otherwise.
+struct PersonAvatar: View {
+    let name: String
+    let photo: URL?
+    let tint: Color
+    var size: CGFloat = 34
+
+    var body: some View {
+        initials
+            .overlay {
+                if let photo {
+                    AsyncImage(url: photo, transaction: Transaction(animation: Theme.spring)) { phase in
+                        if case .success(let image) = phase {
+                            image.resizable().scaledToFill().transition(.opacity)
+                        }
+                    }
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+                }
+            }
+            .accessibilityLabel(name)
+    }
+
+    private var initials: some View {
+        Text(PeopleView.initials(name))
+            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .frame(width: size, height: size)
+            .background(Circle().fill(tint.gradient))
     }
 }
 

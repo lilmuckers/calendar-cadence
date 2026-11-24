@@ -152,8 +152,10 @@ public struct PersonBrief: Codable, Equatable, Identifiable, Sendable {
     public var role: String?
     /// Markdown.
     public var notes: String?
-    public init(id: String, name: String, email: String? = nil, role: String? = nil, notes: String? = nil) {
-        self.id = id; self.name = name; self.email = email; self.role = role; self.notes = notes
+    /// A profile picture (https only), shown in place of the initials when it loads.
+    public var photo: URL?
+    public init(id: String, name: String, email: String? = nil, role: String? = nil, notes: String? = nil, photo: URL? = nil) {
+        self.id = id; self.name = name; self.email = email; self.role = role; self.notes = notes; self.photo = photo
     }
 }
 
@@ -265,7 +267,8 @@ public enum EnrichmentContent: Equatable, Sendable, Codable {
         case .agenda(let list):
             return items(list.map { ["id": .string($0.id), "title": .string($0.title), "minutes": .number(Double($0.minutes)), "owner": opt($0.owner)] })
         case .people(let list):
-            return items(list.map { ["id": .string($0.id), "name": .string($0.name), "email": opt($0.email), "role": opt($0.role), "notes": opt($0.notes)] })
+            return items(list.map { ["id": .string($0.id), "name": .string($0.name), "email": opt($0.email), "role": opt($0.role), "notes": opt($0.notes),
+                                     "photo_url": opt($0.photo?.absoluteString)] })
         case .log(let list):
             return items(list.map(EnrichmentParser.logJSON))
         case .stats(let list):
@@ -505,7 +508,8 @@ public enum EnrichmentParser {
             return .people(try list(value, "people").map { v in
                 guard let name = text(v["name"]) ?? text(v) else { throw MCPToolError("Each person needs a name.") }
                 return PersonBrief(id: ids.next(v["id"], name), name: name, email: text(v["email"])?.lowercased(),
-                                   role: text(v["role"]), notes: text(v["notes"]).map { String($0.prefix(4000)) })
+                                   role: text(v["role"]), notes: text(v["notes"]).map { String($0.prefix(4000)) },
+                                   photo: photo(v))
             })
         case .log:
             var ids = IDs()
@@ -538,6 +542,14 @@ public enum EnrichmentParser {
     }
 
     // MARK: Helpers
+
+    /// A person's picture: https only. Anything else is dropped rather than failing the whole brief.
+    private static func photo(_ v: JSONValue) -> URL? {
+        let raw = ["photo_url", "photo", "image_url", "image", "avatar_url", "avatar", "picture"].lazy
+            .compactMap { text(v[$0]) }.first
+        guard let raw, let url = URL(string: raw), url.scheme?.lowercased() == "https", url.host?.isEmpty == false else { return nil }
+        return url
+    }
 
     private static func text(_ v: JSONValue?) -> String? {
         guard let s = v?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
