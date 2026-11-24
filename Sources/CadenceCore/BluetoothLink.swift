@@ -55,6 +55,13 @@ public struct BluetoothRecordReader: Sendable {
         return out
     }
 
+    /// The bytes after the last complete record (the start of one still arriving), emptying the
+    /// buffer: for handing the rest of the stream on to a `BluetoothSession` after the handshake.
+    public mutating func takeRemainder() -> Data {
+        defer { buffer = Data() }
+        return buffer
+    }
+
     public static func frame(_ body: Data) -> Data {
         var length = UInt32(body.count).bigEndian
         var out = Data(bytes: &length, count: 4)

@@ -12,7 +12,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 swiftc -target "$TARGET" "${OPT[@]}" -parse-as-library -module-name Cadence \
   -I "$BUILD/core" -L "$BUILD/core" -lCadenceCore \
   -framework AppKit -framework SwiftUI -framework EventKit -framework MapKit \
-  -framework CoreLocation -framework ServiceManagement -framework Network -framework CoreImage -framework MediaPlayer -framework AVFoundation \
+  -framework CoreLocation -framework ServiceManagement -framework Network -framework CoreBluetooth -framework CoreImage -framework MediaPlayer -framework AVFoundation \
   -o "$APP/Contents/MacOS/Cadence" \
   $(find "$ROOT/Sources/Cadence" "$ROOT/Sources/CadenceShared" "$ROOT/Sources/CadenceArt" -name '*.swift')
 

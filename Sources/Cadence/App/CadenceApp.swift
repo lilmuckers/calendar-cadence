@@ -189,12 +189,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let own { router.closeAlert(for: own.id) }
         }
         hub.onEnrichmentAction = { [weak self] id, action in self?.state.applyEnrichment(action, meetingID: id) }
+        hub.bluetoothEnabled = state.prefs.companionBluetooth
         if state.prefs.companionEnabled { hub.start() }
         var enabled = state.prefs.companionEnabled
         let previous = state.onPrefsChanged
         state.onPrefsChanged = { [weak self] in
             previous?()
-            guard let self, self.state.prefs.companionEnabled != enabled else { return }
+            guard let self else { return }
+            hub.bluetoothEnabled = self.state.prefs.companionBluetooth
+            guard self.state.prefs.companionEnabled != enabled else { return }
             enabled = self.state.prefs.companionEnabled
             if enabled { hub.start() } else { hub.stop() }
         }

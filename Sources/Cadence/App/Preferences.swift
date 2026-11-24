@@ -152,6 +152,8 @@ struct Preferences: Codable, Equatable {
     var panelHiddenSeries: Set<String> = []
     /// Listen for a paired iPhone.
     var companionEnabled = true
+    /// Let phones reach this Mac over Bluetooth when the network can't (a last resort).
+    var companionBluetooth = true
     /// Full-screen alert on the Mac too while the iPhone is displaying, or only on the phone.
     var companionTakeover: CompanionTakeoverMode = .macAndPhone
     /// Still late with the alert on the phone only: bring it up on the Mac after this long.
@@ -298,6 +300,7 @@ extension Preferences {
         panelHiddenMeetings = try c.decodeIfPresent(Set<String>.self, forKey: .panelHiddenMeetings) ?? d.panelHiddenMeetings
         panelHiddenSeries = try c.decodeIfPresent(Set<String>.self, forKey: .panelHiddenSeries) ?? d.panelHiddenSeries
         companionEnabled = try c.decodeIfPresent(Bool.self, forKey: .companionEnabled) ?? d.companionEnabled
+        companionBluetooth = try c.decodeIfPresent(Bool.self, forKey: .companionBluetooth) ?? d.companionBluetooth
         companionTakeover = (try? c.decodeIfPresent(CompanionTakeoverMode.self, forKey: .companionTakeover)) ?? d.companionTakeover
         companionEscalation = (try? c.decodeIfPresent(CompanionEscalation.self, forKey: .companionEscalation)) ?? d.companionEscalation
         profileRules = (try? c.decodeIfPresent(ProfileRules.self, forKey: .profileRules)) ?? d.profileRules

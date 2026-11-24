@@ -43,6 +43,17 @@ struct PhoneTab: View {
         }
     }
 
+    /// Under the Bluetooth toggle: what it's for, and why it isn't working if it isn't.
+    private static func bluetoothDetail(_ status: CompanionHub.BluetoothStatus, enabled: Bool) -> String {
+        let what = "A last resort for when the network between the devices is blocked (some work VPNs do this). The iPhone tries Wi-Fi first and moves back to it as soon as it can."
+        guard enabled else { return what }
+        switch status {
+        case .notAllowed: return what + " Cadence isn't allowed to use Bluetooth: turn it on in System Settings → Privacy & Security → Bluetooth."
+        case .bluetoothOff: return what + " Bluetooth is off on this Mac."
+        case .advertising, .off: return what
+        }
+    }
+
     private func list(hub: CompanionHub) -> some View {
         @Bindable var state = state
         return Form {
@@ -53,6 +64,10 @@ struct PhoneTab: View {
                 }
                 if state.prefs.companionEnabled {
                     LabeledContent("Status") { StatusLine(hub: hub) }
+                    Toggle(isOn: $state.prefs.companionBluetooth) {
+                        Text("Use Bluetooth when Wi-Fi can't connect")
+                        Text(Self.bluetoothDetail(hub.bluetoothStatus, enabled: state.prefs.companionBluetooth))
+                    }
                 }
             }
 

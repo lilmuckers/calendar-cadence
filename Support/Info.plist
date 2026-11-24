@@ -47,6 +47,8 @@
 	</array>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Cadence reads your calendars to show upcoming meetings, countdowns and join links.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Cadence uses Bluetooth to reach Cadence on your iPhone when Wi-Fi can't connect the two.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Cadence reads your calendars to show upcoming meetings, countdowns and join links.</string>
 	<key>NSHighResolutionCapable</key>
