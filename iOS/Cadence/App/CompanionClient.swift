@@ -294,6 +294,11 @@ final class CompanionClient {
         running = true
         for link in links { link.start() }
         startPathMonitor()
+        // Macs paired before Bluetooth came along never saw the end-of-pairing prompt: ask once now.
+        if bluetoothEnabled, !links.isEmpty, BluetoothScanner.authorization == .notDetermined {
+            bluetooth.activate()
+            refreshBluetooth()
+        }
     }
 
     /// Wi-Fi or wired comes and goes: without either, Bonjour can't work and the links may go to
@@ -805,7 +810,7 @@ final class MacLink: Identifiable {
         channel.onMessage = { [weak self] message in self?.handle(message, over: .bluetooth) }
         channel.onTraffic = { [weak self] message, direction, bytes in
             guard let self else { return }
-            self.traffic?.record(kind: message.kind, direction, bytes: bytes, peer: self.macID)
+            self.traffic?.record(kind: message.kind, direction, bytes: bytes, peer: self.macID, over: .bluetooth)
         }
         channel.onClose = { [weak self, weak channel] _ in
             guard let self, self.bluetoothChannel === channel else { return }

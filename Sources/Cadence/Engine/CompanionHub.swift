@@ -113,7 +113,7 @@ final class CompanionHub {
     let traffic = LinkTrafficStore()
     /// Traffic on a channel before its phone has said who it is; it joins that phone's log after
     /// the hello, or is dropped if the hello fails.
-    @ObservationIgnored private var unclaimedTraffic: [ObjectIdentifier: [(kind: String, direction: LinkDirection, bytes: Int, at: Date)]] = [:]
+    @ObservationIgnored private var unclaimedTraffic: [ObjectIdentifier: [(kind: String, direction: LinkDirection, bytes: Int, at: Date, over: CompanionTransportKind)]] = [:]
     @ObservationIgnored private var refresher: Timer?
     @ObservationIgnored private var retry: Timer?
 
@@ -236,11 +236,12 @@ final class CompanionHub {
     // MARK: Bluetooth
 
     /// Advertises over Bluetooth while the hub is listening and the setting is on. Before macOS has
-    /// asked about Bluetooth access, waits for a pairing code to be on show to start (and ask).
+    /// asked about Bluetooth access, waits for a pairing code to be on show, or a phone to connect
+    /// (one paired before Bluetooth came along), to start and so ask.
     private func updateBluetooth() {
         let authorization = BluetoothAdvertiser.authorization
         let want = started && bluetoothEnabled && authorization != .denied && authorization != .restricted
-            && (authorization == .allowedAlways || pending != nil)
+            && (authorization == .allowedAlways || pending != nil || !phones.isEmpty)
         if want {
             if bluetooth == nil {
                 let advertiser = BluetoothAdvertiser(macID: macID) { [weak self] in self?.listenerKeys() ?? [] }
@@ -367,12 +368,13 @@ final class CompanionHub {
         let id = ObjectIdentifier(channel)
         channels[id] = (channel, nil)
         channel.onMessage = { [weak self] message in self?.handle(message, from: id) }
+        let kind = transport.kind
         channel.onTraffic = { [weak self] message, direction, bytes in
             guard let self else { return }
             if let phoneID = self.channels[id]?.phoneID {
-                self.traffic.record(kind: message.kind, direction, bytes: bytes, peer: phoneID)
+                self.traffic.record(kind: message.kind, direction, bytes: bytes, peer: phoneID, over: kind)
             } else {
-                self.unclaimedTraffic[id, default: []].append((message.kind, direction, bytes, Date()))
+                self.unclaimedTraffic[id, default: []].append((message.kind, direction, bytes, Date(), kind))
             }
         }
         channel.onClose = { [weak self] _ in
@@ -414,7 +416,7 @@ final class CompanionHub {
             let keysChanged = settleKey(match, for: hello, on: entry.channel)
             channels[id]?.phoneID = hello.deviceID
             for event in unclaimedTraffic.removeValue(forKey: id) ?? [] {
-                traffic.record(kind: event.kind, event.direction, bytes: event.bytes, at: event.at, peer: hello.deviceID)
+                traffic.record(kind: event.kind, event.direction, bytes: event.bytes, at: event.at, peer: hello.deviceID, over: event.over)
             }
             // A repeat hello (the phone was renamed) keeps its place in the media-key queue.
             let known = phones.first { $0.id == hello.deviceID }
@@ -437,6 +439,8 @@ final class CompanionHub {
             if let media = macMedia?() { entry.channel.send(.media(media)) }
             onPhoneConnected?()
             if keysChanged { restartListener() }
+            // A phone paired before Bluetooth came along: now's the moment to ask about Bluetooth.
+            if BluetoothAdvertiser.authorization == .notDetermined { updateBluetooth() }
         case .displayState(let displaying):
             guard let phoneID = entry.phoneID, let i = phones.firstIndex(where: { $0.id == phoneID }) else { return }
             if displaying, !phones[i].displaying { phones[i].since = Date() }

@@ -54,3 +54,18 @@ struct LinkTrafficTests {
         #expect(out.allSatisfy { $0.message == message && $0.bytes == frame.count })
     }
 }
+
+@Suite("Link traffic transport")
+struct LinkTrafficTransportTests {
+    @Test func bluetoothShareIsCountedSeparately() {
+        var traffic = LinkTraffic()
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        traffic.record(.ping, .sent, bytes: 20, at: t0)
+        traffic.record(.join(meetingID: "m"), .sent, bytes: 40, at: t0, over: .bluetooth)
+        traffic.record(.ping, .received, bytes: 20, at: t0, over: .bluetooth)
+        #expect(traffic.totalBytes == 80)
+        #expect(traffic.bluetoothBytes == 60)
+        #expect(traffic.bluetoothMessages == 2)
+        #expect(traffic.recent.map(\.transport) == [.network, .bluetooth, .bluetooth])
+    }
+}

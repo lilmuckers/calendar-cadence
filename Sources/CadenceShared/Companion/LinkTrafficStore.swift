@@ -11,8 +11,9 @@ final class LinkTrafficStore {
 
     func traffic(for peer: String) -> LinkTraffic { logs[peer] ?? LinkTraffic() }
 
-    func record(kind: String, _ direction: LinkDirection, bytes: Int, at date: Date = Date(), peer: String) {
-        logs[peer, default: LinkTraffic()].record(kind: kind, direction, bytes: bytes, at: date)
+    func record(kind: String, _ direction: LinkDirection, bytes: Int, at date: Date = Date(), peer: String,
+                over transport: CompanionTransportKind = .network) {
+        logs[peer, default: LinkTraffic()].record(kind: kind, direction, bytes: bytes, at: date, over: transport)
     }
 
     func reset(_ peer: String) { logs[peer] = nil }
