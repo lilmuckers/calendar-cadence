@@ -54,6 +54,9 @@ struct WidgetSchedule: Codable, Equatable {
     /// Today's and tomorrow's working-day stretches. Nil with working hours off, or from older builds.
     var segments: [WidgetSegment]? = nil
 
+    /// How often the widget re-reads the saved schedule on its own, in case the app's reload was dropped.
+    static let refreshInterval: TimeInterval = 30 * 60
+
     /// Within this long of the next meeting the widgets show it rather than the day's moment.
     static let momentYield: TimeInterval = 30 * 60
 
@@ -73,6 +76,19 @@ struct WidgetSchedule: Codable, Equatable {
     func next(after now: Date, calendar: Calendar = .current) -> WidgetMeeting? {
         meetings.filter { $0.start > now && calendar.isDate($0.start, inSameDayAs: now) }
             .min { ($0.start, $0.title) < ($1.start, $1.title) }
+    }
+
+    /// How close the next meeting has to be to take over from one in progress (same as the Mac's
+    /// panel, `PanelPlanner` in CadenceCore).
+    static let liveYield: TimeInterval = 10 * 60
+
+    /// The meeting in progress to show at `now`: the latest to start of those running, unless the
+    /// next one starts within `liveYield`. Matches what the app and the Mac show during a meeting.
+    func live(at now: Date, calendar: Calendar = .current) -> WidgetMeeting? {
+        guard let live = meetings.filter({ $0.start <= now && now < $0.end }).max(by: { ($0.start, $0.title) < ($1.start, $1.title) })
+        else { return nil }
+        if let next = next(after: now, calendar: calendar), next.start.timeIntervalSince(now) <= Self.liveYield { return nil }
+        return live
     }
 
     /// The meeting after `meeting` today, for the "then …" line.
@@ -104,7 +120,7 @@ struct WidgetSchedule: Codable, Equatable {
         return .calm
     }
 
-    /// When the widget has to redraw: now, every meeting start (the next one changes), the icon's
+    /// When the widget has to redraw: now, every meeting start and end (the next or live one changes), the icon's
     /// mood switches, the evening switch to tomorrow's first meeting, and the next midnight (a new
     /// day's "next"). The countdown itself is a system timer, so it ticks between entries on its own. Sorted, unique, none before `now`.
     func entryDates(from now: Date, calendar: Calendar = .current) -> [Date] {
@@ -117,6 +133,10 @@ struct WidgetSchedule: Codable, Equatable {
         // With moments to show, also redraw when a meeting takes over from one and hands back.
         for m in meetings where !(segments ?? []).isEmpty {
             for d in [m.start.addingTimeInterval(-Self.momentYield), m.end] where d > now && d <= midnight { dates.insert(d) }
+        }
+        // A meeting in progress shows until it ends or the next one is close.
+        for m in meetings {
+            for d in [m.end, m.start.addingTimeInterval(-Self.liveYield)] where d > now && d <= midnight { dates.insert(d) }
         }
         for m in meetings where m.start > now && m.start <= midnight {
             dates.insert(m.start)
