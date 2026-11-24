@@ -209,7 +209,9 @@ private struct AgendaScreen: View {
 
     private func statusText(_ mac: MacLink) -> String {
         switch mac.status {
-        case .connected: state.link.connected.first === mac ? "Connected · Join opens on the Mac" : "Connected"
+        case .connected:
+            (state.link.connected.first === mac ? "Connected · Join opens on the Mac" : "Connected")
+                + (mac.transport == .bluetooth ? " · Bluetooth" : "")
         case .failed(let why): why
         default: mac.status.label
         }

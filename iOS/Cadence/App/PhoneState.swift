@@ -20,6 +20,7 @@ final class PhoneState {
             if prefs.icsFeeds != oldValue.icsFeeds { syncFeeds(fetch: true) }
             if prefs.filters != oldValue.filters { recompute() }
             if prefs.sampleCalendarSince != oldValue.sampleCalendarSince { syncSample() }
+            if prefs.useBluetooth != oldValue.useBluetooth { link.bluetoothEnabled = prefs.useBluetooth }
             scheduleBackgroundWork()
         }
     }
@@ -91,6 +92,7 @@ final class PhoneState {
 
     private init() {
         prefs = PhonePrefs.load()
+        link.bluetoothEnabled = prefs.useBluetooth
         Self.migrateSnapshot(to: link.macs.first?.id)
         snapshots = Self.loadSnapshots()
         rebuildAgenda()

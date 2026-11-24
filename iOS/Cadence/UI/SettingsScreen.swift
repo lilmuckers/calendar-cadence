@@ -83,6 +83,8 @@ struct SettingsScreen: View {
         return parts.isEmpty ? "None" : parts.joined(separator: " · ")
     }
 
+    private static let bluetoothNote = "A last resort for when the network between the devices is blocked (some work VPNs do this). Wi-Fi is always tried first, and the link moves back to it as soon as it can."
+
     @ViewBuilder private var macSection: some View {
         @Bindable var state = state
         Section {
@@ -92,7 +94,8 @@ struct SettingsScreen: View {
                         MacDetailScreen(link: mac)
                     } label: {
                         LabeledContent {
-                            Text(mac.status.label).font(.caption).foregroundStyle(.secondary)
+                            Text(mac.transport == .bluetooth ? "Connected · Bluetooth" : mac.status.label)
+                                .font(.caption).foregroundStyle(.secondary)
                         } label: {
                             Label(mac.mac.displayName, systemImage: "laptopcomputer")
                         }
@@ -105,6 +108,10 @@ struct SettingsScreen: View {
                         Text("Open web links on \(state.link.macs.first?.displayName ?? "the first Mac")")
                         Text("A meeting only one Mac has still opens there, unless its link works in any browser: then it opens on the first Mac.")
                     }
+                }
+                Toggle(isOn: $state.prefs.useBluetooth) {
+                    Text("Use Bluetooth when Wi-Fi can't connect")
+                    Text(state.prefs.useBluetooth ? state.link.bluetoothProblem ?? Self.bluetoothNote : Self.bluetoothNote)
                 }
                 LabeledContent("This iPhone") {
                     TextField(state.link.defaultDeviceName, text: $deviceName)
@@ -573,6 +580,7 @@ private struct MacDetailScreen: View {
 
     private var status: String {
         if case .failed(let why) = link.status { return why }
+        if link.transport == .bluetooth { return "Connected over Bluetooth" }
         return link.status.label
     }
 }
