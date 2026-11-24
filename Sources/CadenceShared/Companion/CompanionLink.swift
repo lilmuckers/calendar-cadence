@@ -35,11 +35,12 @@ enum CompanionNetwork {
     }
 }
 
-/// One framed, encrypted connection between the Mac and a phone. Pings while open and closes itself
-/// after `CompanionService.timeout` of silence. Everything runs on the main queue.
+/// One framed connection between the Mac and a phone, over any `CompanionTransport` (which does
+/// the encryption). Pings while open and closes itself after `CompanionService.timeout` of silence.
+/// Everything runs on the main queue.
 @MainActor
 final class CompanionChannel {
-    let connection: NWConnection
+    let transport: CompanionTransport
     var onMessage: ((CompanionMessage) -> Void)?
     var onReady: (() -> Void)?
     /// Called once, when the channel is gone for good.
@@ -53,36 +54,23 @@ final class CompanionChannel {
     private var pinger: Timer?
     private var closed = false
 
-    init(connection: NWConnection) {
-        self.connection = connection
+    init(transport: CompanionTransport) {
+        self.transport = transport
     }
 
     func start() {
-        connection.stateUpdateHandler = { [weak self] state in
-            MainActor.assumeIsolated { self?.handle(state) }
-        }
-        connection.start(queue: .main)
+        transport.onReady = { [weak self] in self?.ready() }
+        transport.onReceive = { [weak self] data in self?.received(data) }
+        transport.onClose = { [weak self] error in self?.close(error) }
+        transport.start()
     }
 
-    private func handle(_ state: NWConnection.State) {
-        switch state {
-        case .ready:
-            lastHeard = Date()
-            receive()
-            pinger = Timer.scheduledTimer(withTimeInterval: CompanionService.pingInterval, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.heartbeat() }
-            }
-            onReady?()
-        case .failed(let error):
-            close(error)
-        case .waiting(let error):
-            // TLS failures (wrong key) surface as "waiting" on the client; don't retry forever on one connection.
-            close(error)
-        case .cancelled:
-            close(nil)
-        default:
-            break
+    private func ready() {
+        lastHeard = Date()
+        pinger = Timer.scheduledTimer(withTimeInterval: CompanionService.pingInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.heartbeat() }
         }
+        onReady?()
     }
 
     private func heartbeat() {
@@ -93,40 +81,26 @@ final class CompanionChannel {
         }
     }
 
-    /// Keying material unique to this TLS session (both ends get the same bytes), which the hello
-    /// proof signs. Nil before the handshake finishes.
-    func sessionBinding() -> Data? {
-        guard let meta = connection.metadata(definition: NWProtocolTLS.definition) as? NWProtocolTLS.Metadata,
-              let secret = sec_protocol_metadata_create_secret(
-                  meta.securityProtocolMetadata, CompanionKeys.exporterLabel.utf8.count,
-                  CompanionKeys.exporterLabel, CompanionKeys.exporterLength) else { return nil }
-        return Data(secret as DispatchData)
-    }
+    /// Keying material unique to this encrypted session, which the hello proof signs. Nil before
+    /// the session is up.
+    func sessionBinding() -> Data? { transport.sessionBinding() }
 
     func send(_ message: CompanionMessage) {
         guard !closed, let frame = try? CompanionFraming.encode(message) else { return }
-        connection.send(content: frame, completion: .contentProcessed { _ in })
+        transport.send(frame)
         onTraffic?(message, .sent, frame.count)
     }
 
-    private func receive() {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) { [weak self] data, _, complete, error in
-            MainActor.assumeIsolated {
-                guard let self, !self.closed else { return }
-                if let data, !data.isEmpty {
-                    self.lastHeard = Date()
-                    do {
-                        for (message, bytes) in try self.decoder.appendFrames(data) {
-                            self.onTraffic?(message, .received, bytes)
-                            if message != .ping { self.onMessage?(message) }
-                        }
-                    } catch {
-                        self.close(error)
-                        return
-                    }
-                }
-                if complete || error != nil { self.close(error) } else { self.receive() }
+    private func received(_ data: Data) {
+        guard !closed else { return }
+        lastHeard = Date()
+        do {
+            for (message, bytes) in try decoder.appendFrames(data) {
+                onTraffic?(message, .received, bytes)
+                if message != .ping { onMessage?(message) }
             }
+        } catch {
+            close(error)
         }
     }
 
@@ -134,8 +108,8 @@ final class CompanionChannel {
         guard !closed else { return }
         closed = true
         pinger?.invalidate()
-        connection.stateUpdateHandler = nil
-        connection.cancel()
+        transport.onClose = nil
+        transport.close()
         onClose?(error)
         onClose = nil
     }

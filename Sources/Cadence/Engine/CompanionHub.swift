@@ -305,7 +305,7 @@ final class CompanionHub {
     // MARK: Connections
 
     private func accept(_ connection: NWConnection) {
-        let channel = CompanionChannel(connection: connection)
+        let channel = CompanionChannel(transport: NetworkTransport(connection: connection))
         let id = ObjectIdentifier(channel)
         channels[id] = (channel, nil)
         channel.onMessage = { [weak self] message in self?.handle(message, from: id) }
