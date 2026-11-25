@@ -551,6 +551,10 @@ private struct GeneralTab: View {
                 if let loginError {
                     Text(loginError).font(.caption).foregroundStyle(.red)
                 }
+                Toggle(isOn: $state.prefs.restartAfterCrash) {
+                    Text("Restart Cadence if it crashes")
+                    Text("Reopens it straight away, unless it crashes \(CrashLoopGuard.limit) times within a few minutes. Either way, it shows what went wrong next time it opens, with a button to report it on GitHub.")
+                }
                 LabeledContent {
                     Button("Run Setup Again…") { state.onRunSetup?() }
                 } label: {

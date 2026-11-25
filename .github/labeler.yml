@@ -8,6 +8,7 @@ mac:
       - any-glob-to-any-file:
           - Sources/Cadence/**
           - Sources/CadenceMCP/**
+          - Sources/CadenceWatchdog/**
           - Support/**
           - scripts/build.sh
           - scripts/dmg*

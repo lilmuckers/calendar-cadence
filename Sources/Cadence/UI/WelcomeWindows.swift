@@ -74,6 +74,14 @@ final class WelcomeWindows: NSObject, NSWindowDelegate {
         }
     }
 
+    /// The last run crashed: what happened, and a pre-filled GitHub issue to report it.
+    func showCrash(_ report: CrashReport) {
+        let notice = CrashNotice(report: report)
+        present(title: "Cadence Crashed", width: CrashNoticeView.width) { close in
+            CrashNoticeView(notice: notice, done: close)
+        }
+    }
+
     private func present<Content: View>(title: String, width: CGFloat, @ViewBuilder _ content: (@escaping () -> Void) -> Content) {
         // Setup stays open (closing it counts as finishing it); anything else here is replaced.
         if window !== setupWindow { window?.close() }

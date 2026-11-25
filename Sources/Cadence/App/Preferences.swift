@@ -181,6 +181,8 @@ struct Preferences: Codable, Equatable {
     @EncodesNil var updateMode: UpdateMode? = nil
     /// The "Finish setting up" checklist in the menu was put away.
     var setupChecklistDismissed = false
+    /// Reopen Cadence by itself when it crashes.
+    var restartAfterCrash = true
 
     /// The pause limit for the media remote control, nil when it's off.
     var mediaRemotePauseLimit: TimeInterval? {
@@ -314,5 +316,6 @@ extension Preferences {
         announceAlerts = try c.decodeIfPresent(Bool.self, forKey: .announceAlerts) ?? d.announceAlerts
         updateMode = (try? c.decodeIfPresent(UpdateMode.self, forKey: .updateMode)) ?? d.updateMode
         setupChecklistDismissed = try c.decodeIfPresent(Bool.self, forKey: .setupChecklistDismissed) ?? d.setupChecklistDismissed
+        restartAfterCrash = try c.decodeIfPresent(Bool.self, forKey: .restartAfterCrash) ?? d.restartAfterCrash
     }
 }

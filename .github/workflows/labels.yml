@@ -31,3 +31,5 @@ jobs:
           gh label create website --force --color C2E0C6 --description "Changes the website (gh-pages)"
           gh label create ci --force --color 0052CC --description "CI, release pipeline, build scripts or dev tooling"
           gh label create docs --force --color 0075CA --description "README, plans or other repo docs"
+          # Issues opened from the app's "Cadence crashed" window.
+          gh label create crash --force --color D93F0B --description "Cadence crashed"
