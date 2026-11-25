@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var bridge: MCPBridge?
     private var drawer: EnrichmentDrawerController?
     private var welcome: WelcomeWindows?
+    private let crashes = CrashReporter()
 
     /// From the version in the About window. Nil in builds without a version (nothing to look up).
     var showVersionNotes: (() -> Void)? {
@@ -64,6 +65,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
+        let previousCrash = crashes.takePreviousCrash()
+        crashes.install()
+        crashes.setRestartsAfterCrash(state.prefs.restartAfterCrash)
         Keychain.keepOnThisDevice()
         let panel = CountdownPanelController(state: state)
         let router = AlertRouter(state: state)
@@ -115,6 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.onPrefsChanged = { [weak self] in
             panel.update()
             bridge.sync()
+            if let self { self.crashes.setRestartsAfterCrash(self.state.prefs.restartAfterCrash) }
             guard let self, self.state.prefs.joinHotKey != registered else { return }
             registered = self.state.prefs.joinHotKey
             hotKey.register(registered)
@@ -132,6 +137,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observeDrawer()
 
         startUpdater(router: router)
+        if let previousCrash { welcome?.showCrash(previousCrash) }
+        #if DEBUG
+        // Crashes on purpose a few seconds after launch, to try crash detection and the restart.
+        if CommandLine.arguments.contains("--test-crash") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { fatalError("Test crash (--test-crash)") }
+        }
+        #endif
     }
 
     /// Update checks, the first-launch welcome and "What's new" after an update.

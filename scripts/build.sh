@@ -60,6 +60,14 @@ swiftc -target "$TARGET" "${OPT[@]}" -module-name CadenceMCP \
 codesign "${SIGN_FLAGS[@]}" --identifier com.cadence.calendarmonitor.mcp \
   --sign "${CODESIGN_IDENTITY:--}" "$APP/Contents/MacOS/cadence-mcp"
 
+# Watches the app and reopens it after a crash (see CrashReporter.swift).
+swiftc -target "$TARGET" "${OPT[@]}" -module-name CadenceWatchdog \
+  -I "$BUILD/core" -L "$BUILD/core" -lCadenceCore \
+  -o "$APP/Contents/MacOS/cadence-watchdog" \
+  "$ROOT/Sources/CadenceWatchdog/main.swift"
+codesign "${SIGN_FLAGS[@]}" --identifier com.cadence.calendarmonitor.watchdog \
+  --sign "${CODESIGN_IDENTITY:--}" "$APP/Contents/MacOS/cadence-watchdog"
+
 codesign "${SIGN_FLAGS[@]}" --sign "${CODESIGN_IDENTITY:--}" \
   --entitlements "$ROOT/Support/Cadence.entitlements" "$APP"
 
