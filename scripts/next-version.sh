@@ -5,7 +5,7 @@
 #   PRs with none of those labels count as patch (and are listed as a warning).
 #   With no release tag yet, the first release uses CFBundleShortVersionString from Support/Info.plist.
 #
-# Usage: scripts/next-version.sh [auto|major|minor|patch]   (default auto: decide from labels)
+# Usage: [INCLUDE_PR=<n>] scripts/next-version.sh [auto|major|minor|patch]   (default auto: decide from labels)
 # Needs: git history with tags (fetch-depth: 0), gh authenticated (GH_TOKEN in CI).
 # Prints key=value lines (version, tag, previous_tag, bump, prs) and appends them to $GITHUB_OUTPUT when set.
 set -euo pipefail
@@ -28,6 +28,12 @@ if [[ -n "$PREV_TAG" ]]; then
 fi
 PRS_JSON="$(gh pr list --state merged --base "$BASE_BRANCH" --search "$SEARCH" --limit 1000 \
   --json number,title,labels)"
+# INCLUDE_PR=<n>: count that PR too. The release workflow sets it when releasing a PR it just merged, since
+# GitHub's search can take a while to list a fresh merge (and a dry run doesn't merge it at all).
+if [[ -n "${INCLUDE_PR:-}" ]]; then
+  EXTRA="$(gh pr view "$INCLUDE_PR" --json number,title,labels)"
+  PRS_JSON="$(jq --argjson pr "$EXTRA" 'map(select(.number != $pr.number)) + [$pr]' <<<"$PRS_JSON")"
+fi
 PR_COUNT="$(jq 'length' <<<"$PRS_JSON")"
 
 highest_label() {
