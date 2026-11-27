@@ -53,6 +53,55 @@ struct ClashTests {
         #expect(c.first?.meetings.count == 3)
     }
 
+    // Issue #101: a meeting ending at 13:00 and one starting at 13:00 are back-to-back, not a clash.
+    @Test func backToBackIsNotAClash() {
+        #expect(ClashDetector.clashes(in: [m("a", at: 0, for: 60), m("b", at: 60, for: 60)], after: t0).isEmpty)
+        // Order in the input doesn't matter.
+        #expect(ClashDetector.clashes(in: [m("b", at: 60, for: 60), m("a", at: 0, for: 60)], after: t0).isEmpty)
+        // A run of three back-to-back meetings.
+        #expect(ClashDetector.clashes(in: [m("a", at: 0), m("b", at: 30), m("c", at: 60)], after: t0).isEmpty)
+    }
+
+    @Test(arguments: [0.001, 0.4, 0.999, 1, 5, 29])
+    func backToBackWithStraySecondsIsNotAClash(drift: Double) {
+        let cal = CalendarInfo(id: "c", title: "Work", sourceTitle: "s", color: .gray)
+        let thirteen = t0.addingTimeInterval(60 * 60)
+        // End stored a fraction (or a few seconds) late, as some feeds do.
+        let a = Meeting(id: "a", title: "a", start: t0, end: thirteen.addingTimeInterval(drift), calendar: cal)
+        let b = Meeting(id: "b", title: "b", start: thirteen, end: thirteen.addingTimeInterval(3600), calendar: cal)
+        #expect(ClashDetector.clashes(in: [a, b], after: t0).isEmpty)
+        // Or the next start a fraction early.
+        let c = Meeting(id: "c", title: "c", start: thirteen.addingTimeInterval(-drift), end: thirteen.addingTimeInterval(3600), calendar: cal)
+        let d = Meeting(id: "d", title: "d", start: t0, end: thirteen, calendar: cal)
+        #expect(ClashDetector.clashes(in: [d, c], after: t0).isEmpty)
+    }
+
+    @Test func overlapByOneMinuteIsAClash() {
+        let c = ClashDetector.clashes(in: [m("a", at: 0, for: 61), m("b", at: 60, for: 60)], after: t0)
+        #expect(c.count == 1)
+        #expect(c.first?.meetings.map(\.id) == ["a", "b"])
+        // And when the second starts a minute early instead.
+        #expect(ClashDetector.clashes(in: [m("a", at: 0, for: 60), m("b", at: 59, for: 60)], after: t0).count == 1)
+    }
+
+    @Test func containedMeetingIsAClash() {
+        let c = ClashDetector.clashes(in: [m("outer", at: 0, for: 120), m("inner", at: 30, for: 30)], after: t0)
+        #expect(c.count == 1)
+        #expect(Set(c.first?.meetings.map(\.id) ?? []) == ["outer", "inner"])
+        // Sharing the outer meeting's start or end still counts.
+        #expect(ClashDetector.clashes(in: [m("outer", at: 0, for: 120), m("inner", at: 0, for: 30)], after: t0).count == 1)
+        #expect(ClashDetector.clashes(in: [m("outer", at: 0, for: 120), m("inner", at: 90, for: 30)], after: t0).count == 1)
+    }
+
+    @Test func overlapsHelper() {
+        func at(_ minutes: Double) -> Date { t0.addingTimeInterval(minutes * 60) }
+        #expect(!ClashDetector.overlaps(at(0), at(60), at(60), at(120)))
+        #expect(!ClashDetector.overlaps(at(60), at(120), at(0), at(60)))
+        #expect(ClashDetector.overlaps(at(0), at(60), at(59), at(120)))
+        #expect(ClashDetector.overlaps(at(0), at(60), at(10), at(20)))
+        #expect(ClashDetector.overlaps(at(10), at(20), at(0), at(60)))
+    }
+
     @Test func pastClashesIgnored() {
         #expect(ClashDetector.clashes(in: [m("a", at: -60), m("b", at: -50)], after: t0).isEmpty)
     }

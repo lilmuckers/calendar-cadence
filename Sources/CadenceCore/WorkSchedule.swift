@@ -141,7 +141,7 @@ public struct WorkSchedule: Codable, Equatable, Hashable, Sendable {
         guard let hours = hours(on: meeting.start, calendar: calendar) else { return [.dayOff] }
         var out: [WorkConflict] = []
         for (b, span) in breaks(on: meeting.start, calendar: calendar)
-        where meeting.start < span.end && meeting.end > span.start {
+        where ClashDetector.overlaps(meeting.start, meeting.end, span.start, span.end) {
             out.append(.onBreak(b.name))
         }
         if meeting.start < hours.start || meeting.end > hours.end { out.append(.outsideHours) }

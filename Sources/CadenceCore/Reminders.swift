@@ -223,6 +223,19 @@ public struct Clash: Equatable, Sendable {
 }
 
 public enum ClashDetector {
+    /// A time snapped to the nearest whole minute. Calendars schedule in minutes, but dates from
+    /// different sources can carry stray seconds or fractions (an end stored as 13:00:00.4, or
+    /// 12:59:59.999 from another feed), which would otherwise make back-to-back meetings overlap.
+    static func minute(_ date: Date) -> Date {
+        Date(timeIntervalSinceReferenceDate: (date.timeIntervalSinceReferenceDate / 60).rounded() * 60)
+    }
+
+    /// Whether two time ranges overlap at minute precision. Strict: one ending exactly when the
+    /// other starts (back-to-back) is not an overlap.
+    public static func overlaps(_ aStart: Date, _ aEnd: Date, _ bStart: Date, _ bEnd: Date) -> Bool {
+        minute(aStart) < minute(bEnd) && minute(bStart) < minute(aEnd)
+    }
+
     /// Clusters timed meetings whose times overlap (back-to-back doesn't count).
     public static func clashes(in meetings: [Meeting], after now: Date) -> [Clash] {
         let timed = meetings
@@ -232,13 +245,14 @@ public enum ClashDetector {
         var cluster: [Meeting] = []
         var clusterEnd = Date.distantPast
         for m in timed {
-            if !cluster.isEmpty && m.start < clusterEnd {
+            // Strict, minute-precision overlap with the cluster so far: m.start < clusterEnd.
+            if !cluster.isEmpty && minute(m.start) < clusterEnd {
                 if !cluster.contains(where: { MeetingDeduplicator.isSameMeeting($0, m) }) { cluster.append(m) }
-                clusterEnd = max(clusterEnd, m.end)
+                clusterEnd = max(clusterEnd, minute(m.end))
             } else {
                 if cluster.count > 1 { result.append(Clash(meetings: cluster)) }
                 cluster = [m]
-                clusterEnd = m.end
+                clusterEnd = minute(m.end)
             }
         }
         if cluster.count > 1 { result.append(Clash(meetings: cluster)) }
