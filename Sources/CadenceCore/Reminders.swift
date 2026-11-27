@@ -1,5 +1,37 @@
 import Foundation
 
+/// The "Leave now" reminder times shown in Settings. Stored as minutes before you need to leave
+/// (`Preferences.leaveOffsets`, e.g. `[10, 0]`); 0 is the "time to leave" reminder itself.
+public enum LeaveOffsets {
+    /// Times offered when adding a reminder.
+    public static let presets = [0, 5, 10, 15, 20, 30, 45, 60, 90, 120]
+    /// Offsets accepted (the same range the old free-text field allowed).
+    public static let range = 0...240
+
+    /// "When it's time to leave", "5 minutes before leaving", "1 hour before leaving", "1 hr 30 min before leaving".
+    public static func label(_ minutes: Int) -> String {
+        if minutes <= 0 { return "When it's time to leave" }
+        let h = minutes / 60, m = minutes % 60
+        let amount: String
+        switch (h, m) {
+        case (0, _): amount = m == 1 ? "1 minute" : "\(m) minutes"
+        case (_, 0): amount = h == 1 ? "1 hour" : "\(h) hours"
+        default: amount = "\(h) hr \(m) min"
+        }
+        return "\(amount) before leaving"
+    }
+
+    /// De-duplicated, in range, earliest reminder first (largest offset first): the order they fire.
+    public static func normalized(_ offsets: [Int]) -> [Int] {
+        Set(offsets.filter { range.contains($0) }).sorted(by: >)
+    }
+
+    /// Presets not already chosen.
+    public static func available(excluding chosen: [Int]) -> [Int] {
+        presets.filter { !chosen.contains($0) }
+    }
+}
+
 /// A one-off reminder (heads-up, leave-now) tied to a meeting.
 public struct Reminder: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {

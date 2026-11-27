@@ -33,6 +33,22 @@ struct ReminderTests {
         #expect(msg.body.contains("25m"))
         #expect(ReminderPlanner.message(for: r[0]).title == "Leave in 10 min for a")
     }
+
+    @Test func leaveOffsetLabels() {
+        #expect(LeaveOffsets.label(0) == "When it's time to leave")
+        #expect(LeaveOffsets.label(1) == "1 minute before leaving")
+        #expect(LeaveOffsets.label(10) == "10 minutes before leaving")
+        #expect(LeaveOffsets.label(60) == "1 hour before leaving")
+        #expect(LeaveOffsets.label(120) == "2 hours before leaving")
+        #expect(LeaveOffsets.label(90) == "1 hr 30 min before leaving")
+    }
+
+    @Test func leaveOffsetsNormalizeStoredValues() {
+        // Values typed into the old free-text field stay valid: deduped, in range, largest first.
+        #expect(LeaveOffsets.normalized([0, 10, 10, 300, -5, 7]) == [10, 7, 0])
+        #expect(LeaveOffsets.available(excluding: [10, 0]).contains(10) == false)
+        #expect(LeaveOffsets.available(excluding: [10, 0]).contains(5))
+    }
 }
 
 @Suite("Clashes")
