@@ -43,7 +43,7 @@ struct DeskView: View {
                                             .frame(maxWidth: .infinity, maxHeight: dayDone ? .infinity : nil)
                                         if !dayDone {
                                             AgendaColumn(limit: 2).padding(.top, 8)
-                                            Spacer(minLength: 0)
+                                                .frame(maxHeight: .infinity, alignment: .top)
                                         }
                                     }
                                 } else if dayDone && !prompting {
@@ -57,7 +57,7 @@ struct DeskView: View {
                                     }
                                 } else {
                                     AgendaColumn(limit: prompting ? 2 : (state.prefs.deskMediaControls ? 6 : 8))
-                                    Spacer(minLength: 0)
+                                        .frame(maxHeight: .infinity, alignment: .top)
                                 }
                                 PromptStrip(style: .panel)
                                 // Room for the media corner, drawn above the dimming below.
@@ -128,6 +128,10 @@ struct DeskView: View {
                     .padding(.horizontal, 28)
                     .padding(.bottom, byMedia ? 20 + MediaCorner.height + 10 : 24)
             }
+            // Pinned to the screen: if a column ever wants more height than there is, it overflows
+            // here rather than growing the whole desk past the bottom edge (which dragged Join and
+            // the media corner down with it).
+            .frame(width: geo.size.width, height: geo.size.height)
             .foregroundStyle(.white)
             .contentShape(Rectangle())
         }
@@ -349,13 +353,23 @@ struct JoinButton: View {
     }
 }
 
-/// "Later today" list.
+/// "Later today" list: up to `limit` rows, fewer when they don't all fit the height it's given
+/// (a busy afternoon, a short phone in landscape, larger text), so it never pushes past the screen.
 private struct AgendaColumn: View {
     @Environment(PhoneState.self) private var state
     var limit: Int
 
     var body: some View {
         let later = Array(state.laterToday.prefix(limit))
+        ViewThatFits(in: .vertical) {
+            ForEach((0...later.count).reversed(), id: \.self) { n in
+                rows(Array(later.prefix(n)))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func rows(_ later: [Meeting]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if !later.isEmpty {
                 Text("LATER TODAY").font(.caption.weight(.heavy)).kerning(1.2).foregroundStyle(.white.opacity(0.5))
