@@ -157,7 +157,7 @@ public enum EnrichmentTools {
 
     static let contentDescription = """
     Shape depends on kind. markdown: {"text": "# Heading\\n- bullets, **bold**, [links](https://…), - [ ] tasks"}. \
-    links: {"items": [{"title", "url" (http/https/mailto), "note"?}]}. \
+    links: {"items": [{"title" (the link's name, shown instead of its domain), "url" (http/https/mailto), "note"?}]}. \
     checklist: {"items": ["text", …] or [{"id"?, "text"}]} (the user ticks them). \
     bingo: {"squares": ["synergy", "circle back", …], "size"?: 3-5 (default 5), "free_centre"?: true} — \
     needs at least size²−1 squares; extras are sampled per meeting. \

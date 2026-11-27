@@ -85,7 +85,7 @@ struct LinksView: View {
                                 .frame(width: 30, height: 30)
                                 .background(Circle().fill(.tint.opacity(0.25)))
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(link.title).font(.system(size: 14, weight: .semibold)).lineLimit(2).multilineTextAlignment(.leading)
+                                Text(link.displayTitle()).font(.system(size: 14, weight: .semibold)).lineLimit(2).multilineTextAlignment(.leading)
                                 Text(link.note ?? link.host).font(.system(size: 12)).foregroundStyle(.white.opacity(0.55)).lineLimit(2)
                                     .multilineTextAlignment(.leading)
                             }
