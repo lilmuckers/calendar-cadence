@@ -47,7 +47,7 @@ name: Release
 # fails the run before anything is built. Its version is the usual bump from the last release tag, with the
 # PR's own label counted. The GitHub release is always a draft (so the website isn't updated), and
 # TestFlight's "What to Test" opens with the PR's number and title, then every iPhone change since the
-# last major release (the newest vX.0.0 tag; all of them while still on 0.x). A dry run with a PR merges
+# last full release: the newest published one that isn't a draft or pre-release and whose tag is on main. A dry run with a PR merges
 # nothing: it checks the PR merges cleanly and builds GitHub's test merge (refs/pull/<n>/merge).
 # Re-running after the merge went through picks up the existing merge commit instead of failing.
 # Merges made with the workflow's token don't start other workflows, so CI won't run on main for it.
@@ -353,7 +353,8 @@ jobs:
         run: scripts/ci-select-xcode.sh
 
       # What changed in the iPhone app (only PRs labelled ios): since the last release, or for a PR release,
-      # the PR's number and title then everything since the last major release (newest vX.0.0 tag; on 0.x, all).
+      # the PR's number and title then everything since the last full release (published, not a draft or
+      # pre-release, tag on main), so testers see all that's piled up across draft PR releases.
       - name: iPhone changelog
         env:
           GH_TOKEN: ${{ github.token }}
@@ -368,12 +369,20 @@ jobs:
             python3 -I scripts/changelog.py "$TAG" "$PREV_TAG" --target-ref HEAD --only ios --format text > "$NOTES"
             [[ -s "$NOTES" ]] || echo "Behind-the-scenes changes only." > "$NOTES"
           else
-            MAJOR_TAG="$(git tag --list 'v[0-9]*.0.0' --sort=-v:refname | grep -E '^v[0-9]+\.0\.0$' | grep -vxF "$TAG" | head -n1 || true)"
-            CHANGES="$(python3 -I scripts/changelog.py "$TAG" "$MAJOR_TAG" --target-ref HEAD --only ios --format text)"
+            FULL_RELEASES="$(gh release list --limit 200 --json tagName,isDraft,isPrerelease \
+              --jq '.[] | select((.isDraft or .isPrerelease) | not) | .tagName')"
+            BASE_TAG=""
+            for t in $(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname); do
+              [[ "$t" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$t" != "$TAG" ]] || continue
+              grep -qxF "$t" <<<"$FULL_RELEASES" || continue
+              git merge-base --is-ancestor "$t^{commit}" origin/main || continue
+              BASE_TAG="$t"; break
+            done
+            CHANGES="$(python3 -I scripts/changelog.py "$TAG" "$BASE_TAG" --target-ref HEAD --only ios --format text)"
             {
               echo "PR #$PR_NUMBER: $PR_TITLE"
               echo
-              echo "Changes since ${MAJOR_TAG:-the first release}:"
+              echo "Changes since ${BASE_TAG:-the first release}:"
               echo "${CHANGES:-Behind-the-scenes changes only.}"
             } > "$NOTES"
           fi
