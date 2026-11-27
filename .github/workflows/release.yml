@@ -40,10 +40,25 @@ name: Release
 #     SPOTIFY_CLIENT_ID              optional built-in Spotify app
 # Build numbers are the run number followed by the attempt (run 42 → 421, its re-run → 422), so a
 # re-run never reuses a number App Store Connect has already seen.
+#
+# Releasing a PR (the "pr" input): the "source" job merges that PR into main first (merge commit, the same
+# as the Merge button) and the whole release builds from the merge commit. A PR that conflicts with main,
+# isn't open against main, or that GitHub refuses to merge (branch protection, failing required checks)
+# fails the run before anything is built. Its version is the usual bump from the last release tag, with the
+# PR's own label counted. The GitHub release is always a draft (so the website isn't updated), and
+# TestFlight's "What to Test" opens with the PR's number and title, then every iPhone change since the
+# last major release (the newest vX.0.0 tag; all of them while still on 0.x). A dry run with a PR merges
+# nothing: it checks the PR merges cleanly and builds GitHub's test merge (refs/pull/<n>/merge).
+# Re-running after the merge went through picks up the existing merge commit instead of failing.
+# Merges made with the workflow's token don't start other workflows, so CI won't run on main for it.
 
 on:
   workflow_dispatch:
     inputs:
+      pr:
+        description: "PR number to merge into main and release as a draft (blank = release main as it is)"
+        type: string
+        default: ""
       bump:
         description: "Version bump. auto = highest major/minor/patch label on PRs merged since the last release"
         type: choice
@@ -72,8 +87,98 @@ permissions:
   contents: read
 
 jobs:
+  # What the release builds from. Without a PR: the commit this run is on. With one: merges it into main
+  # (or, on a dry run, only checks it would merge) and hands on the resulting commit. Always runs, so the
+  # jobs after it never get skipped for want of it.
+  source:
+    name: ${{ inputs.pr != '' && format('Merge PR {0} into main', inputs.pr) || 'Pick commit' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write        # merging the PR
+      pull-requests: write
+    outputs:
+      ref: ${{ steps.pr.outputs.ref || github.sha }}     # what the jobs below check out
+      sha: ${{ steps.pr.outputs.sha || github.sha }}     # what the release tag points at
+      pr_number: ${{ steps.pr.outputs.number }}
+      pr_title: ${{ steps.pr.outputs.title }}
+    steps:
+      - name: Releases come from main
+        if: ${{ github.ref != 'refs/heads/main' && !inputs.dry_run }}
+        run: |
+          echo "::error::Run the release from main (this run is on ${{ github.ref_name }}). Use dry_run to test other branches."
+          exit 1
+
+      - name: Merge the PR
+        id: pr
+        if: ${{ inputs.pr != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ inputs.pr }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::'$PR' isn't a PR number"; exit 1; }
+          info() { gh pr view "$PR" --json number,title,state,baseRefName,headRefOid,mergeable,isDraft,mergeCommit; }
+          JSON="$(info)"
+          STATE="$(jq -r .state <<<"$JSON")"
+          BASE="$(jq -r .baseRefName <<<"$JSON")"
+          TITLE="$(jq -r .title <<<"$JSON")"
+          [[ "$BASE" == "main" ]] || { echo "::error::PR #$PR targets $BASE, not main"; exit 1; }
+
+          case "$STATE" in
+            MERGED)
+              # A re-run after the merge went through: release the merge commit that's already there.
+              SHA="$(jq -r .mergeCommit.oid <<<"$JSON")"
+              echo "::notice::PR #$PR is already merged ($SHA) — releasing that merge commit."
+              ;;
+            OPEN)
+              [[ "$(jq -r .isDraft <<<"$JSON")" == "false" ]] || { echo "::error::PR #$PR is a draft"; exit 1; }
+              # GitHub works out mergeability in the background: UNKNOWN until it has.
+              for _ in $(seq 1 24); do
+                MERGEABLE="$(jq -r .mergeable <<<"$JSON")"
+                [[ "$MERGEABLE" != "UNKNOWN" ]] && break
+                sleep 5; JSON="$(info)"
+              done
+              case "$MERGEABLE" in
+                MERGEABLE) ;;
+                CONFLICTING) echo "::error::PR #$PR conflicts with main. Resolve the conflicts, then run the release again."; exit 1 ;;
+                *) echo "::error::GitHub couldn't tell whether PR #$PR merges cleanly (mergeable: $MERGEABLE). Try again."; exit 1 ;;
+              esac
+              if [[ "$DRY_RUN" == "true" ]]; then
+                # Build GitHub's test merge of the PR into main, without merging anything.
+                SHA="$(gh api "repos/$GH_REPO/pulls/$PR" --jq .merge_commit_sha)"
+                REF="refs/pull/$PR/merge"
+                echo "::notice::Dry run: PR #$PR merges cleanly; building its test merge without merging."
+              else
+                # --match-head-commit: refuse if someone pushed to the PR after the check above.
+                gh pr merge "$PR" --merge --match-head-commit "$(jq -r .headRefOid <<<"$JSON")"
+                for _ in $(seq 1 12); do
+                  SHA="$(gh pr view "$PR" --json mergeCommit --jq '.mergeCommit.oid // empty')"
+                  [[ -n "$SHA" ]] && break
+                  sleep 5
+                done
+                [[ -n "$SHA" ]] || { echo "::error::PR #$PR merged, but its merge commit didn't show up"; exit 1; }
+              fi
+              ;;
+            *) echo "::error::PR #$PR is $STATE"; exit 1 ;;
+          esac
+
+          {
+            echo "number=$PR"
+            echo "sha=$SHA"
+            echo "ref=${REF:-$SHA}"
+            # Titles are one line, but use a delimiter anyway so any character is safe.
+            echo "title<<TITLE_EOF_$$"; echo "$TITLE"; echo "TITLE_EOF_$$"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### PR #$PR: $TITLE"
+            if [[ "$DRY_RUN" == "true" ]]; then echo "- Dry run: merges cleanly, not merged"; else echo "- Merged into main as \`$SHA\`"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   version:
     name: Work out version
+    needs: source
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -84,17 +189,15 @@ jobs:
       previous_tag: ${{ steps.next.outputs.previous_tag }}
       bump: ${{ steps.next.outputs.bump }}
     steps:
-      - name: Releases come from main
-        if: ${{ github.ref != 'refs/heads/main' && !inputs.dry_run }}
-        run: |
-          echo "::error::Run the release from main (this run is on ${{ github.ref_name }}). Use dry_run to test other branches."
-          exit 1
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.source.outputs.ref }}
           fetch-depth: 0
       - id: next
         env:
           GH_TOKEN: ${{ github.token }}
+          # Count the PR's label even if GitHub's search hasn't indexed the merge yet (or, on a dry run, it isn't merged).
+          INCLUDE_PR: ${{ needs.source.outputs.pr_number }}
         run: scripts/next-version.sh "${{ inputs.bump }}"
       - name: Summary
         run: |
@@ -106,18 +209,20 @@ jobs:
 
   test:
     name: Unit tests
-    needs: version
+    needs: [source, version]
     runs-on: xcode-27
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.ref }}
       - name: Select Xcode
         run: scripts/ci-select-xcode.sh
       - run: scripts/test.sh
 
   build:
     name: Build app and DMG
-    needs: [version, test]
+    needs: [source, version, test]
     runs-on: xcode-27
     timeout-minutes: 45
     env:
@@ -129,6 +234,8 @@ jobs:
       notarized: ${{ steps.notarize.outputs.notarized || 'false' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.ref }}
       - name: Select Xcode
         run: scripts/ci-select-xcode.sh
 
@@ -225,7 +332,7 @@ jobs:
 
   ios:
     name: iPhone app to TestFlight
-    needs: [version, test]
+    needs: [source, version, test]
     # Off until the iPhone app is set up for distribution (see above).
     if: ${{ vars.IOS_BUNDLE_ID != '' }}
     runs-on: xcode-27
@@ -240,21 +347,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.source.outputs.ref }}
           fetch-depth: 0   # the changelog needs the tags
       - name: Select Xcode
         run: scripts/ci-select-xcode.sh
 
-      # What changed in the iPhone app since the last release: only PRs labelled ios.
+      # What changed in the iPhone app (only PRs labelled ios): since the last release, or for a PR release,
+      # the PR's number and title then everything since the last major release (newest vX.0.0 tag; on 0.x, all).
       - name: iPhone changelog
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.version.outputs.tag }}
           PREV_TAG: ${{ needs.version.outputs.previous_tag }}
+          PR_NUMBER: ${{ needs.source.outputs.pr_number }}
+          PR_TITLE: ${{ needs.source.outputs.pr_title }}
         run: |
-          python3 -I scripts/changelog.py "$TAG" "$PREV_TAG" --target-ref "$GITHUB_SHA" --only ios --format text \
-            > "$RUNNER_TEMP/ios-notes.txt"
-          [[ -s "$RUNNER_TEMP/ios-notes.txt" ]] || echo "Behind-the-scenes changes only." > "$RUNNER_TEMP/ios-notes.txt"
+          NOTES="$RUNNER_TEMP/ios-notes.txt"
+          if [[ -z "$PR_NUMBER" ]]; then
+            python3 -I scripts/changelog.py "$TAG" "$PREV_TAG" --target-ref HEAD --only ios --format text > "$NOTES"
+            [[ -s "$NOTES" ]] || echo "Behind-the-scenes changes only." > "$NOTES"
+          else
+            MAJOR_TAG="$(git tag --list 'v[0-9]*.0.0' --sort=-v:refname | grep -E '^v[0-9]+\.0\.0$' | grep -vxF "$TAG" | head -n1 || true)"
+            CHANGES="$(python3 -I scripts/changelog.py "$TAG" "$MAJOR_TAG" --target-ref HEAD --only ios --format text)"
+            {
+              echo "PR #$PR_NUMBER: $PR_TITLE"
+              echo
+              echo "Changes since ${MAJOR_TAG:-the first release}:"
+              echo "${CHANGES:-Behind-the-scenes changes only.}"
+            } > "$NOTES"
+          fi
           {
             echo "### iPhone changelog for $VERSION"
             echo '```text'; cat "$RUNNER_TEMP/ios-notes.txt"; echo '```'
@@ -429,7 +551,7 @@ jobs:
 
   release:
     name: Tag and publish release
-    needs: [version, build]
+    needs: [source, version, build]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     permissions:
@@ -441,11 +563,14 @@ jobs:
       PREV_TAG: ${{ needs.version.outputs.previous_tag }}
       BUMP: ${{ needs.version.outputs.bump }}
       NOTARIZED: ${{ needs.build.outputs.notarized }}
+      SOURCE_SHA: ${{ needs.source.outputs.sha }}
+      DRAFT: ${{ inputs.draft || inputs.pr != '' }}   # a PR release is always a draft
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.source.outputs.ref }}
           fetch-depth: 0   # the changelog needs the tags
 
       - uses: actions/download-artifact@v4
@@ -458,7 +583,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Cadence $VERSION" "$GITHUB_SHA"
+          git tag -a "$TAG" -m "Cadence $VERSION" "$SOURCE_SHA"
           git push origin "$TAG"
 
       - name: Write release notes
@@ -467,7 +592,7 @@ jobs:
       - name: Create GitHub release
         run: |
           FLAGS=(--verify-tag --title "Cadence $VERSION" --notes-file "$RUNNER_TEMP/notes.md")
-          [[ "${{ inputs.draft }}" == "true" ]] && FLAGS+=(--draft)
+          [[ "$DRAFT" == "true" ]] && FLAGS+=(--draft)
           # Un-notarized builds are pre-releases so they never show up as "Latest".
           if [[ "$NOTARIZED" == "true" ]]; then FLAGS+=(--latest); else FLAGS+=(--prerelease --latest=false); fi
           gh release create "$TAG" dist/* "${FLAGS[@]}"
@@ -479,8 +604,8 @@ jobs:
   site:
     name: Update website downloads
     needs: release
-    # Drafts aren't public, so the site would have nothing new to show.
-    if: ${{ !inputs.dry_run && !inputs.draft }}
+    # Drafts (which PR releases always are) aren't public, so the site would have nothing new to show.
+    if: ${{ !inputs.dry_run && !inputs.draft && inputs.pr == '' }}
     permissions:
       contents: write
     uses: ./.github/workflows/site-downloads.yml
