@@ -28,7 +28,11 @@ struct CadenceCompanionApp: App {
         }
         // A missed meeting's time is up: take its Live Activity down.
         .backgroundTask(.appRefresh(PhoneState.missedCheckTask)) {
-            await MainActor.run { PhoneState.shared.backgroundRefresh() }
+            await PhoneState.shared.backgroundRefresh()
+        }
+        // Fetch the calendars so the widgets pick up meetings added since the app was last open.
+        .backgroundTask(.appRefresh(PhoneState.calendarRefreshTask)) {
+            await PhoneState.shared.backgroundRefresh()
         }
     }
 }

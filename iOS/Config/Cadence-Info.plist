@@ -65,6 +65,7 @@
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>cadence.liveactivity.missed-check</string>
+		<string>cadence.calendars.refresh</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

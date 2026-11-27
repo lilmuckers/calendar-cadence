@@ -134,7 +134,55 @@ struct WidgetScheduleTests {
         let m = { (minutes: Double) in morning.addingTimeInterval(minutes * 60) }
         // "soon" is already inside its nervous lead, so only its panic point and start count.
         // Ends (40, 90) and the next one's 10-minute takeover (50) redraw for the live view.
-        #expect(dates == [morning, m(5), m(10), m(40), m(45), m(50), m(55), m(60), m(90), midnight])
+        // Tomorrow's 04:00 one (+1080) gets the same, and the timeline runs on to the end of tomorrow.
+        let horizon = cal.date(byAdding: .day, value: 1, to: midnight)!
+        #expect(dates == [morning, m(5), m(10), m(40), m(45), m(50), m(55), m(60), m(90), midnight,
+                          m(1065), m(1070), m(1075), m(1080), m(1110), horizon])
+    }
+
+    /// What the widget shows at `t` from a timeline built at `built`: WidgetKit keeps the last entry
+    /// dated at or before `t` until it's given a new timeline.
+    private func shown(at t: Date, builtAt built: Date, _ schedule: WidgetSchedule) -> (live: String?, next: String?) {
+        let entry = schedule.entryDates(from: built, calendar: cal).last { $0 <= t } ?? built
+        return (schedule.live(at: entry, calendar: cal)?.id, schedule.next(after: entry, calendar: cal)?.id)
+    }
+
+    /// Issue #102: the lock screen widget got the first meeting of the day wrong. A timeline built the
+    /// evening before stopped at midnight, so with iOS holding reloads back overnight the whole
+    /// morning played out on that one entry. It now carries on through tomorrow by itself.
+    @Test func anEveningTimelineCarriesTheWidgetThroughTomorrowMorning() {
+        // morning is 10:00; tomorrow 09:30 is +1410 min, 10:30 is +1470.
+        var schedule = WidgetSchedule(meetings: [item("today", inMinutes: 60), item("standup", inMinutes: 1410),
+                                                 item("review", inMinutes: 1470)],
+                                      generatedAt: morning)
+        schedule.tomorrowFromHour = 18
+        let built = morning.addingTimeInterval(600 * 60) // 20:00, the last reload iOS allowed
+        let m = { (minutes: Double) in morning.addingTimeInterval(minutes * 60) }
+        let dates = schedule.entryDates(from: built, calendar: cal)
+        for d in [m(1395), m(1400), m(1405), m(1410), m(1440), m(1460), m(1470)] { #expect(dates.contains(d)) }
+        #expect(schedule.tomorrowFirst(after: built, calendar: cal)?.id == "standup")
+        #expect(shown(at: m(1380), builtAt: built, schedule).next == "standup") // 09:00
+        #expect(shown(at: m(1408), builtAt: built, schedule).next == "standup") // 09:28
+        // 09:35: in the standup, with the review as "then".
+        #expect(shown(at: m(1415), builtAt: built, schedule).live == "standup")
+        #expect(shown(at: m(1415), builtAt: built, schedule).next == "review")
+        // 10:05: the standup's over, the review is next.
+        #expect(shown(at: m(1445), builtAt: built, schedule).live == nil)
+        #expect(shown(at: m(1445), builtAt: built, schedule).next == "review")
+    }
+
+    @Test func tomorrowsMomentsAndCutoffAreInTheTimeline() {
+        let tomorrowStart = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: morning))!
+        let beforeWork = WidgetSegment(kind: "beforeWork", start: tomorrowStart.addingTimeInterval(6 * 3600),
+                                       end: tomorrowStart.addingTimeInterval(9 * 3600), title: "Morning!", detail: "")
+        var schedule = WidgetSchedule(meetings: [], generatedAt: morning, segments: [beforeWork])
+        schedule.tomorrowFromHour = 20
+        let dates = schedule.entryDates(from: morning, calendar: cal)
+        #expect(dates.contains(beforeWork.start))
+        #expect(dates.contains(beforeWork.end))
+        #expect(dates.contains(tomorrowStart.addingTimeInterval(20 * 3600))) // tomorrow's evening cutoff
+        let horizon = cal.date(byAdding: .day, value: 1, to: tomorrowStart)!
+        #expect(dates.allSatisfy { $0 >= morning && $0 <= horizon })
     }
 
     @Test func aMeetingInProgressShowsUntilTheNextIsClose() {
