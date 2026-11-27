@@ -44,6 +44,11 @@ final class SpotifyRemote: NSObject {
     @ObservationIgnored private var connecting = false
     @ObservationIgnored private var renewing = false
     @ObservationIgnored private var lastRenew: Date?
+    /// A tap is waiting on a quiet reconnect: if it can't be done with the saved session, approve
+    /// in Spotify instead (so the tap still does something).
+    @ObservationIgnored private var tapPending = false
+    /// Start playback once the pending reconnect lands.
+    @ObservationIgnored private var playOnConnect = false
 
     @ObservationIgnored private var configuration: SPTConfiguration?
     @ObservationIgnored private var remote: SPTAppRemote?
@@ -148,10 +153,37 @@ final class SpotifyRemote: NSObject {
         connect(token: session.accessToken)
     }
 
+    /// From a tap (play, or the link on the desk card): reconnects with the saved session,
+    /// renewing its token first if it has lapsed, and only hops over to Spotify to approve when
+    /// there's no session or the quiet reconnect doesn't work (Spotify not running, access revoked).
+    func reconnect(thenPlay play: Bool) {
+        guard isAvailable else { return }
+        if connected {
+            if play { self.play() }
+            return
+        }
+        guard !needsAuthorization, let session = sessions?.session else { authorize(); return }
+        lastError = nil
+        tapPending = true
+        playOnConnect = play
+        if session.isExpired || session.expirationDate.timeIntervalSinceNow < 60 {
+            renew(force: true)
+        } else {
+            connect(token: session.accessToken)
+        }
+    }
+
+    /// A quiet reconnect for a tap didn't work: approve in Spotify after all.
+    private func tapFallback() {
+        guard tapPending else { return }
+        tapPending = false
+        authorize()
+    }
+
     /// A fresh access token from the refresh token (network, no app switch).
-    private func renew() {
+    private func renew(force: Bool = false) {
         guard let sessions, sessions.session != nil, !renewing else { return }
-        if let lastRenew, Date().timeIntervalSince(lastRenew) < 30 { return }
+        if !force, let lastRenew, Date().timeIntervalSince(lastRenew) < 30 { return }
         lastRenew = Date()
         renewing = true
         sessions.renewSession()
@@ -170,6 +202,8 @@ final class SpotifyRemote: NSObject {
     /// the last track), then come back here connected.
     func authorize() {
         guard let sessions else { return }
+        tapPending = false
+        playOnConnect = false
         wantConnected = true
         lastError = nil
         // The SDK's installed check (canOpenURL on "spotify:") can say no with Spotify right there,
@@ -208,6 +242,8 @@ final class SpotifyRemote: NSObject {
         sessions?.session = nil
         needsAuthorization = true
         wantConnected = false
+        tapPending = false
+        playOnConnect = false
         remote?.disconnect()
         clear()
     }
@@ -252,7 +288,12 @@ final class SpotifyRemote: NSObject {
         connecting = false
         needsAuthorization = false
         lastError = nil
+        tapPending = false
         guard let player = remote?.playerAPI else { return }
+        if playOnConnect {
+            playOnConnect = false
+            play()
+        }
         player.delegate = self
         player.subscribe(toPlayerState: { [weak self] result, error in
             Task { @MainActor in
@@ -326,6 +367,11 @@ extension SpotifyRemote: SPTSessionManagerDelegate {
             // A refresh that Spotify turned down (revoked, or the app's settings changed) needs a tap;
             // being offline just waits for the next try.
             if self.renewing && !offline { self.needsAuthorization = true }
+            // A tap waiting on that renewal: approve in Spotify if it was turned down, else (offline)
+            // there's nothing more to do for now.
+            if self.renewing && self.tapPending {
+                if offline { self.tapPending = false; self.playOnConnect = false } else { self.tapFallback() }
+            }
             self.renewing = false
         }
     }
@@ -355,6 +401,9 @@ extension SpotifyRemote: SPTAppRemoteDelegate, SPTAppRemotePlayerStateDelegate {
             // Spotify not running fails too, so don't give up on the session: if its token has
             // lapsed, renew it (quietly) and the next attempt uses the new one.
             if let error { NSLog("Cadence: Spotify connection failed: \(error.localizedDescription)") }
+            // From a tap, though, do what the tap asked: Spotify probably isn't running (it drops
+            // App Remote a while after pausing), and approving in Spotify wakes it and plays.
+            if self.tapPending { self.tapFallback(); return }
             if let session = self.sessions?.session, session.isExpired || session.expirationDate.timeIntervalSinceNow < 60 {
                 self.renew()
             }
