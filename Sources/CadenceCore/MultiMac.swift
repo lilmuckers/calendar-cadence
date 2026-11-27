@@ -11,6 +11,57 @@ public struct MacAgenda: Equatable, Sendable {
     }
 }
 
+/// A meeting a Mac took off its agenda (deleted, or cancelled by the organiser), as of that Mac's
+/// snapshot. The phone remembers these so another Mac's older saved copy, shown while the Macs are
+/// out of reach, doesn't bring the meeting back.
+public struct DroppedMeeting: Codable, Equatable, Sendable {
+    public var meeting: Meeting
+    /// The Mac that dropped it.
+    public var macID: String
+    /// When that Mac's snapshot without it was made.
+    public var droppedAt: Date
+
+    public init(meeting: Meeting, macID: String, droppedAt: Date) {
+        self.meeting = meeting
+        self.macID = macID
+        self.droppedAt = droppedAt
+    }
+
+    /// Whether `other` is this meeting, as this Mac or another one knows it.
+    public func matches(_ other: Meeting) -> Bool {
+        other.id == meeting.id || MeetingDeduplicator.isSameMeeting(other, meeting)
+    }
+
+    /// `old`'s meetings that `new` (the same Mac's next snapshot) no longer has, or now has cancelled.
+    /// Meetings already over by `now` aren't worth remembering.
+    public static func changes(from old: CompanionSnapshot, to new: CompanionSnapshot, macID: String, now: Date) -> [DroppedMeeting] {
+        let current = Dictionary(new.meetings.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return old.meetings.compactMap { m in
+            guard m.end > now, !m.isCanceled else { return nil }
+            if let still = current[m.id], !still.isCanceled { return nil }
+            return DroppedMeeting(meeting: m, macID: macID, droppedAt: new.generatedAt)
+        }
+    }
+
+    /// Folds a Mac's new snapshot into `dropped`: records what it just dropped, forgets what it has
+    /// again, and lets go of meetings that ended before `cutoff`.
+    public static func update(_ dropped: [DroppedMeeting], macID: String, old: CompanionSnapshot?, new: CompanionSnapshot,
+                              now: Date, cutoff: Date) -> [DroppedMeeting] {
+        var out = dropped.filter { d in
+            guard d.meeting.end > cutoff else { return false }
+            guard d.macID == macID else { return true }
+            // Back on that Mac's agenda (re-invited, un-cancelled): no longer dropped.
+            return !new.meetings.contains { $0.id == d.meeting.id && !$0.isCanceled }
+        }
+        guard let old else { return out }
+        for d in changes(from: old, to: new, macID: macID, now: now) {
+            out.removeAll { $0.macID == macID && $0.meeting.id == d.meeting.id }
+            out.append(d)
+        }
+        return out
+    }
+}
+
 /// A phone paired with several Macs sees the same meeting from each Mac that has it (often with a
 /// different id on each). This merges their agendas into one, and finds each Mac's copy again so
 /// Join, Snooze, prompts and enrichments reach the right Mac with the id that Mac knows.
@@ -18,9 +69,20 @@ public struct MultiMacAgenda: Equatable, Sendable {
     /// Highest priority first.
     public var agendas: [MacAgenda]
 
-    public init(agendas: [MacAgenda]) {
-        self.agendas = agendas
+    /// - `dropped`: meetings some Mac has since taken off its agenda. Each is left out of every
+    ///   other Mac's copy saved before then, so a stale copy can't bring it back.
+    public init(agendas: [MacAgenda], dropped: [DroppedMeeting] = []) {
+        self.agendas = agendas.map { agenda in
+            let later = dropped.filter { $0.macID != agenda.macID && $0.droppedAt > agenda.snapshot.generatedAt }
+            guard !later.isEmpty else { return agenda }
+            var pruned = agenda
+            pruned.snapshot.meetings.removeAll { m in later.contains { $0.matches(m) } }
+            return pruned
+        }
     }
+
+    /// The newest of the Macs' copies: when the phone last heard how things stand.
+    public var updatedAt: Date? { agendas.map(\.snapshot.generatedAt).max() }
 
     /// Every Mac's meetings, duplicates merged, in time order.
     public var meetings: [Meeting] {

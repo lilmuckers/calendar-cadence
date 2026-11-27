@@ -31,6 +31,8 @@ final class PhoneState {
     private(set) var ownMeetings: [Meeting] = []
     /// Each paired Mac's last snapshot, by Mac id (kept after disconnecting, shown when there's nothing else).
     private(set) var snapshots: [String: CompanionSnapshot] = PhoneState.loadSnapshots()
+    /// Meetings a Mac has taken off its agenda since another Mac's saved copy was made (#111).
+    @ObservationIgnored private var dropped: [DroppedMeeting] = PhoneState.loadDropped()
     /// The Macs' agendas in priority order: the connected Macs while any is, else every paired Mac's
     /// saved copy. Finds each Mac's own copy of a meeting for Join, Snooze, prompts and enrichments.
     private(set) var agenda = MultiMacAgenda(agendas: [])
@@ -102,15 +104,18 @@ final class PhoneState {
     private func rebuildAgenda() {
         let pool = link.isConnected ? link.connected : link.links
         let sources = pool.compactMap { l in snapshots[l.mac.id].map { MacAgenda(macID: l.mac.id, snapshot: $0) } }
-        let merged = MultiMacAgenda(agendas: sources)
+        // A Mac out of reach for a while still has its old saved copy: what a fresher Mac has since
+        // dropped (a cancelled meeting, say) stays dropped instead of coming back from that copy.
+        let merged = MultiMacAgenda(agendas: sources, dropped: dropped)
         agenda = merged
-        snapshot = sources.first.map { first in
+        snapshot = merged.agendas.first.map { first in
             var s = first.snapshot
             guard sources.count > 1 else { return s }
             s.meetings = merged.meetings
             s.suppressedIDs = merged.suppressedIDs
             s.agendaOnlyIDs = merged.agendaOnlyIDs
-            s.generatedAt = sources.map(\.snapshot.generatedAt).min() ?? s.generatedAt
+            // When the phone last heard from a Mac, not the stalest copy among them.
+            s.generatedAt = merged.updatedAt ?? s.generatedAt
             return s
         }
     }
@@ -121,6 +126,10 @@ final class PhoneState {
         if snapshots.keys.contains(where: { !paired.contains($0) }) {
             snapshots = snapshots.filter { paired.contains($0.key) }
             Self.saveSnapshots(snapshots)
+        }
+        if dropped.contains(where: { !paired.contains($0.macID) }) {
+            dropped.removeAll { !paired.contains($0.macID) }
+            Self.saveDropped(dropped)
         }
         rebuildAgenda()
         sourcesChanged()
@@ -437,6 +446,10 @@ final class PhoneState {
         case .welcome:
             break // the Mac decides alerts while connected; the planner keeps what's fired for later
         case .snapshot(let snap):
+            let now = Date()
+            dropped = DroppedMeeting.update(dropped, macID: macID, old: snapshots[macID], new: snap,
+                                            now: now, cutoff: Calendar.current.startOfDay(for: now))
+            Self.saveDropped(dropped)
             snapshots[macID] = snap
             Self.saveSnapshots(snapshots)
             rebuildAgenda()
@@ -552,6 +565,17 @@ final class PhoneState {
         guard let macID, defaults.data(forKey: snapshotsKey) == nil,
               let snap = try? JSONDecoder().decode(CompanionSnapshot.self, from: data) else { return }
         saveSnapshots([macID: snap])
+    }
+
+    private static let droppedKey = "Cadence.companion.droppedMeetings"
+
+    private static func loadDropped() -> [DroppedMeeting] {
+        guard let data = UserDefaults.standard.data(forKey: droppedKey) else { return [] }
+        return (try? JSONDecoder().decode([DroppedMeeting].self, from: data)) ?? []
+    }
+
+    private static func saveDropped(_ dropped: [DroppedMeeting]) {
+        if let data = try? JSONEncoder().encode(dropped) { UserDefaults.standard.set(data, forKey: droppedKey) }
     }
 
     private static func loadSnapshots() -> [String: CompanionSnapshot] {
