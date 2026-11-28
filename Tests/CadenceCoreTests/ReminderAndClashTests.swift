@@ -62,7 +62,7 @@ struct ClashTests {
         #expect(ClashDetector.clashes(in: [m("a", at: 0), m("b", at: 30), m("c", at: 60)], after: t0).isEmpty)
     }
 
-    @Test(arguments: [0.001, 0.4, 0.999, 1, 5, 29])
+    @Test(arguments: [0.001, 0.4, 0.999, 1, 5, 29, 59, 60])
     func backToBackWithStraySecondsIsNotAClash(drift: Double) {
         let cal = CalendarInfo(id: "c", title: "Work", sourceTitle: "s", color: .gray)
         let thirteen = t0.addingTimeInterval(60 * 60)
@@ -76,12 +76,23 @@ struct ClashTests {
         #expect(ClashDetector.clashes(in: [d, c], after: t0).isEmpty)
     }
 
-    @Test func overlapByOneMinuteIsAClash() {
-        let c = ClashDetector.clashes(in: [m("a", at: 0, for: 61), m("b", at: 60, for: 60)], after: t0)
+    @Test func overlapUpToAMinuteIsNotAClash() {
+        // Running exactly a minute into the next meeting, either way round.
+        #expect(ClashDetector.clashes(in: [m("a", at: 0, for: 61), m("b", at: 60, for: 60)], after: t0).isEmpty)
+        #expect(ClashDetector.clashes(in: [m("a", at: 0, for: 60), m("b", at: 59, for: 60)], after: t0).isEmpty)
+    }
+
+    @Test func overlapPastAMinuteIsAClash() {
+        let c = ClashDetector.clashes(in: [m("a", at: 0, for: 62), m("b", at: 60, for: 60)], after: t0)
         #expect(c.count == 1)
         #expect(c.first?.meetings.map(\.id) == ["a", "b"])
-        // And when the second starts a minute early instead.
-        #expect(ClashDetector.clashes(in: [m("a", at: 0, for: 60), m("b", at: 59, for: 60)], after: t0).count == 1)
+        // And when the second starts early instead.
+        #expect(ClashDetector.clashes(in: [m("a", at: 0, for: 60), m("b", at: 58, for: 60)], after: t0).count == 1)
+        // One second past the tolerance is enough.
+        let cal = CalendarInfo(id: "c", title: "Work", sourceTitle: "s", color: .gray)
+        let x = Meeting(id: "x", title: "x", start: t0, end: t0.addingTimeInterval(3661), calendar: cal)
+        let y = Meeting(id: "y", title: "y", start: t0.addingTimeInterval(3600), end: t0.addingTimeInterval(7200), calendar: cal)
+        #expect(ClashDetector.clashes(in: [x, y], after: t0).count == 1)
     }
 
     @Test func containedMeetingIsAClash() {
@@ -97,7 +108,8 @@ struct ClashTests {
         func at(_ minutes: Double) -> Date { t0.addingTimeInterval(minutes * 60) }
         #expect(!ClashDetector.overlaps(at(0), at(60), at(60), at(120)))
         #expect(!ClashDetector.overlaps(at(60), at(120), at(0), at(60)))
-        #expect(ClashDetector.overlaps(at(0), at(60), at(59), at(120)))
+        #expect(!ClashDetector.overlaps(at(0), at(60), at(59), at(120)))
+        #expect(ClashDetector.overlaps(at(0), at(60), at(58), at(120)))
         #expect(ClashDetector.overlaps(at(0), at(60), at(10), at(20)))
         #expect(ClashDetector.overlaps(at(10), at(20), at(0), at(60)))
     }
