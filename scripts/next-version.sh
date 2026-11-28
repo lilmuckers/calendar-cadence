@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Work out the next release version from the labels on PRs merged since the last release tag.
+# Work out the next release version from the labels on PRs merged since the last published release.
 #
 #   major > minor > patch — the highest label among the merged PRs wins.
 #   PRs with none of those labels count as patch (and are listed as a warning).
-#   With no release tag yet, the first release uses CFBundleShortVersionString from Support/Info.plist.
+#   The previous release is the newest published one: not a draft or pre-release, and its tag on main.
+#   Tags left by drafts, deleted releases or PR test builds don't count.
+#   With no published release yet, the first release uses CFBundleShortVersionString from Support/Info.plist.
 #
 # Usage: scripts/next-version.sh [auto|major|minor|patch]   (default auto: decide from labels)
 #
 # PR test builds (the Release workflow's "pr" input) set INCLUDE_PR=<n> and BUILD_NUMBER. Then:
-#   - the previous release is the last full one: the newest published release that isn't a draft or
-#     pre-release and whose tag is on main (draft releases and test builds don't count);
 #   - PR <n> (not merged) counts towards the bump;
 #   - the tag is v<version>-pr.<n>.<build>, so a test build never takes the tag the real release will.
 # Needs: git history with tags (fetch-depth: 0), gh authenticated (GH_TOKEN in CI).
@@ -25,18 +25,19 @@ case "$OVERRIDE" in auto|major|minor|patch) ;; *)
 esac
 
 release_tags() { git -C "$ROOT" tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; }
-if [[ -n "${INCLUDE_PR:-}" ]]; then
-  FULL_RELEASES="$(gh release list --limit 200 --json tagName,isDraft,isPrerelease \
-    --jq '.[] | select((.isDraft or .isPrerelease) | not) | .tagName')"
-  PREV_TAG=""
-  for t in $(release_tags); do
-    grep -qxF "$t" <<<"$FULL_RELEASES" || continue
-    git -C "$ROOT" merge-base --is-ancestor "$t^{commit}" "origin/$BASE_BRANCH" || continue
-    PREV_TAG="$t"; break
-  done
-else
-  PREV_TAG="$(release_tags | head -n1)"
-fi
+PUBLISHED="$(gh release list --limit 200 --json tagName,isDraft,isPrerelease \
+  --jq '.[] | select((.isDraft or .isPrerelease) | not) | .tagName')"
+PREV_TAG=""
+for t in $(release_tags); do
+  grep -qxF "$t" <<<"$PUBLISHED" || continue
+  git -C "$ROOT" merge-base --is-ancestor "$t^{commit}" "origin/$BASE_BRANCH" || continue
+  PREV_TAG="$t"; break
+done
+# Newer release-shaped tags that aren't published releases: warn, they're skipped.
+for t in $(release_tags); do
+  [[ "$t" == "$PREV_TAG" ]] && break
+  echo "::warning::Skipping tag $t: it isn't a published release on $BASE_BRANCH (draft, pre-release, deleted release or not on $BASE_BRANCH)" >&2
+done
 
 # Merged PRs since the previous tag, with their labels.
 SEARCH="is:merged base:$BASE_BRANCH"
@@ -89,7 +90,12 @@ fi
 TAG="v$VERSION"
 [[ -n "${INCLUDE_PR:-}" ]] && TAG="v$VERSION-pr.$INCLUDE_PR.${BUILD_NUMBER:?BUILD_NUMBER is needed with INCLUDE_PR}"
 if git -C "$ROOT" rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-  echo "::error::Tag $TAG already exists" >&2; exit 1
+  if gh release view "$TAG" --json isDraft >/dev/null 2>&1; then
+    echo "::error::Tag $TAG already exists with a draft or pre-release. Publish or delete that release (and its tag) first." >&2
+  else
+    echo "::error::Tag $TAG already exists without a release (left by an earlier run). Delete it with: git push origin :refs/tags/$TAG" >&2
+  fi
+  exit 1
 fi
 
 OUT="version=$VERSION

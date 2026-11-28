@@ -3,7 +3,8 @@ name: Release
 # Release flow: work out the version → test → build Cadence.app → DMG + zip → tag → GitHub release
 # → website download links (site-downloads.yml).
 #
-# Version: the highest major/minor/patch label among PRs merged into main since the last vX.Y.Z tag
+# Version: the highest major/minor/patch label among PRs merged into main since the last published
+# release: not a draft or pre-release, tag on main. Stray tags from drafts or deleted releases are skipped
 # (see scripts/next-version.sh). The first release uses the version in Support/Info.plist.
 # Release notes: .github/RELEASE_NOTES_TEMPLATE.md, with the merged-PR changelog grouped by build (the mac / ios /
 # website / ci / docs labels), then by release label (scripts/changelog.py). The iPhone build gets only the
