@@ -41,22 +41,20 @@ name: Release
 # Build numbers are the run number followed by the attempt (run 42 → 421, its re-run → 422), so a
 # re-run never reuses a number App Store Connect has already seen.
 #
-# Releasing a PR (the "pr" input): the "source" job merges that PR into main first (merge commit, the same
-# as the Merge button) and the whole release builds from the merge commit. A PR that conflicts with main,
-# isn't open against main, or that GitHub refuses to merge (branch protection, failing required checks)
-# fails the run before anything is built. Its version is the usual bump from the last release tag, with the
-# PR's own label counted. The GitHub release is always a draft (so the website isn't updated), and
-# TestFlight's "What to Test" opens with the PR's number and title, then every iPhone change since the
-# last full release: the newest published one that isn't a draft or pre-release and whose tag is on main. A dry run with a PR merges
-# nothing: it checks the PR merges cleanly and builds GitHub's test merge (refs/pull/<n>/merge).
-# Re-running after the merge went through picks up the existing merge commit instead of failing.
-# Merges made with the workflow's token don't start other workflows, so CI won't run on main for it.
+# Test build of a PR (the "pr" input), to try it on real hardware before it's merged. The PR stays open and
+# main is untouched: every job merges the PR's head into main locally (scripts/pr-test-merge.sh) and builds
+# that. A PR that conflicts with main fails the run before anything is built. The version is the usual
+# bump (with the PR's own label counted) from the last full release: the newest published release that
+# isn't a draft or pre-release and whose tag is on main. It's released as a draft pre-release tagged
+# v<version>-pr.<n>.<build>, so it never takes a real release's tag or shows on the website, and the
+# iPhone build goes to TestFlight with "What to Test" opening with the PR's number and title, then every
+# iPhone change since that last full release.
 
 on:
   workflow_dispatch:
     inputs:
       pr:
-        description: "PR number to merge into main and release as a draft (blank = release main as it is)"
+        description: "PR number for a test build: merged into main for the build only, released as a draft (blank = release main)"
         type: string
         default: ""
       bump:
@@ -87,20 +85,22 @@ permissions:
   contents: read
 
 jobs:
-  # What the release builds from. Without a PR: the commit this run is on. With one: merges it into main
-  # (or, on a dry run, only checks it would merge) and hands on the resulting commit. Always runs, so the
-  # jobs after it never get skipped for want of it.
+  # What the release builds from. Without a PR: the commit this run is on. With one: pins main and the PR's
+  # head, and checks the PR merges cleanly into main (merging locally; nothing is pushed). Always runs, so
+  # the jobs after it never get skipped for want of it.
   source:
-    name: ${{ inputs.pr != '' && format('Merge PR {0} into main', inputs.pr) || 'Pick commit' }}
+    name: ${{ inputs.pr != '' && format('Merge PR {0} with main', inputs.pr) || 'Pick commit' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write        # merging the PR
-      pull-requests: write
+      contents: read
+      pull-requests: read
     outputs:
-      ref: ${{ steps.pr.outputs.ref || github.sha }}     # what the jobs below check out
-      sha: ${{ steps.pr.outputs.sha || github.sha }}     # what the release tag points at
+      ref: ${{ steps.pr.outputs.base || github.sha }}   # what the jobs below check out (then merge the PR into)
+      sha: ${{ steps.merge.outputs.sha || github.sha }} # what's built, and what the release tag points at
       pr_number: ${{ steps.pr.outputs.number }}
+      pr_head: ${{ steps.pr.outputs.head }}
+      merge_date: ${{ steps.pr.outputs.date }}
       pr_title: ${{ steps.pr.outputs.title }}
     steps:
       - name: Releases come from main
@@ -109,71 +109,49 @@ jobs:
           echo "::error::Run the release from main (this run is on ${{ github.ref_name }}). Use dry_run to test other branches."
           exit 1
 
-      - name: Merge the PR
+      - name: Pin main and the PR
         id: pr
         if: ${{ inputs.pr != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR: ${{ inputs.pr }}
-          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::'$PR' isn't a PR number"; exit 1; }
-          info() { gh pr view "$PR" --json number,title,state,baseRefName,headRefOid,mergeable,isDraft,mergeCommit; }
-          JSON="$(info)"
+          JSON="$(gh pr view "$PR" --json number,title,state,headRefOid)"
           STATE="$(jq -r .state <<<"$JSON")"
-          BASE="$(jq -r .baseRefName <<<"$JSON")"
-          TITLE="$(jq -r .title <<<"$JSON")"
-          [[ "$BASE" == "main" ]] || { echo "::error::PR #$PR targets $BASE, not main"; exit 1; }
-
-          case "$STATE" in
-            MERGED)
-              # A re-run after the merge went through: release the merge commit that's already there.
-              SHA="$(jq -r .mergeCommit.oid <<<"$JSON")"
-              echo "::notice::PR #$PR is already merged ($SHA) — releasing that merge commit."
-              ;;
-            OPEN)
-              [[ "$(jq -r .isDraft <<<"$JSON")" == "false" ]] || { echo "::error::PR #$PR is a draft"; exit 1; }
-              # GitHub works out mergeability in the background: UNKNOWN until it has.
-              for _ in $(seq 1 24); do
-                MERGEABLE="$(jq -r .mergeable <<<"$JSON")"
-                [[ "$MERGEABLE" != "UNKNOWN" ]] && break
-                sleep 5; JSON="$(info)"
-              done
-              case "$MERGEABLE" in
-                MERGEABLE) ;;
-                CONFLICTING) echo "::error::PR #$PR conflicts with main. Resolve the conflicts, then run the release again."; exit 1 ;;
-                *) echo "::error::GitHub couldn't tell whether PR #$PR merges cleanly (mergeable: $MERGEABLE). Try again."; exit 1 ;;
-              esac
-              if [[ "$DRY_RUN" == "true" ]]; then
-                # Build GitHub's test merge of the PR into main, without merging anything.
-                SHA="$(gh api "repos/$GH_REPO/pulls/$PR" --jq .merge_commit_sha)"
-                REF="refs/pull/$PR/merge"
-                echo "::notice::Dry run: PR #$PR merges cleanly; building its test merge without merging."
-              else
-                # --match-head-commit: refuse if someone pushed to the PR after the check above.
-                gh pr merge "$PR" --merge --match-head-commit "$(jq -r .headRefOid <<<"$JSON")"
-                for _ in $(seq 1 12); do
-                  SHA="$(gh pr view "$PR" --json mergeCommit --jq '.mergeCommit.oid // empty')"
-                  [[ -n "$SHA" ]] && break
-                  sleep 5
-                done
-                [[ -n "$SHA" ]] || { echo "::error::PR #$PR merged, but its merge commit didn't show up"; exit 1; }
-              fi
-              ;;
-            *) echo "::error::PR #$PR is $STATE"; exit 1 ;;
-          esac
-
+          [[ "$STATE" == "OPEN" ]] || { echo "::error::PR #$PR is $STATE — test builds are for open PRs"; exit 1; }
+          BASE="$(gh api "repos/$GH_REPO/commits/main" --jq .sha)"
           {
             echo "number=$PR"
-            echo "sha=$SHA"
-            echo "ref=${REF:-$SHA}"
+            echo "base=$BASE"
+            echo "head=$(jq -r .headRefOid <<<"$JSON")"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             # Titles are one line, but use a delimiter anyway so any character is safe.
-            echo "title<<TITLE_EOF_$$"; echo "$TITLE"; echo "TITLE_EOF_$$"
+            echo "title<<TITLE_EOF_$$"; jq -r .title <<<"$JSON"; echo "TITLE_EOF_$$"
           } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: ${{ inputs.pr != '' }}
+        with:
+          ref: ${{ steps.pr.outputs.base }}
+          fetch-depth: 0
+
+      - name: Merge the PR into main (locally)
+        id: merge
+        if: ${{ inputs.pr != '' }}
+        env:
+          PR: ${{ steps.pr.outputs.number }}
+          BASE: ${{ steps.pr.outputs.base }}
+          HEAD_SHA: ${{ steps.pr.outputs.head }}
+          DATE: ${{ steps.pr.outputs.date }}
+          TITLE: ${{ steps.pr.outputs.title }}
+        run: |
+          SHA="$(scripts/pr-test-merge.sh "$PR" "$BASE" "$HEAD_SHA" "$DATE")"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           {
-            echo "### PR #$PR: $TITLE"
-            if [[ "$DRY_RUN" == "true" ]]; then echo "- Dry run: merges cleanly, not merged"; else echo "- Merged into main as \`$SHA\`"; fi
+            echo "### Test build of PR #$PR: $TITLE"
+            echo "- main \`$BASE\` + PR head \`$HEAD_SHA\` → \`$SHA\` (not pushed; the PR stays open)"
           } >> "$GITHUB_STEP_SUMMARY"
 
   version:
@@ -196,15 +174,16 @@ jobs:
       - id: next
         env:
           GH_TOKEN: ${{ github.token }}
-          # Count the PR's label even if GitHub's search hasn't indexed the merge yet (or, on a dry run, it isn't merged).
+          # PR test build: bump from the last full release, count the PR, tag v<version>-pr.<n>.<build>.
           INCLUDE_PR: ${{ needs.source.outputs.pr_number }}
+          BUILD_NUMBER: ${{ github.run_number }}${{ github.run_attempt }}
         run: scripts/next-version.sh "${{ inputs.bump }}"
       - name: Summary
         run: |
           {
             echo "### Releasing ${{ steps.next.outputs.tag }}"
             echo "- Bump: **${{ steps.next.outputs.bump }}** from ${{ steps.next.outputs.previous_tag || 'nothing (first release)' }}"
-            echo "- PRs merged since then: ${{ steps.next.outputs.prs }}"
+            echo "- PRs counted: ${{ steps.next.outputs.prs }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
   test:
@@ -216,6 +195,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.source.outputs.ref }}
+          fetch-depth: 0   # the PR merge needs history
+      # PR test build: the same local merge as the source job (same inputs, so the same commit).
+      - name: Merge PR into main (locally)
+        if: ${{ needs.source.outputs.pr_number != '' }}
+        env:
+          PR: ${{ needs.source.outputs.pr_number }}
+          BASE: ${{ needs.source.outputs.ref }}
+          HEAD_SHA: ${{ needs.source.outputs.pr_head }}
+          DATE: ${{ needs.source.outputs.merge_date }}
+          WANT: ${{ needs.source.outputs.sha }}
+        run: |
+          SHA="$(scripts/pr-test-merge.sh "$PR" "$BASE" "$HEAD_SHA" "$DATE")"
+          [[ "$SHA" == "$WANT" ]] || { echo "::error::The merge came out as $SHA, not $WANT as in the source job"; exit 1; }
       - name: Select Xcode
         run: scripts/ci-select-xcode.sh
       - run: scripts/test.sh
@@ -236,6 +228,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.source.outputs.ref }}
+          fetch-depth: 0   # the PR merge needs history
+      # PR test build: the same local merge as the source job (same inputs, so the same commit).
+      - name: Merge PR into main (locally)
+        if: ${{ needs.source.outputs.pr_number != '' }}
+        env:
+          PR: ${{ needs.source.outputs.pr_number }}
+          BASE: ${{ needs.source.outputs.ref }}
+          HEAD_SHA: ${{ needs.source.outputs.pr_head }}
+          DATE: ${{ needs.source.outputs.merge_date }}
+          WANT: ${{ needs.source.outputs.sha }}
+        run: |
+          SHA="$(scripts/pr-test-merge.sh "$PR" "$BASE" "$HEAD_SHA" "$DATE")"
+          [[ "$SHA" == "$WANT" ]] || { echo "::error::The merge came out as $SHA, not $WANT as in the source job"; exit 1; }
       - name: Select Xcode
         run: scripts/ci-select-xcode.sh
 
@@ -341,6 +346,7 @@ jobs:
       contents: read
       pull-requests: read   # scripts/changelog.py lists the merged PRs
     env:
+      # Plain X.Y.Z, also for PR test builds: TestFlight gets the semver, never the v…-pr.<n>.<build> tag.
       VERSION: ${{ needs.version.outputs.version }}
       BUILD_NUMBER: ${{ github.run_number }}${{ github.run_attempt }}
       HAS_IOS_SIGNING: ${{ secrets.IOS_DISTRIBUTION_P12 != '' && secrets.IOS_APP_PROFILE != '' && secrets.IOS_WIDGET_PROFILE != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.ASC_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' && vars.IOS_BUNDLE_ID != '' }}
@@ -349,12 +355,23 @@ jobs:
         with:
           ref: ${{ needs.source.outputs.ref }}
           fetch-depth: 0   # the changelog needs the tags
+      # PR test build: the same local merge as the source job (same inputs, so the same commit).
+      - name: Merge PR into main (locally)
+        if: ${{ needs.source.outputs.pr_number != '' }}
+        env:
+          PR: ${{ needs.source.outputs.pr_number }}
+          BASE: ${{ needs.source.outputs.ref }}
+          HEAD_SHA: ${{ needs.source.outputs.pr_head }}
+          DATE: ${{ needs.source.outputs.merge_date }}
+          WANT: ${{ needs.source.outputs.sha }}
+        run: |
+          SHA="$(scripts/pr-test-merge.sh "$PR" "$BASE" "$HEAD_SHA" "$DATE")"
+          [[ "$SHA" == "$WANT" ]] || { echo "::error::The merge came out as $SHA, not $WANT as in the source job"; exit 1; }
       - name: Select Xcode
         run: scripts/ci-select-xcode.sh
 
-      # What changed in the iPhone app (only PRs labelled ios): since the last release, or for a PR release,
-      # the PR's number and title then everything since the last full release (published, not a draft or
-      # pre-release, tag on main), so testers see all that's piled up across draft PR releases.
+      # What changed in the iPhone app since the previous release (only PRs labelled ios). For a PR test build
+      # that's the last full release, and the notes open with the PR's number and title.
       - name: iPhone changelog
         env:
           GH_TOKEN: ${{ github.token }}
@@ -365,24 +382,14 @@ jobs:
           PR_TITLE: ${{ needs.source.outputs.pr_title }}
         run: |
           NOTES="$RUNNER_TEMP/ios-notes.txt"
+          CHANGES="$(python3 -I scripts/changelog.py "$TAG" "$PREV_TAG" --target-ref HEAD --only ios --format text)"
           if [[ -z "$PR_NUMBER" ]]; then
-            python3 -I scripts/changelog.py "$TAG" "$PREV_TAG" --target-ref HEAD --only ios --format text > "$NOTES"
-            [[ -s "$NOTES" ]] || echo "Behind-the-scenes changes only." > "$NOTES"
+            echo "${CHANGES:-Behind-the-scenes changes only.}" > "$NOTES"
           else
-            FULL_RELEASES="$(gh release list --limit 200 --json tagName,isDraft,isPrerelease \
-              --jq '.[] | select((.isDraft or .isPrerelease) | not) | .tagName')"
-            BASE_TAG=""
-            for t in $(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname); do
-              [[ "$t" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$t" != "$TAG" ]] || continue
-              grep -qxF "$t" <<<"$FULL_RELEASES" || continue
-              git merge-base --is-ancestor "$t^{commit}" origin/main || continue
-              BASE_TAG="$t"; break
-            done
-            CHANGES="$(python3 -I scripts/changelog.py "$TAG" "$BASE_TAG" --target-ref HEAD --only ios --format text)"
             {
               echo "PR #$PR_NUMBER: $PR_TITLE"
               echo
-              echo "Changes since ${BASE_TAG:-the first release}:"
+              echo "Changes since ${PREV_TAG:-the first release}:"
               echo "${CHANGES:-Behind-the-scenes changes only.}"
             } > "$NOTES"
           fi
@@ -573,7 +580,9 @@ jobs:
       BUMP: ${{ needs.version.outputs.bump }}
       NOTARIZED: ${{ needs.build.outputs.notarized }}
       SOURCE_SHA: ${{ needs.source.outputs.sha }}
-      DRAFT: ${{ inputs.draft || inputs.pr != '' }}   # a PR release is always a draft
+      PR_NUMBER: ${{ needs.source.outputs.pr_number }}
+      PR_TITLE: ${{ needs.source.outputs.pr_title }}
+      BUILD_NUMBER: ${{ github.run_number }}${{ github.run_attempt }}   # the iPhone build's number
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
@@ -581,29 +590,60 @@ jobs:
         with:
           ref: ${{ needs.source.outputs.ref }}
           fetch-depth: 0   # the changelog needs the tags
+      # PR test build: the same local merge as the source job (same inputs, so the same commit).
+      - name: Merge PR into main (locally)
+        if: ${{ needs.source.outputs.pr_number != '' }}
+        env:
+          PR: ${{ needs.source.outputs.pr_number }}
+          BASE: ${{ needs.source.outputs.ref }}
+          HEAD_SHA: ${{ needs.source.outputs.pr_head }}
+          DATE: ${{ needs.source.outputs.merge_date }}
+          WANT: ${{ needs.source.outputs.sha }}
+        run: |
+          SHA="$(scripts/pr-test-merge.sh "$PR" "$BASE" "$HEAD_SHA" "$DATE")"
+          [[ "$SHA" == "$WANT" ]] || { echo "::error::The merge came out as $SHA, not $WANT as in the source job"; exit 1; }
 
       - uses: actions/download-artifact@v4
         with:
           name: Cadence-${{ needs.version.outputs.version }}
           path: dist
 
-      # Tag only after the build succeeded, so a failed run never leaves a stray tag behind.
+      # Tag only after the build succeeded, so a failed run never leaves a stray tag behind. For a PR test
+      # build this pushes the local merge commit with the tag (and nothing else: main and the PR are untouched).
       - name: Create tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Cadence $VERSION" "$SOURCE_SHA"
+          MESSAGE="Cadence $VERSION"
+          [[ -n "$PR_NUMBER" ]] && MESSAGE="Cadence $VERSION test build of #$PR_NUMBER on main"
+          git tag -a "$TAG" -m "$MESSAGE" "$SOURCE_SHA"
           git push origin "$TAG"
 
       - name: Write release notes
-        run: scripts/release-notes.sh "$TAG" "$PREV_TAG" "$BUMP" "$NOTARIZED" dist/SHA256SUMS.txt > "$RUNNER_TEMP/notes.md"
+        run: |
+          NOTES="$RUNNER_TEMP/notes.md"
+          if [[ -n "$PR_NUMBER" ]]; then
+            {
+              echo "> [!IMPORTANT]"
+              echo "> Test build of **#$PR_NUMBER: $PR_TITLE** merged onto main (\`${SOURCE_SHA:0:7}\`), not a release."
+              echo "> iPhone build $BUILD_NUMBER on TestFlight. The changes below are since $PREV_TAG, the last full release, and don't include the PR."
+              echo
+            } > "$NOTES"
+          fi
+          scripts/release-notes.sh "$TAG" "$PREV_TAG" "$BUMP" "$NOTARIZED" dist/SHA256SUMS.txt >> "$NOTES"
 
       - name: Create GitHub release
         run: |
-          FLAGS=(--verify-tag --title "Cadence $VERSION" --notes-file "$RUNNER_TEMP/notes.md")
-          [[ "$DRAFT" == "true" ]] && FLAGS+=(--draft)
-          # Un-notarized builds are pre-releases so they never show up as "Latest".
-          if [[ "$NOTARIZED" == "true" ]]; then FLAGS+=(--latest); else FLAGS+=(--prerelease --latest=false); fi
+          FLAGS=(--verify-tag --notes-file "$RUNNER_TEMP/notes.md")
+          if [[ -n "$PR_NUMBER" ]]; then
+            # A test build is always a draft pre-release: never public, never "Latest", never a full release.
+            FLAGS+=(--title "Cadence $VERSION test build: #$PR_NUMBER (build $BUILD_NUMBER)" --draft --prerelease --latest=false)
+          else
+            FLAGS+=(--title "Cadence $VERSION")
+            [[ "${{ inputs.draft }}" == "true" ]] && FLAGS+=(--draft)
+            # Un-notarized builds are pre-releases so they never show up as "Latest".
+            if [[ "$NOTARIZED" == "true" ]]; then FLAGS+=(--latest); else FLAGS+=(--prerelease --latest=false); fi
+          fi
           gh release create "$TAG" dist/* "${FLAGS[@]}"
           {
             echo "### Released $TAG"
@@ -613,7 +653,7 @@ jobs:
   site:
     name: Update website downloads
     needs: release
-    # Drafts (which PR releases always are) aren't public, so the site would have nothing new to show.
+    # Drafts (which PR test builds always are) aren't public, so the site would have nothing new to show.
     if: ${{ !inputs.dry_run && !inputs.draft && inputs.pr == '' }}
     permissions:
       contents: write
