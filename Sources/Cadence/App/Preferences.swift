@@ -102,6 +102,8 @@ struct Preferences: Codable, Equatable {
     /// Minutes before you need to leave; 0 = "time to leave".
     var leaveOffsets: [Int] = [10, 0]
     var clashPromptEnabled = true
+    /// Seconds two meetings may overlap before they count as a clash (see ClashDetector).
+    var clashOverlapTolerance: TimeInterval = ClashDetector.defaultOverlapTolerance
     var panelStyle: PanelStyle = .standard
     /// Let AI assistants on this Mac connect through cadence-mcp.
     var mcpEnabled = true
@@ -263,6 +265,7 @@ extension Preferences {
         leaveEnabled = try c.decodeIfPresent(Bool.self, forKey: .leaveEnabled) ?? d.leaveEnabled
         leaveOffsets = try c.decodeIfPresent([Int].self, forKey: .leaveOffsets) ?? d.leaveOffsets
         clashPromptEnabled = try c.decodeIfPresent(Bool.self, forKey: .clashPromptEnabled) ?? d.clashPromptEnabled
+        clashOverlapTolerance = try c.decodeIfPresent(TimeInterval.self, forKey: .clashOverlapTolerance) ?? d.clashOverlapTolerance
         useEventColors = try c.decodeIfPresent(Bool.self, forKey: .useEventColors) ?? d.useEventColors
         namedColorsOnly = try c.decodeIfPresent(Bool.self, forKey: .namedColorsOnly) ?? d.namedColorsOnly
         mcpEnabled = try c.decodeIfPresent(Bool.self, forKey: .mcpEnabled) ?? d.mcpEnabled

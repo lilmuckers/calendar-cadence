@@ -324,7 +324,7 @@ final class AppState {
                                hiddenFromPanel: isHiddenFromPanel(m), agendaOnly: isAgendaOnly(m),
                                enrichmentCount: enrichments.enrichments(for: m).count)
         var json = (try? JSONValue(encoding: value)) ?? .null
-        let conflicts = prefs.workSchedule.conflicts(for: m).map(\.label)
+        let conflicts = prefs.workSchedule.conflicts(for: m, overlapTolerance: prefs.clashOverlapTolerance).map(\.label)
         if !conflicts.isEmpty, case .object(var o) = json {
             o["work_schedule"] = .array(conflicts.map { .string($0) })
             json = .object(o)
@@ -609,13 +609,13 @@ final class AppState {
         if prefs.workSchedule.enabled && prefs.workSchedule.defences.clashPrompt {
             pool = (pool + breakMeetings).sorted { ($0.start, $0.end, $0.title) < ($1.start, $1.end, $1.title) }
         }
-        return ClashDetector.clashes(in: pool, after: now)
+        return ClashDetector.clashes(in: pool, after: now, tolerance: prefs.clashOverlapTolerance)
     }
 
     /// How a meeting sits against working hours and breaks, worded for an invite.
     func workConflicts(_ m: Meeting) -> [String] {
         guard prefs.workSchedule.defences.flagInvites else { return [] }
-        return prefs.workSchedule.conflicts(for: m).map(\.label)
+        return prefs.workSchedule.conflicts(for: m, overlapTolerance: prefs.clashOverlapTolerance).map(\.label)
     }
 
     /// Meetings the user chose not to be alerted for because of a clash.

@@ -223,19 +223,31 @@ public struct Clash: Equatable, Sendable {
 }
 
 public enum ClashDetector {
-    /// How much two meetings may overlap before it counts as a clash. Times from different
-    /// sources can disagree by seconds (an end stored as 13:00:00.4, or a start at 12:59:59 from
-    /// another feed), and a meeting that runs a minute into the next isn't worth an alert.
-    public static let overlapTolerance: TimeInterval = 60
+    /// How much two meetings may overlap before it counts as a clash, by default. Times from
+    /// different sources can disagree by seconds (an end stored as 13:00:00.4, or a start at
+    /// 12:59:59 from another feed), so back-to-back meetings need a little slack.
+    public static let defaultOverlapTolerance: TimeInterval = 30
 
-    /// Whether two time ranges overlap by more than `overlapTolerance`. Back-to-back meetings,
-    /// and ones that overlap by a minute or less, don't.
-    public static func overlaps(_ aStart: Date, _ aEnd: Date, _ bStart: Date, _ bEnd: Date) -> Bool {
-        min(aEnd, bEnd).timeIntervalSince(max(aStart, bStart)) > overlapTolerance
+    /// The tolerances offered in Settings, from 1 second to 5 minutes.
+    public static let overlapToleranceOptions: [TimeInterval] = [1, 5, 10, 15, 30, 60, 120, 180, 300]
+
+    /// "1 second", "30 seconds", "1 minute", "5 minutes"…
+    public static func toleranceLabel(_ seconds: TimeInterval) -> String {
+        let s = Int(seconds.rounded())
+        if s >= 60, s % 60 == 0 { return s == 60 ? "1 minute" : "\(s / 60) minutes" }
+        return s == 1 ? "1 second" : "\(s) seconds"
     }
 
-    /// Clusters timed meetings that overlap by more than `overlapTolerance` (back-to-back doesn't count).
-    public static func clashes(in meetings: [Meeting], after now: Date) -> [Clash] {
+    /// Whether two time ranges overlap by more than `tolerance`. Back-to-back meetings, and ones
+    /// that overlap by the tolerance or less, don't.
+    public static func overlaps(_ aStart: Date, _ aEnd: Date, _ bStart: Date, _ bEnd: Date,
+                                tolerance: TimeInterval = defaultOverlapTolerance) -> Bool {
+        min(aEnd, bEnd).timeIntervalSince(max(aStart, bStart)) > tolerance
+    }
+
+    /// Clusters timed meetings that overlap by more than `tolerance` (back-to-back doesn't count).
+    public static func clashes(in meetings: [Meeting], after now: Date,
+                               tolerance: TimeInterval = defaultOverlapTolerance) -> [Clash] {
         let timed = meetings
             .filter { !$0.isAllDay && !$0.isCanceled && $0.participation != .declined && $0.availability != .free && $0.end > now }
             .sorted { $0.start < $1.start }
@@ -245,7 +257,7 @@ public enum ClashDetector {
         for m in timed {
             // Sorted by start, so m's overlap with the cluster so far runs from m.start to the
             // earlier of the two ends; it clashes only past the tolerance.
-            if !cluster.isEmpty && min(m.end, clusterEnd).timeIntervalSince(m.start) > overlapTolerance {
+            if !cluster.isEmpty && min(m.end, clusterEnd).timeIntervalSince(m.start) > tolerance {
                 if !cluster.contains(where: { MeetingDeduplicator.isSameMeeting($0, m) }) { cluster.append(m) }
                 clusterEnd = max(clusterEnd, m.end)
             } else {

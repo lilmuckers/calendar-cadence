@@ -135,13 +135,15 @@ public struct WorkSchedule: Codable, Equatable, Hashable, Sendable {
         calendar.date(byAdding: .minute, value: minutes, to: midnight) ?? midnight.addingTimeInterval(Double(minutes) * 60)
     }
 
-    /// How a meeting sits against the schedule: on a break, outside hours, on a day off.
-    public func conflicts(for meeting: Meeting, calendar: Calendar = .current) -> [WorkConflict] {
+    /// How a meeting sits against the schedule: on a break, outside hours, on a day off. A meeting
+    /// only counts as on a break when it overlaps it by more than `overlapTolerance`.
+    public func conflicts(for meeting: Meeting, calendar: Calendar = .current,
+                          overlapTolerance: TimeInterval = ClashDetector.defaultOverlapTolerance) -> [WorkConflict] {
         guard enabled, !meeting.isAllDay else { return [] }
         guard let hours = hours(on: meeting.start, calendar: calendar) else { return [.dayOff] }
         var out: [WorkConflict] = []
         for (b, span) in breaks(on: meeting.start, calendar: calendar)
-        where ClashDetector.overlaps(meeting.start, meeting.end, span.start, span.end) {
+        where ClashDetector.overlaps(meeting.start, meeting.end, span.start, span.end, tolerance: overlapTolerance) {
             out.append(.onBreak(b.name))
         }
         if meeting.start < hours.start || meeting.end > hours.end { out.append(.outsideHours) }

@@ -407,8 +407,14 @@ private struct AlertsTab: View {
                         }
                     }
                 }
+                Picker("Allow an overlap of", selection: $state.prefs.clashOverlapTolerance) {
+                    ForEach(clashToleranceChoices, id: \.self) { Text(ClashDetector.toleranceLabel($0)).tag($0) }
+                }
             } header: {
                 Text("Clashes")
+            } footer: {
+                Text("Meetings that overlap by this much or less, like back-to-back meetings whose times differ by a few seconds, aren't a clash.")
+                    .foregroundStyle(.secondary)
             }
             Section {
                 Toggle("Morning summary", isOn: $state.prefs.summaryEnabled)
@@ -452,6 +458,13 @@ private struct AlertsTab: View {
     }
 
     @State private var status = "Checking…"
+
+    /// The preset tolerances, plus the saved one if it was set to something else in the settings file.
+    private var clashToleranceChoices: [TimeInterval] {
+        let options = ClashDetector.overlapToleranceOptions
+        let current = state.prefs.clashOverlapTolerance
+        return options.contains(current) ? options : (options + [current]).sorted()
+    }
 
     private var summaryTime: Binding<Date> {
         Binding(

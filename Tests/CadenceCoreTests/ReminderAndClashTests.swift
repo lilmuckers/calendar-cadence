@@ -62,7 +62,7 @@ struct ClashTests {
         #expect(ClashDetector.clashes(in: [m("a", at: 0), m("b", at: 30), m("c", at: 60)], after: t0).isEmpty)
     }
 
-    @Test(arguments: [0.001, 0.4, 0.999, 1, 5, 29, 59, 60])
+    @Test(arguments: [0.001, 0.4, 0.999, 1, 5, 29, 30])
     func backToBackWithStraySecondsIsNotAClash(drift: Double) {
         let cal = CalendarInfo(id: "c", title: "Work", sourceTitle: "s", color: .gray)
         let thirteen = t0.addingTimeInterval(60 * 60)
@@ -76,23 +76,40 @@ struct ClashTests {
         #expect(ClashDetector.clashes(in: [d, c], after: t0).isEmpty)
     }
 
-    @Test func overlapUpToAMinuteIsNotAClash() {
-        // Running exactly a minute into the next meeting, either way round.
-        #expect(ClashDetector.clashes(in: [m("a", at: 0, for: 61), m("b", at: 60, for: 60)], after: t0).isEmpty)
-        #expect(ClashDetector.clashes(in: [m("a", at: 0, for: 60), m("b", at: 59, for: 60)], after: t0).isEmpty)
-    }
-
-    @Test func overlapPastAMinuteIsAClash() {
-        let c = ClashDetector.clashes(in: [m("a", at: 0, for: 62), m("b", at: 60, for: 60)], after: t0)
+    @Test func overlapPastTheDefaultToleranceIsAClash() {
+        let cal = CalendarInfo(id: "c", title: "Work", sourceTitle: "s", color: .gray)
+        func pair(overlap: TimeInterval) -> [Meeting] {
+            [Meeting(id: "a", title: "a", start: t0, end: t0.addingTimeInterval(3600 + overlap), calendar: cal),
+             Meeting(id: "b", title: "b", start: t0.addingTimeInterval(3600), end: t0.addingTimeInterval(7200), calendar: cal)]
+        }
+        #expect(ClashDetector.defaultOverlapTolerance == 30)
+        #expect(ClashDetector.clashes(in: pair(overlap: 30), after: t0).isEmpty)
+        let c = ClashDetector.clashes(in: pair(overlap: 31), after: t0)
         #expect(c.count == 1)
         #expect(c.first?.meetings.map(\.id) == ["a", "b"])
         // And when the second starts early instead.
-        #expect(ClashDetector.clashes(in: [m("a", at: 0, for: 60), m("b", at: 58, for: 60)], after: t0).count == 1)
-        // One second past the tolerance is enough.
+        #expect(ClashDetector.clashes(in: [m("a", at: 0, for: 60), m("b", at: 59, for: 60)], after: t0).count == 1)
+    }
+
+    @Test(arguments: ClashDetector.overlapToleranceOptions)
+    func toleranceIsTheMostOverlapAllowed(tolerance: TimeInterval) {
         let cal = CalendarInfo(id: "c", title: "Work", sourceTitle: "s", color: .gray)
-        let x = Meeting(id: "x", title: "x", start: t0, end: t0.addingTimeInterval(3661), calendar: cal)
-        let y = Meeting(id: "y", title: "y", start: t0.addingTimeInterval(3600), end: t0.addingTimeInterval(7200), calendar: cal)
-        #expect(ClashDetector.clashes(in: [x, y], after: t0).count == 1)
+        func pair(overlap: TimeInterval) -> [Meeting] {
+            [Meeting(id: "a", title: "a", start: t0, end: t0.addingTimeInterval(3600 + overlap), calendar: cal),
+             Meeting(id: "b", title: "b", start: t0.addingTimeInterval(3600), end: t0.addingTimeInterval(7200), calendar: cal)]
+        }
+        #expect(ClashDetector.clashes(in: pair(overlap: tolerance), after: t0, tolerance: tolerance).isEmpty)
+        #expect(ClashDetector.clashes(in: pair(overlap: tolerance + 1), after: t0, tolerance: tolerance).count == 1)
+    }
+
+    @Test func toleranceOptionsAndLabels() {
+        #expect(ClashDetector.overlapToleranceOptions.first == 1)
+        #expect(ClashDetector.overlapToleranceOptions.last == 300)
+        #expect(ClashDetector.overlapToleranceOptions.contains(ClashDetector.defaultOverlapTolerance))
+        #expect(ClashDetector.toleranceLabel(1) == "1 second")
+        #expect(ClashDetector.toleranceLabel(30) == "30 seconds")
+        #expect(ClashDetector.toleranceLabel(60) == "1 minute")
+        #expect(ClashDetector.toleranceLabel(300) == "5 minutes")
     }
 
     @Test func containedMeetingIsAClash() {
@@ -108,8 +125,9 @@ struct ClashTests {
         func at(_ minutes: Double) -> Date { t0.addingTimeInterval(minutes * 60) }
         #expect(!ClashDetector.overlaps(at(0), at(60), at(60), at(120)))
         #expect(!ClashDetector.overlaps(at(60), at(120), at(0), at(60)))
-        #expect(!ClashDetector.overlaps(at(0), at(60), at(59), at(120)))
-        #expect(ClashDetector.overlaps(at(0), at(60), at(58), at(120)))
+        #expect(ClashDetector.overlaps(at(0), at(60), at(59), at(120)))
+        #expect(!ClashDetector.overlaps(at(0), at(60), at(59), at(120), tolerance: 60))
+        #expect(ClashDetector.overlaps(at(0), at(60), at(58), at(120), tolerance: 60))
         #expect(ClashDetector.overlaps(at(0), at(60), at(10), at(20)))
         #expect(ClashDetector.overlaps(at(10), at(20), at(0), at(60)))
     }
