@@ -309,7 +309,7 @@ final class PhoneState {
         // -previewHome: past the welcome with nothing connected (the empty home screen).
         if ProcessInfo.processInfo.arguments.contains("-previewHome") { prefs.welcomeSeen = true; setSample(false) }
         #endif
-        Task { await refreshRemote() }
+        initialFetch = Task { await refreshRemote() }
 
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
@@ -338,6 +338,7 @@ final class PhoneState {
             spotify.suspend()
             link.stop()
             scheduleBackgroundWork()
+            scheduleCalendarRefresh()
             // Last chance to start a Live Activity until the app is opened again.
             updateLiveActivity(leaving: true)
         }
@@ -1096,11 +1097,37 @@ final class PhoneState {
 
     @ObservationIgnored private var scheduledMissedCheck: Date?
 
-    /// Woken in the background (see `scheduleMissedCheck`).
-    func backgroundRefresh() {
-        refresh()
+    static let calendarRefreshTask = "cadence.calendars.refresh"
+
+    /// How long after one background calendar fetch to ask for the next (iOS picks the actual time).
+    static let calendarRefreshInterval: TimeInterval = 30 * 60
+
+    /// Google, Microsoft and feed calendars are only fetched while the app runs, so a meeting booked
+    /// or moved after it was last open (often the first one of the next morning) never reached the
+    /// Home and Lock Screen widgets, which can only show the schedule the app saved. Ask iOS to wake
+    /// the app now and then to fetch them and save a fresh schedule.
+    private func scheduleCalendarRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: Self.calendarRefreshTask)
+        request.earliestBeginDate = Date().addingTimeInterval(Self.calendarRefreshInterval)
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    /// Woken in the background (see `scheduleMissedCheck` and `scheduleCalendarRefresh`): fetch the
+    /// calendars, then bring the widgets, notifications and Live Activity up to date.
+    func backgroundRefresh() async {
+        scheduleCalendarRefresh() // the next one first, in case iOS cuts this one short
+        if started {
+            await refreshRemote()
+        } else {
+            // Launched straight into the background: set the accounts up first (that starts a fetch),
+            // so the widgets don't get a schedule saved before the meetings have loaded.
+            start()
+            await initialFetch?.value
+        }
         updateLiveActivity()
     }
+
+    @ObservationIgnored private var initialFetch: Task<Void, Never>?
 
     /// iOS ends Live Activities after 8 hours; don't start one so early it would expire first.
     private static let earlyStartLimit: TimeInterval = 7 * 3600

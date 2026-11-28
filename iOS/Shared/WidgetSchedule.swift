@@ -121,24 +121,33 @@ struct WidgetSchedule: Codable, Equatable {
     }
 
     /// When the widget has to redraw: now, every meeting start and end (the next or live one changes), the icon's
-    /// mood switches, the evening switch to tomorrow's first meeting, and the next midnight (a new
+    /// mood switches, the evening switch to tomorrow's first meeting, and each midnight (a new
     /// day's "next"). The countdown itself is a system timer, so it ticks between entries on its own. Sorted, unique, none before `now`.
+    ///
+    /// Covers today and tomorrow, as much as the app saves, not just up to midnight: iOS rations widget
+    /// reloads and often holds them back overnight, so a timeline built in the evening has to carry the
+    /// widget through tomorrow morning on its own (its first meeting starting, going live, handing over
+    /// to the next) instead of sitting on the midnight entry until a reload is let through.
     func entryDates(from now: Date, calendar: Calendar = .current) -> [Date] {
-        let midnight = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now.addingTimeInterval(86_400)
-        var dates: Set<Date> = [now, midnight]
-        if let from = tomorrowStart(on: now, calendar: calendar), from > now { dates.insert(from) }
+        let today = calendar.startOfDay(for: now)
+        let midnight = calendar.date(byAdding: .day, value: 1, to: today) ?? now.addingTimeInterval(86_400)
+        let horizon = calendar.date(byAdding: .day, value: 2, to: today) ?? midnight.addingTimeInterval(86_400)
+        var dates: Set<Date> = [now, midnight, horizon]
+        for day in [now, midnight] {
+            if let from = tomorrowStart(on: day, calendar: calendar), from > now { dates.insert(from) }
+        }
         for seg in segments ?? [] {
-            for d in [seg.start, seg.end] where d > now && d <= midnight { dates.insert(d) }
+            for d in [seg.start, seg.end] where d > now && d <= horizon { dates.insert(d) }
         }
         // With moments to show, also redraw when a meeting takes over from one and hands back.
         for m in meetings where !(segments ?? []).isEmpty {
-            for d in [m.start.addingTimeInterval(-Self.momentYield), m.end] where d > now && d <= midnight { dates.insert(d) }
+            for d in [m.start.addingTimeInterval(-Self.momentYield), m.end] where d > now && d <= horizon { dates.insert(d) }
         }
         // A meeting in progress shows until it ends or the next one is close.
         for m in meetings {
-            for d in [m.end, m.start.addingTimeInterval(-Self.liveYield)] where d > now && d <= midnight { dates.insert(d) }
+            for d in [m.end, m.start.addingTimeInterval(-Self.liveYield)] where d > now && d <= horizon { dates.insert(d) }
         }
-        for m in meetings where m.start > now && m.start <= midnight {
+        for m in meetings where m.start > now && m.start <= horizon {
             dates.insert(m.start)
             for lead in [Self.nervousLead, Self.panicLead] {
                 let at = m.start.addingTimeInterval(-lead)
