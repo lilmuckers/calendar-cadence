@@ -754,7 +754,8 @@ final class PhoneState {
             // No app to open: carry on with whatever was playing last.
             if nowPlaying.hasTrack { nowPlaying.resumeMusic() } else if spotify.connected { spotify.play() }
         } else if prefs.mediaApp == .spotify && spotify.isAvailable {
-            if spotify.connected { spotify.play() } else { spotify.authorize() }
+            // Reuses the saved session; only approves in Spotify when there isn't one or it fails.
+            spotify.reconnect(thenPlay: true)
         } else {
             openMediaApp()
         }

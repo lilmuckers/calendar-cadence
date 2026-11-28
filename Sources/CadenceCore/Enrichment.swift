@@ -102,6 +102,15 @@ public struct EnrichmentLink: Codable, Equatable, Identifiable, Sendable {
         self.id = id; self.title = title; self.url = url; self.note = note
     }
     public var host: String { url.scheme == "mailto" ? "Email" : (url.host ?? url.absoluteString).replacingOccurrences(of: "www.", with: "") }
+
+    /// The name to show for the link: a fetched page title (e.g. OpenGraph) when there is one,
+    /// then the title it was given, and only then the domain.
+    public func displayTitle(previewTitle: String? = nil) -> String {
+        for candidate in [previewTitle, title] {
+            if let t = candidate?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty { return t }
+        }
+        return host
+    }
 }
 
 /// Where an assistant got (part of) an enrichment from: a document, page, email thread, its own knowledge…
@@ -521,7 +530,9 @@ public enum EnrichmentParser {
                       let url = URL(string: raw), let scheme = url.scheme?.lowercased(), allowedSchemes.contains(scheme) else {
                     throw MCPToolError("Each link needs a url starting with http://, https:// or mailto:.")
                 }
-                let title = text(v["title"]) ?? url.host ?? raw
+                // Assistants name links as they name sources ("name"), or call it a label; accept those too
+                // rather than dropping the name and showing just the domain.
+                let title = text(v["title"]) ?? text(v["name"]) ?? text(v["label"]) ?? text(v["text"]) ?? url.host ?? raw
                 return EnrichmentLink(id: ids.next(v["id"], url.absoluteString), title: title, url: url, note: text(v["note"]))
             })
         case .checklist:

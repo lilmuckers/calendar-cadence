@@ -46,6 +46,30 @@ struct EnrichmentTests {
         }
     }
 
+    @Test func linksKeepTheirGivenName() throws {
+        let content = try EnrichmentParser.parse(kind: "links", ["items": [
+            ["title": "Q3 plan", "url": "https://docs.google.com/document/d/abc/edit"],
+            ["name": "Launch doc", "url": "https://docs.google.com/document/d/def/edit"],
+            ["label": "Tracker", "url": "https://linear.app/x"],
+            ["title": "  ", "url": "https://www.example.com/page"],
+            "https://example.org/bare",
+        ]], seed: "")
+        guard case .links(let links) = content else { Issue.record("not links"); return }
+        #expect(links.map { $0.displayTitle() } == ["Q3 plan", "Launch doc", "Tracker", "www.example.com", "example.org"])
+        // The name survives storage / the phone link.
+        let decoded = try JSONDecoder().decode(EnrichmentContent.self, from: JSONEncoder().encode(content))
+        #expect(decoded == content)
+    }
+
+    @Test func linkTitleFallsBackFromPreviewToGivenNameToDomain() {
+        let doc = EnrichmentLink(id: "1", title: "Q3 plan", url: URL(string: "https://www.docs.google.com/d/abc")!)
+        #expect(doc.displayTitle(previewTitle: "Q3 plan — Google Docs") == "Q3 plan — Google Docs")
+        #expect(doc.displayTitle(previewTitle: nil) == "Q3 plan")
+        #expect(doc.displayTitle(previewTitle: " ") == "Q3 plan")
+        let untitled = EnrichmentLink(id: "2", title: "", url: URL(string: "https://www.docs.google.com/d/abc")!)
+        #expect(untitled.displayTitle() == "docs.google.com")
+    }
+
     @Test func peopleTakeHTTPSPhotosOnly() throws {
         let content = try EnrichmentParser.parse(kind: "people", ["items": [
             ["name": "Ada Lovelace", "photo_url": "https://example.com/ada.jpg"],

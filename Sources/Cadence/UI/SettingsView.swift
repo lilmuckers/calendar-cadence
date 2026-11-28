@@ -392,7 +392,7 @@ private struct AlertsTab: View {
             } header: {
                 Text("In-person meetings")
             } footer: {
-                Text("Uses live travel time and re-checks traffic every 15 minutes. Offsets are minutes before you need to leave; 0 means \"time to leave\". Travel time is also what the agenda's \"leave in…\" hint uses.")
+                Text("Reminders count back from when you need to leave, using live travel time that's re-checked for traffic every 15 minutes. Travel time is also what the agenda's \"leave in…\" hint uses.")
                     .foregroundStyle(.secondary)
             }
             Section {
@@ -407,8 +407,14 @@ private struct AlertsTab: View {
                         }
                     }
                 }
+                Picker("Allow an overlap of", selection: $state.prefs.clashOverlapTolerance) {
+                    ForEach(clashToleranceChoices, id: \.self) { Text(ClashDetector.toleranceLabel($0)).tag($0) }
+                }
             } header: {
                 Text("Clashes")
+            } footer: {
+                Text("Meetings that overlap by this much or less, like back-to-back meetings whose times differ by a few seconds, aren't a clash.")
+                    .foregroundStyle(.secondary)
             }
             Section {
                 Toggle("Morning summary", isOn: $state.prefs.summaryEnabled)
@@ -452,6 +458,13 @@ private struct AlertsTab: View {
     }
 
     @State private var status = "Checking…"
+
+    /// The preset tolerances, plus the saved one if it was set to something else in the settings file.
+    private var clashToleranceChoices: [TimeInterval] {
+        let options = ClashDetector.overlapToleranceOptions
+        let current = state.prefs.clashOverlapTolerance
+        return options.contains(current) ? options : (options + [current]).sorted()
+    }
 
     private var summaryTime: Binding<Date> {
         Binding(
@@ -595,19 +608,46 @@ private struct GeneralTab: View {
     }
 }
 
-/// Comma-separated minute offsets, e.g. "15, 5, 0".
+/// "Leave now" reminder times as readable rows ("10 minutes before leaving", "When it's time to
+/// leave"), each removable, plus a menu of preset times to add. Stored as minute offsets, e.g. `[10, 0]`.
 private struct OffsetsField: View {
     @Binding var offsets: [Int]
-    @State private var text = ""
 
     var body: some View {
-        TextField("Remind me", text: $text, prompt: Text("10, 0"))
-            .onAppear { text = offsets.map(String.init).joined(separator: ", ") }
-            .onChange(of: text) {
-                let parsed = text.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
-                    .filter { (0...240).contains($0) }
-                offsets = Array(Set(parsed)).sorted(by: >)
+        let current = LeaveOffsets.normalized(offsets)
+        let addable = LeaveOffsets.available(excluding: current)
+        LabeledContent("Remind me") {
+            Menu {
+                ForEach(addable, id: \.self) { minutes in
+                    Button(LeaveOffsets.label(minutes)) {
+                        offsets = LeaveOffsets.normalized(current + [minutes])
+                    }
+                }
+            } label: {
+                Label("Add", systemImage: "plus")
             }
+            .fixedSize()
+            .disabled(addable.isEmpty)
+            .help("Add another reminder time")
+        }
+        if current.isEmpty {
+            Text("No reminders. Add a time to be told when to leave.")
+                .foregroundStyle(.secondary)
+        }
+        ForEach(current, id: \.self) { minutes in
+            HStack {
+                Label(LeaveOffsets.label(minutes), systemImage: minutes == 0 ? "figure.walk" : "bell")
+                Spacer()
+                Button {
+                    offsets = current.filter { $0 != minutes }
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("Remove this reminder")
+            }
+        }
     }
 }
 

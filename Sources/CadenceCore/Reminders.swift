@@ -1,5 +1,37 @@
 import Foundation
 
+/// The "Leave now" reminder times shown in Settings. Stored as minutes before you need to leave
+/// (`Preferences.leaveOffsets`, e.g. `[10, 0]`); 0 is the "time to leave" reminder itself.
+public enum LeaveOffsets {
+    /// Times offered when adding a reminder.
+    public static let presets = [0, 5, 10, 15, 20, 30, 45, 60, 90, 120]
+    /// Offsets accepted (the same range the old free-text field allowed).
+    public static let range = 0...240
+
+    /// "When it's time to leave", "5 minutes before leaving", "1 hour before leaving", "1 hr 30 min before leaving".
+    public static func label(_ minutes: Int) -> String {
+        if minutes <= 0 { return "When it's time to leave" }
+        let h = minutes / 60, m = minutes % 60
+        let amount: String
+        switch (h, m) {
+        case (0, _): amount = m == 1 ? "1 minute" : "\(m) minutes"
+        case (_, 0): amount = h == 1 ? "1 hour" : "\(h) hours"
+        default: amount = "\(h) hr \(m) min"
+        }
+        return "\(amount) before leaving"
+    }
+
+    /// De-duplicated, in range, earliest reminder first (largest offset first): the order they fire.
+    public static func normalized(_ offsets: [Int]) -> [Int] {
+        Set(offsets.filter { range.contains($0) }).sorted(by: >)
+    }
+
+    /// Presets not already chosen.
+    public static func available(excluding chosen: [Int]) -> [Int] {
+        presets.filter { !chosen.contains($0) }
+    }
+}
+
 /// A one-off reminder (heads-up, leave-now) tied to a meeting.
 public struct Reminder: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
@@ -223,8 +255,31 @@ public struct Clash: Equatable, Sendable {
 }
 
 public enum ClashDetector {
-    /// Clusters timed meetings whose times overlap (back-to-back doesn't count).
-    public static func clashes(in meetings: [Meeting], after now: Date) -> [Clash] {
+    /// How much two meetings may overlap before it counts as a clash, by default. Times from
+    /// different sources can disagree by seconds (an end stored as 13:00:00.4, or a start at
+    /// 12:59:59 from another feed), so back-to-back meetings need a little slack.
+    public static let defaultOverlapTolerance: TimeInterval = 30
+
+    /// The tolerances offered in Settings, from 1 second to 5 minutes.
+    public static let overlapToleranceOptions: [TimeInterval] = [1, 5, 10, 15, 30, 60, 120, 180, 300]
+
+    /// "1 second", "30 seconds", "1 minute", "5 minutes"…
+    public static func toleranceLabel(_ seconds: TimeInterval) -> String {
+        let s = Int(seconds.rounded())
+        if s >= 60, s % 60 == 0 { return s == 60 ? "1 minute" : "\(s / 60) minutes" }
+        return s == 1 ? "1 second" : "\(s) seconds"
+    }
+
+    /// Whether two time ranges overlap by more than `tolerance`. Back-to-back meetings, and ones
+    /// that overlap by the tolerance or less, don't.
+    public static func overlaps(_ aStart: Date, _ aEnd: Date, _ bStart: Date, _ bEnd: Date,
+                                tolerance: TimeInterval = defaultOverlapTolerance) -> Bool {
+        min(aEnd, bEnd).timeIntervalSince(max(aStart, bStart)) > tolerance
+    }
+
+    /// Clusters timed meetings that overlap by more than `tolerance` (back-to-back doesn't count).
+    public static func clashes(in meetings: [Meeting], after now: Date,
+                               tolerance: TimeInterval = defaultOverlapTolerance) -> [Clash] {
         let timed = meetings
             .filter { !$0.isAllDay && !$0.isCanceled && $0.participation != .declined && $0.availability != .free && $0.end > now }
             .sorted { $0.start < $1.start }
@@ -232,7 +287,9 @@ public enum ClashDetector {
         var cluster: [Meeting] = []
         var clusterEnd = Date.distantPast
         for m in timed {
-            if !cluster.isEmpty && m.start < clusterEnd {
+            // Sorted by start, so m's overlap with the cluster so far runs from m.start to the
+            // earlier of the two ends; it clashes only past the tolerance.
+            if !cluster.isEmpty && min(m.end, clusterEnd).timeIntervalSince(m.start) > tolerance {
                 if !cluster.contains(where: { MeetingDeduplicator.isSameMeeting($0, m) }) { cluster.append(m) }
                 clusterEnd = max(clusterEnd, m.end)
             } else {
