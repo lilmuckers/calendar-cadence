@@ -1,5 +1,35 @@
 [
  {
+  "tag": "v0.5.6",
+  "name": "Cadence 0.5.6",
+  "url": "https://github.com/lilmuckers/calendar-cadence/releases/tag/v0.5.6",
+  "date": "2026-11-28T09:41:51Z",
+  "pre": false,
+  "body": "## Cadence 0.5.6\n\n_Released 2026-11-28 · patch release_\n\n> [!NOTE]\n> Signed with a Developer ID and notarized by Apple.\n\n## What's Changed\n\n### 🖥️ Mac app\n#### 🐛 Fixes and improvements\n* Show \"Leave now\" reminder times as readable rows by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/116\n* Show enrichment links by their given name, not just the domain by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/118\n* Don't flag back-to-back meetings as clashes by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/119\n\n### 📱 iPhone app\n#### 🐛 Fixes and improvements\n* Keep Join and the media corner on screen in landscape desk mode by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/115\n* Show enrichment links by their given name, not just the domain by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/118\n* Don't flag back-to-back meetings as clashes by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/119\n\n### ⚙️ Build and release\n#### 🐛 Fixes and improvements\n* Release workflow: test-build a PR on main without merging it by @lilmuckers in https://github.com/lilmuckers/calendar-cadence/pull/123\n\n**Full Changelog**: https://github.com/lilmuckers/calendar-cadence/compare/v0.5.5...v0.5.6\n\n## 📥 Install\n\n1. Download **Cadence-0.5.6.dmg** below.\n2. Open it and drag **Cadence** into **Applications**.\n3. Launch Cadence from Applications and allow calendar access when asked.\n\nRequires macOS 14 or later on Apple Silicon.\n\n<details>\n<summary>Downloads and checksums</summary>\n\n| File | What it is |\n|---|---|\n| `Cadence-0.5.6.dmg` | Disk image, drag to Applications |\n| `Cadence-0.5.6.zip` | The same app, zipped (for scripted installs) |\n| `SHA256SUMS.txt` | Checksums for both |\n\n```text\n5b4ae1b54ad905345c1119a772132eb4b5cf33c9a4ec345823ead9353a3e50dc  Cadence-0.5.6.dmg\ncc8430eaee68daa7abec9adc4015a0447451fc5138807825b6651dc1592f8812  Cadence-0.5.6.zip\n```\n\nCheck a download with `shasum -a 256 -c SHA256SUMS.txt`.\n</details>\n",
+  "assets": [
+   {
+    "name": "Cadence-0.5.6.dmg",
+    "size": 6575548,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.5.6/Cadence-0.5.6.dmg"
+   },
+   {
+    "name": "Cadence-0.5.6.zip",
+    "size": 4555506,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.5.6/Cadence-0.5.6.zip"
+   },
+   {
+    "name": "Cadence.dmg",
+    "size": 6575548,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.5.6/Cadence.dmg"
+   },
+   {
+    "name": "SHA256SUMS.txt",
+    "size": 168,
+    "url": "https://github.com/lilmuckers/calendar-cadence/releases/download/v0.5.6/SHA256SUMS.txt"
+   }
+  ]
+ },
+ {
   "tag": "v0.5.4",
   "name": "Cadence 0.5.4",
   "url": "https://github.com/lilmuckers/calendar-cadence/releases/tag/v0.5.4",
