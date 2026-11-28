@@ -5,7 +5,13 @@
 #   PRs with none of those labels count as patch (and are listed as a warning).
 #   With no release tag yet, the first release uses CFBundleShortVersionString from Support/Info.plist.
 #
-# Usage: [INCLUDE_PR=<n>] scripts/next-version.sh [auto|major|minor|patch]   (default auto: decide from labels)
+# Usage: scripts/next-version.sh [auto|major|minor|patch]   (default auto: decide from labels)
+#
+# PR test builds (the Release workflow's "pr" input) set INCLUDE_PR=<n> and BUILD_NUMBER. Then:
+#   - the previous release is the last full one: the newest published release that isn't a draft or
+#     pre-release and whose tag is on main (draft releases and test builds don't count);
+#   - PR <n> (not merged) counts towards the bump;
+#   - the tag is v<version>-pr.<n>.<build>, so a test build never takes the tag the real release will.
 # Needs: git history with tags (fetch-depth: 0), gh authenticated (GH_TOKEN in CI).
 # Prints key=value lines (version, tag, previous_tag, bump, prs) and appends them to $GITHUB_OUTPUT when set.
 set -euo pipefail
@@ -18,7 +24,19 @@ case "$OVERRIDE" in auto|major|minor|patch) ;; *)
   echo "Unknown bump '$OVERRIDE' (expected auto, major, minor or patch)" >&2; exit 1 ;;
 esac
 
-PREV_TAG="$(git -C "$ROOT" tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)"
+release_tags() { git -C "$ROOT" tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; }
+if [[ -n "${INCLUDE_PR:-}" ]]; then
+  FULL_RELEASES="$(gh release list --limit 200 --json tagName,isDraft,isPrerelease \
+    --jq '.[] | select((.isDraft or .isPrerelease) | not) | .tagName')"
+  PREV_TAG=""
+  for t in $(release_tags); do
+    grep -qxF "$t" <<<"$FULL_RELEASES" || continue
+    git -C "$ROOT" merge-base --is-ancestor "$t^{commit}" "origin/$BASE_BRANCH" || continue
+    PREV_TAG="$t"; break
+  done
+else
+  PREV_TAG="$(release_tags | head -n1)"
+fi
 
 # Merged PRs since the previous tag, with their labels.
 SEARCH="is:merged base:$BASE_BRANCH"
@@ -28,8 +46,7 @@ if [[ -n "$PREV_TAG" ]]; then
 fi
 PRS_JSON="$(gh pr list --state merged --base "$BASE_BRANCH" --search "$SEARCH" --limit 1000 \
   --json number,title,labels)"
-# INCLUDE_PR=<n>: count that PR too. The release workflow sets it when releasing a PR it just merged, since
-# GitHub's search can take a while to list a fresh merge (and a dry run doesn't merge it at all).
+# A PR test build counts the (unmerged) PR too.
 if [[ -n "${INCLUDE_PR:-}" ]]; then
   EXTRA="$(gh pr view "$INCLUDE_PR" --json number,title,labels)"
   PRS_JSON="$(jq --argjson pr "$EXTRA" 'map(select(.number != $pr.number)) + [$pr]' <<<"$PRS_JSON")"
@@ -69,12 +86,14 @@ else
 fi
 
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Computed version '$VERSION' is not semver" >&2; exit 1; }
-if git -C "$ROOT" rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
-  echo "::error::Tag v$VERSION already exists" >&2; exit 1
+TAG="v$VERSION"
+[[ -n "${INCLUDE_PR:-}" ]] && TAG="v$VERSION-pr.$INCLUDE_PR.${BUILD_NUMBER:?BUILD_NUMBER is needed with INCLUDE_PR}"
+if git -C "$ROOT" rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+  echo "::error::Tag $TAG already exists" >&2; exit 1
 fi
 
 OUT="version=$VERSION
-tag=v$VERSION
+tag=$TAG
 previous_tag=$PREV_TAG
 bump=$BUMP
 prs=$PR_COUNT"
