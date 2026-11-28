@@ -346,6 +346,7 @@ jobs:
       contents: read
       pull-requests: read   # scripts/changelog.py lists the merged PRs
     env:
+      # Plain X.Y.Z, also for PR test builds: TestFlight gets the semver, never the v…-pr.<n>.<build> tag.
       VERSION: ${{ needs.version.outputs.version }}
       BUILD_NUMBER: ${{ github.run_number }}${{ github.run_attempt }}
       HAS_IOS_SIGNING: ${{ secrets.IOS_DISTRIBUTION_P12 != '' && secrets.IOS_APP_PROFILE != '' && secrets.IOS_WIDGET_PROFILE != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.ASC_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' && vars.IOS_BUNDLE_ID != '' }}
